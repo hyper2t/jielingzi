@@ -68,7 +68,7 @@
 
 > **进度（2026-10-01，首批）**：BE-M2-01（词库 + msgSecCheck，档案已接入）、BE-M2-03（举报 / 自动折叠 / 队列 / 处理）、BE-M2-04（站内通知）、BE-M2-05（`scripts/ops/set-role.mjs`）、
 > FE-M2-01（`ReportSheet`）、FE-M2-02（`pkg-admin/pages/queue`，入口仅 mod / admin）、FE-M2-03（首次发布前阅读公约）、QA-M2-01（样本集 37 + 20，命中率 100%、误杀 0）已完成，用例见 `docs/test/cases/M2.md`，契约见 `docs/api/moderation.md`。
-> 2026-10-01 已部署（含小程序凭证与手机号哈希密钥）、建好 19 个索引、设置第一个管理员。BE-M2-02 图片异步机审 + 自定义头像上传（小程序 / H5）代码完成（`_shared/media.js`、`cloudfunctions/mediacheck`、`community.setAvatar`、`moderation.mediaQueue / decideMedia`）。待办：部署 + 微信侧配置消息推送（wxa_media_check → mediacheck）+ 云存储读权限；App 端存储上传；三端真机执行。
+> 2026-10-01 已部署（含小程序凭证与手机号哈希密钥）、建好 19 个索引、设置第一个管理员。BE-M2-02 图片异步机审 + 自定义头像上传（小程序 / H5）代码完成（`_shared/media.js`、`cloudfunctions/mediacheck`、`community.setAvatar`、`moderation.mediaQueue / decideMedia`）。2026-10-01 已上线（规则、media 集合与索引、4 个函数，客户端调 mediacheck 实测被拒）。待办：微信侧配置消息推送（wxa_media_check → mediacheck）+ 云存储读权限「所有用户可读」；App 端存储上传；三端真机执行。
 
 | 编号 | 负责 | 任务 | 验收 |
 |---|---|---|---|

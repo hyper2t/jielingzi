@@ -78,7 +78,7 @@
     },
     {
       "name": "mediacheck",
-      "description": "图片异步机审回调（消息推送 wxa_media_check → 生效 / 下架，BE-M2-02）；客户端无权调用",
+      "description": "图片异步机审回调（微信消息推送），通过则生效、违规则删除，客户端无权调用（BE-M2-02）",
       "runtime": "Nodejs20.19",
       "handler": "index.main",
       "timeout": 10,
