@@ -1,0 +1,76 @@
+{
+  "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
+  "version": "2.0",
+  "envId": "{{env.TARO_APP_CLOUD_ENV_ID}}",
+  "functionRoot": "./cloudfunctions",
+  "functions": [
+    {
+      "name": "user",
+      "description": "login / consent / confirmAdult / updateSettings / whoami / wechatAppLogin / bindWechat / appleLogin / bindApple / linkPhoneSession / bindPhoneWeapp / deleteAccount",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules",
+        "node_modules/**/*"
+      ],
+      "envVariables": {
+        "WX_APP_ID": "{{env.WX_APP_ID}}",
+        "WX_APP_SECRET": "{{env.WX_APP_SECRET}}",
+        "TCB_CUSTOM_LOGIN_JSON": "{{env.CLOUDBASE_CUSTOM_LOGIN_JSON}}",
+        "TCB_CUSTOM_LOGIN_KEY_ID": "{{env.CLOUDBASE_CUSTOM_LOGIN_KEY_ID}}",
+        "APPLE_TEAM_ID": "{{env.APPLE_TEAM_ID}}",
+        "APPLE_KEY_ID": "{{env.APPLE_KEY_ID}}",
+        "APPLE_PRIVATE_KEY": "{{env.APPLE_PRIVATE_KEY}}",
+        "WX_MP_APP_ID": "{{env.WX_MP_APP_ID}}",
+        "WX_MP_APP_SECRET": "{{env.WX_MP_APP_SECRET}}",
+        "PHONE_HASH_SECRET": "{{env.PHONE_HASH_SECRET}}"
+      }
+    },
+    {
+      "name": "community",
+      "description": "ping / getProfile / updateProfile（M1）/ circles / invites / topics / replies（M3、M4）",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules",
+        "node_modules/**/*"
+      ]
+    },
+    {
+      "name": "moderation",
+      "description": "ping / report / queue / decide + 机审回调（M2）",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules",
+        "node_modules/**/*"
+      ],
+      "envVariables": {
+        "WX_MP_APP_ID": "{{env.WX_MP_APP_ID}}",
+        "WX_MP_APP_SECRET": "{{env.WX_MP_APP_SECRET}}"
+      }
+    },
+    {
+      "name": "practice",
+      "description": "ping / checkin / dailyPrompt（M5、M6）",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules",
+        "node_modules/**/*"
+      ]
+    }
+  ]
+}

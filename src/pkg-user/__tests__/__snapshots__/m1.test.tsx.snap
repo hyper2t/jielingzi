@@ -1,0 +1,106 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`练习档案（FE-M1-03） 档案卡快照：有档案 / 未完善 1`] = `
+<View
+  accessibilityLabel="林然，编辑档案"
+  accessibilityRole="button"
+  ariaLabel="林然，编辑档案"
+  ariaRole="button"
+  className="flex flex-row items-center mx-page mt-3 p-4 rounded-md bg-paper-light"
+  hoverClass="bg-paper-dark"
+  onClick={[Function]}
+>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="rounded-full w-14 h-14"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFill"
+    src="file-stub"
+  />
+  <View
+    className="flex flex-col flex-1 ml-3"
+  >
+    <Text
+      className="font-title font-bold text-subtitle text-ink"
+      numberOfLines={1}
+    >
+      林然
+    </Text>
+    <Text
+      className="font-body text-caption text-ink-soft mt-1"
+      numberOfLines={1}
+    >
+      正念 · 太极  练习 3 年
+    </Text>
+    <Text
+      className="font-body text-caption text-ink-faint mt-1"
+      numberOfLines={2}
+    >
+      “在呼吸里找回自己”
+    </Text>
+  </View>
+  <Text
+    className="font-body text-caption text-ink-soft ml-2"
+  >
+    编辑
+  </Text>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="w-4 h-4"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFit"
+    src="file-stub"
+  />
+</View>
+`;
+
+exports[`练习档案（FE-M1-03） 档案卡快照：有档案 / 未完善 2`] = `
+<View
+  accessibilityLabel="完善练习档案"
+  accessibilityRole="button"
+  ariaLabel="完善练习档案"
+  ariaRole="button"
+  className="flex flex-row items-center mx-page mt-3 p-4 rounded-md bg-paper-light"
+  hoverClass="bg-paper-dark"
+  onClick={[Function]}
+>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="rounded-full w-14 h-14"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFill"
+    src="file-stub"
+  />
+  <View
+    className="flex flex-col flex-1 ml-3"
+  >
+    <Text
+      className="font-title font-bold text-subtitle text-ink"
+      numberOfLines={1}
+    >
+      完善练习档案
+    </Text>
+    <Text
+      className="font-body text-caption text-ink-faint mt-1"
+    >
+      设置昵称与练习方式，让同好认识你
+    </Text>
+  </View>
+  <Text
+    className="font-body text-caption text-ink-soft ml-2"
+  >
+    编辑
+  </Text>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="w-4 h-4"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFit"
+    src="file-stub"
+  />
+</View>
+`;

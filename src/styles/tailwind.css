@@ -1,0 +1,4 @@
+/* Tailwind 入口（小程序 / H5）。RN 端会解析到同目录的 tailwind.rn.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

@@ -1,0 +1,16 @@
+{
+  "miniprogramRoot": "./dist",
+  "cloudfunctionRoot": "./cloudfunctions",
+  "projectname": "jielingzi",
+  "description": "一款国学启蒙故事有声书App",
+  "appid": "wx9cfbb8972ed135b9",
+  "setting": {
+    "urlCheck": true,
+    "es6": false,
+    "enhance": false,
+    "compileHotReLoad": false,
+    "postcss": false,
+    "minified": false
+  },
+  "compileType": "miniprogram"
+}

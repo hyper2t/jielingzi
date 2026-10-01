@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <!-- 结灵子标志：一笔连成的「结」（∞ 双环）+ 上方一粒「子」。色值 = tailwind brand（竹青 #578A6B） -->
+  <path d="M60 68 C 70 56, 84 50, 96 54 C 108 58, 108 76, 96 80 C 84 84, 70 78, 60 68 C 50 58, 36 52, 24 56 C 12 60, 12 78, 24 82 C 36 86, 50 80, 60 68 Z"
+        fill="none" stroke="#578A6B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="61" cy="42" r="5.5" fill="#578A6B"/>
+</svg>

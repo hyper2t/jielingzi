@@ -1,0 +1,51 @@
+/* 全局基础样式（preflight 已关闭，这里做最小重置）。色值与 tailwind.config.js 令牌一致。 */
+page,
+body {
+  background-color: #F7F8F2;
+  color: #2B2A28;
+  font-family: "LXGW WenKai", serif;
+  min-height: 100%;
+}
+
+/* 非 tabBar 页底部安全区 */
+.jl-safe-bottom {
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 加载转圈（Button loading）；RN 不引用 */
+@keyframes jl-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.jl-spin {
+  animation: jl-spin 1s linear infinite;
+}
+
+/* 骨架墨晕扫光：1.2s 循环 */
+@keyframes jl-shimmer {
+  0% { opacity: 1; }
+  50% { opacity: 0.55; }
+  100% { opacity: 1; }
+}
+.jl-skeleton {
+  animation: jl-shimmer 1.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+/* 减少动态效果：关闭非必要动画（H5 生效；小程序无该媒体查询时保持默认） */
+@media (prefers-reduced-motion: reduce) {
+  .jl-spin,
+  .jl-skeleton {
+    animation: none;
+  }
+}
+
+/* 微信原生 button（如手机号授权 open-type="getPhoneNumber"）：去掉默认外边距 / 内边距 / 行高 / 边框，外观由 tw 类决定 */
+.jl-native-btn {
+  margin: 0;
+  padding: 0;
+  line-height: inherit;
+}
+.jl-native-btn::after {
+  border: none;
+}

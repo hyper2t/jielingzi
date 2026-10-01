@@ -1,0 +1,16 @@
+{
+  "extends": [
+    "taro/react"
+  ],
+  "rules": {
+    "react/jsx-uses-react": "off",
+    "react/react-in-jsx-scope": "off",
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "Literal[raw=/^[0-9][0-9_]*_[0-9_]*$/]",
+        "message": "RN 打包（metro + uglify-es）不支持数字分隔符 1_000，请写成 1000 或 1e3（FE-RN-01）"
+      }
+    ]
+  }
+}

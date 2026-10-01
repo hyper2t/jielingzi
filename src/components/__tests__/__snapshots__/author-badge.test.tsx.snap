@@ -1,0 +1,80 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`AuthorBadge 匿名：匿名头像 +「匿名·代号」，不显示任何档案信息（即使接口带了） 1`] = `
+<View
+  accessibilityLabel="匿名·竹影，10-01"
+  ariaLabel="匿名·竹影，10-01"
+  className="flex flex-row items-center"
+>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="rounded-full w-10 h-10"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFill"
+    src="anon.png"
+  />
+  <View
+    className="flex flex-col flex-1 ml-2"
+  >
+    <View
+      className="flex flex-row items-center"
+    >
+      <Text
+        className="font-body font-bold text-ink text-body"
+        numberOfLines={1}
+      >
+        匿名·竹影
+      </Text>
+    </View>
+    <Text
+      className="font-body text-caption text-ink-faint"
+      numberOfLines={1}
+    >
+      10-01
+    </Text>
+  </View>
+</View>
+`;
+
+exports[`AuthorBadge 实名：档案头像 + 昵称 + 资深标识 + 练习方式 · 年限 · 时间 1`] = `
+<View
+  accessibilityLabel="林然，资深练习者，正念  练习 3 年 · 10-01"
+  ariaLabel="林然，资深练习者，正念  练习 3 年 · 10-01"
+  className="flex flex-row items-center"
+>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="rounded-full w-10 h-10"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFill"
+    src="leaf.png"
+  />
+  <View
+    className="flex flex-col flex-1 ml-2"
+  >
+    <View
+      className="flex flex-row items-center"
+    >
+      <Text
+        className="font-body font-bold text-ink text-body"
+        numberOfLines={1}
+      >
+        林然
+      </Text>
+      <Text
+        className="ml-1 px-1 rounded-sm bg-highlight font-body text-caption text-apricot-dark"
+      >
+        资深练习者
+      </Text>
+    </View>
+    <Text
+      className="font-body text-caption text-ink-faint"
+      numberOfLines={1}
+    >
+      正念  练习 3 年 · 10-01
+    </Text>
+  </View>
+</View>
+`;

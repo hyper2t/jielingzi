@@ -1,0 +1,750 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`基础组件快照 Button disabled 1`] = `
+<View
+  accessibilityLabel="不可用"
+  accessibilityRole="button"
+  ariaLabel="不可用"
+  ariaRole="button"
+  className="flex flex-row items-center justify-center rounded-full bg-paper-dark min-h-btn px-6 self-start"
+  hoverClass="none"
+  onClick={[Function]}
+>
+  <Text
+    className="font-body font-bold text-kid-button text-ink-faint"
+  >
+    不可用
+  </Text>
+</View>
+`;
+
+exports[`基础组件快照 Button kid 1`] = `
+<View
+  accessibilityLabel="播放"
+  accessibilityRole="button"
+  ariaLabel="播放"
+  ariaRole="button"
+  className="flex flex-row items-center justify-center rounded-full bg-brand min-h-btn px-6 min-h-touch-kid self-start"
+  hoverClass="bg-brand-dark"
+  onClick={[Function]}
+>
+  <Text
+    className="font-body font-bold text-kid-button text-paper-light"
+  >
+    播放
+  </Text>
+</View>
+`;
+
+exports[`基础组件快照 Button loading 1`] = `
+<View
+  accessibilityLabel="加载中"
+  accessibilityRole="button"
+  ariaLabel="加载中"
+  ariaRole="button"
+  className="flex flex-row items-center justify-center rounded-full bg-brand min-h-btn px-6 self-start"
+  hoverClass="none"
+  onClick={[Function]}
+>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="w-4 h-4 mr-2 jl-spin"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFit"
+    src="file-stub"
+  />
+  <Text
+    className="font-body font-bold text-kid-button text-paper-light"
+  >
+    加载中
+  </Text>
+</View>
+`;
+
+exports[`基础组件快照 Button primary 1`] = `
+<View
+  accessibilityLabel="开始听"
+  accessibilityRole="button"
+  ariaLabel="开始听"
+  ariaRole="button"
+  className="flex flex-row items-center justify-center rounded-full bg-brand min-h-btn px-6 self-start"
+  hoverClass="bg-brand-dark"
+  onClick={[Function]}
+>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="w-4 h-4 mr-2"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFit"
+    src="file-stub"
+  />
+  <Text
+    className="font-body font-bold text-kid-button text-paper-light"
+  >
+    开始听
+  </Text>
+</View>
+`;
+
+exports[`基础组件快照 Button secondary 1`] = `
+<View
+  accessibilityLabel="收藏"
+  accessibilityRole="button"
+  ariaLabel="收藏"
+  ariaRole="button"
+  className="flex flex-row items-center justify-center rounded-full bg-paper-light border-2 border-solid border-ink min-h-touch px-5 self-start"
+  hoverClass="bg-paper-dark"
+  onClick={[Function]}
+>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="w-4 h-4 mr-2"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFit"
+    src="file-stub"
+  />
+  <Text
+    className="font-body font-bold text-kid-button text-ink"
+  >
+    收藏
+  </Text>
+</View>
+`;
+
+exports[`基础组件快照 Button text 1`] = `
+<View
+  accessibilityLabel="去同意"
+  accessibilityRole="button"
+  ariaLabel="去同意"
+  ariaRole="button"
+  className="flex flex-row items-center justify-center rounded-full min-h-touch px-2 self-start"
+  hoverClass="bg-paper-dark"
+  onClick={[Function]}
+>
+  <Text
+    className="font-body font-bold text-kid-button text-brand-dark"
+  >
+    去同意
+  </Text>
+</View>
+`;
+
+exports[`基础组件快照 Empty 1`] = `
+<View
+  className="flex flex-col items-center justify-center px-page py-section"
+>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="w-[7.5rem] h-[7.5rem] mb-4"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFit"
+    src="file-stub"
+  />
+  <Text
+    className="font-body text-body text-ink-soft text-center mb-6"
+  >
+    还没有收藏
+  </Text>
+  <View
+    accessibilityLabel="去首页听听"
+    accessibilityRole="button"
+    ariaLabel="去首页听听"
+    ariaRole="button"
+    className="flex flex-row items-center justify-center rounded-full bg-paper-light border-2 border-solid border-ink min-h-touch px-5 self-start self-center"
+    hoverClass="bg-paper-dark"
+    onClick={[Function]}
+  >
+    <Text
+      className="font-body font-bold text-kid-button text-ink"
+    >
+      去首页听听
+    </Text>
+  </View>
+</View>
+`;
+
+exports[`基础组件快照 Empty compact 1`] = `
+<View
+  className="flex flex-col items-center justify-center px-page py-4"
+>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="w-20 h-20 mb-3"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFit"
+    src="file-stub"
+  />
+  <Text
+    className="font-body text-caption text-ink-soft text-center mb-3"
+  >
+    还没有听过内容
+  </Text>
+  <View
+    accessibilityLabel="去首页"
+    accessibilityRole="button"
+    ariaLabel="去首页"
+    ariaRole="button"
+    className="flex flex-row items-center justify-center rounded-full bg-paper-light border-2 border-solid border-ink min-h-touch px-5 self-start self-center"
+    hoverClass="bg-paper-dark"
+    onClick={[Function]}
+  >
+    <Text
+      className="font-body font-bold text-kid-button text-ink"
+    >
+      去首页
+    </Text>
+  </View>
+</View>
+`;
+
+exports[`基础组件快照 ErrorRetry block 1`] = `
+<View
+  className="flex flex-col items-center justify-center px-page py-section"
+>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="w-[7.5rem] h-[7.5rem] mb-4"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFit"
+    src="file-stub"
+  />
+  <Text
+    className="font-body text-body text-ink-soft text-center mb-6"
+  >
+    网络不太好
+  </Text>
+  <View
+    accessibilityLabel="点我重试"
+    accessibilityRole="button"
+    ariaLabel="点我重试"
+    ariaRole="button"
+    className="flex flex-row items-center justify-center rounded-full bg-paper-light border-2 border-solid border-ink min-h-touch px-5 self-start self-center"
+    hoverClass="bg-paper-dark"
+    onClick={[Function]}
+  >
+    <Text
+      className="font-body font-bold text-kid-button text-ink"
+    >
+      点我重试
+    </Text>
+  </View>
+</View>
+`;
+
+exports[`基础组件快照 ErrorRetry inline 1`] = `
+<View
+  accessibilityLabel="网络不太好，点我重试"
+  accessibilityRole="button"
+  ariaLabel="网络不太好，点我重试"
+  ariaRole="button"
+  className="flex flex-row items-center justify-center min-h-touch px-page"
+  hoverClass="bg-paper-dark"
+  onClick={[Function]}
+>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="w-4 h-4 mr-2"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFit"
+    src="file-stub"
+  />
+  <Text
+    className="font-body text-body text-ink"
+  >
+    网络不太好
+    ，
+  </Text>
+  <Text
+    className="font-body text-body font-bold text-brand-dark"
+  >
+    点我重试
+  </Text>
+</View>
+`;
+
+exports[`基础组件快照 Icon 1`] = `
+<Image
+  accessibilityLabel="播放"
+  ariaLabel="播放"
+  className="w-7 h-7"
+  mode="aspectFit"
+  src="file-stub"
+/>
+`;
+
+exports[`基础组件快照 Icon 装饰 1`] = `
+<Image
+  accessibilityElementsHidden={true}
+  ariaHidden={true}
+  className="w-3 h-3"
+  importantForAccessibility="no-hide-descendants"
+  mode="aspectFit"
+  src="file-stub"
+/>
+`;
+
+exports[`基础组件快照 NavBar 1`] = `
+<View
+  className="bg-paper"
+  style={
+    {
+      "paddingTop": 20,
+    }
+  }
+>
+  <View
+    className="flex flex-row items-center px-2"
+    style={
+      {
+        "height": 40,
+        "paddingRight": 94,
+      }
+    }
+  >
+    <View
+      accessibilityLabel="返回"
+      accessibilityRole="button"
+      ariaLabel="返回"
+      ariaRole="button"
+      className="flex items-center justify-center w-touch h-touch rounded-full"
+      hoverClass="bg-paper-dark"
+      onClick={[Function]}
+    >
+      <Image
+        accessibilityElementsHidden={true}
+        ariaHidden={true}
+        className="w-7 h-7"
+        importantForAccessibility="no-hide-descendants"
+        mode="aspectFit"
+        src="file-stub"
+      />
+    </View>
+    <Text
+      className="flex-1 font-title font-bold text-subtitle text-ink ml-1"
+      numberOfLines={1}
+    >
+      标题
+    </Text>
+    <View
+      accessibilityElementsHidden={true}
+      ariaHidden={true}
+      className="flex flex-col items-center justify-center bg-brand rounded-seal px-1 py-1 mr-2"
+      importantForAccessibility="no-hide-descendants"
+      style={
+        {
+          "transform": "rotate(-4deg)",
+        }
+      }
+    >
+      <Text
+        className="font-title font-bold text-paper-light text-caption"
+      >
+        结
+      </Text>
+      <Text
+        className="font-title font-bold text-paper-light text-caption"
+      >
+        灵
+      </Text>
+    </View>
+  </View>
+</View>
+`;
+
+exports[`基础组件快照 NetTip offline 1`] = `
+<View
+  accessibilityLabel="网络不太好，先看看缓存的内容，点我重试"
+  accessibilityRole="button"
+  ariaLabel="网络不太好，先看看缓存的内容，点我重试"
+  ariaRole="button"
+  className="flex flex-row items-center min-h-touch px-page bg-paper-dark"
+  onClick={[Function]}
+>
+  <Image
+    accessibilityElementsHidden={true}
+    ariaHidden={true}
+    className="w-4 h-4 mr-2"
+    importantForAccessibility="no-hide-descendants"
+    mode="aspectFit"
+    src="file-stub"
+  />
+  <Text
+    className="flex-1 font-body text-caption text-ink"
+  >
+    网络不太好，先看看缓存的内容
+  </Text>
+  <Text
+    className="font-body text-caption font-bold text-brand-dark"
+  >
+    点我重试
+  </Text>
+</View>
+`;
+
+exports[`基础组件快照 NetTip online 1`] = `null`;
+
+exports[`基础组件快照 Screen empty 1`] = `
+<View
+  className="flex flex-col flex-1 min-h-screen bg-paper jl-safe-bottom"
+>
+  <View
+    className="bg-paper"
+    style={
+      {
+        "paddingTop": 20,
+      }
+    }
+  >
+    <View
+      className="flex flex-row items-center px-2"
+      style={
+        {
+          "height": 40,
+          "paddingRight": 94,
+        }
+      }
+    >
+      <View
+        className="flex-1"
+      />
+    </View>
+  </View>
+  <View
+    className="flex flex-col flex-1"
+  >
+    <View
+      className="flex flex-col items-center justify-center px-page py-section"
+    >
+      <Image
+        accessibilityElementsHidden={true}
+        ariaHidden={true}
+        className="w-[7.5rem] h-[7.5rem] mb-4"
+        importantForAccessibility="no-hide-descendants"
+        mode="aspectFit"
+        src="file-stub"
+      />
+      <Text
+        className="font-body text-body text-ink-soft text-center mb-6"
+      >
+        这里还空空的
+      </Text>
+    </View>
+  </View>
+</View>
+`;
+
+exports[`基础组件快照 Screen error 1`] = `
+<View
+  className="flex flex-col flex-1 min-h-screen bg-paper jl-safe-bottom"
+>
+  <View
+    className="bg-paper"
+    style={
+      {
+        "paddingTop": 20,
+      }
+    }
+  >
+    <View
+      className="flex flex-row items-center px-2"
+      style={
+        {
+          "height": 40,
+          "paddingRight": 94,
+        }
+      }
+    >
+      <View
+        className="flex-1"
+      />
+    </View>
+  </View>
+  <View
+    className="flex flex-col flex-1"
+  >
+    <View
+      className="flex flex-col items-center justify-center px-page py-section"
+    >
+      <Image
+        accessibilityElementsHidden={true}
+        ariaHidden={true}
+        className="w-[7.5rem] h-[7.5rem] mb-4"
+        importantForAccessibility="no-hide-descendants"
+        mode="aspectFit"
+        src="file-stub"
+      />
+      <Text
+        className="font-body text-body text-ink-soft text-center mb-6"
+      >
+        网络不太好
+      </Text>
+      <View
+        accessibilityLabel="点我重试"
+        accessibilityRole="button"
+        ariaLabel="点我重试"
+        ariaRole="button"
+        className="flex flex-row items-center justify-center rounded-full bg-paper-light border-2 border-solid border-ink min-h-touch px-5 self-start self-center"
+        hoverClass="bg-paper-dark"
+        onClick={[Function]}
+      >
+        <Text
+          className="font-body font-bold text-kid-button text-ink"
+        >
+          点我重试
+        </Text>
+      </View>
+    </View>
+  </View>
+</View>
+`;
+
+exports[`基础组件快照 Screen loading 1`] = `
+<View
+  className="flex flex-col flex-1 min-h-screen bg-paper jl-safe-bottom"
+>
+  <View
+    className="bg-paper"
+    style={
+      {
+        "paddingTop": 20,
+      }
+    }
+  >
+    <View
+      className="flex flex-row items-center px-2"
+      style={
+        {
+          "height": 40,
+          "paddingRight": 94,
+        }
+      }
+    >
+      <View
+        className="flex-1"
+      />
+    </View>
+  </View>
+  <View
+    className="flex flex-col flex-1"
+  >
+    <View
+      accessibilityElementsHidden={true}
+      ariaHidden={true}
+      className="flex flex-col px-page pt-4"
+      importantForAccessibility="no-hide-descendants"
+    >
+      <View
+        className="bg-paper-dark h-4 w-full rounded-sm mb-3 jl-skeleton"
+      />
+      <View
+        className="bg-paper-dark h-4 w-full rounded-sm mb-3 jl-skeleton"
+      />
+      <View
+        className="bg-paper-dark h-4 w-full rounded-sm mb-3 jl-skeleton"
+      />
+      <View
+        className="bg-paper-dark h-4 w-2/3 rounded-sm mb-3 jl-skeleton"
+      />
+    </View>
+  </View>
+</View>
+`;
+
+exports[`基础组件快照 Screen ready 1`] = `
+<View
+  className="flex flex-col flex-1 min-h-screen bg-paper"
+>
+  <View
+    className="bg-paper"
+    style={
+      {
+        "paddingTop": 20,
+      }
+    }
+  >
+    <View
+      className="flex flex-row items-center px-2"
+      style={
+        {
+          "height": 40,
+          "paddingRight": 94,
+        }
+      }
+    >
+      <Text
+        className="flex-1 font-title font-bold text-subtitle text-ink ml-3"
+        numberOfLines={1}
+      >
+        首页
+      </Text>
+    </View>
+  </View>
+  <View
+    className="flex flex-col flex-1"
+  >
+    内容
+  </View>
+</View>
+`;
+
+exports[`基础组件快照 Seal 1`] = `
+<View
+  accessibilityElementsHidden={true}
+  ariaHidden={true}
+  className="flex flex-col items-center justify-center bg-brand rounded-seal px-2 py-2"
+  importantForAccessibility="no-hide-descendants"
+  style={
+    {
+      "transform": "rotate(-4deg)",
+    }
+  }
+>
+  <Text
+    className="font-title font-bold text-paper-light text-subtitle"
+  >
+    结
+  </Text>
+  <Text
+    className="font-title font-bold text-paper-light text-subtitle"
+  >
+    灵
+  </Text>
+</View>
+`;
+
+exports[`基础组件快照 Skeleton card 1`] = `
+<View
+  accessibilityElementsHidden={true}
+  ariaHidden={true}
+  className="flex flex-col px-page"
+  importantForAccessibility="no-hide-descendants"
+>
+  <View
+    className="flex flex-row"
+  >
+    <View
+      className="flex flex-col mr-4"
+    >
+      <View
+        className="bg-paper-dark w-[9.75rem] h-[13rem] rounded-md mb-2 jl-skeleton"
+      />
+      <View
+        className="bg-paper-dark h-4 w-24 rounded-sm jl-skeleton"
+      />
+    </View>
+    <View
+      className="flex flex-col mr-4 mt-4"
+    >
+      <View
+        className="bg-paper-dark w-[9.75rem] h-[13rem] rounded-md mb-2 jl-skeleton"
+      />
+      <View
+        className="bg-paper-dark h-4 w-24 rounded-sm jl-skeleton"
+      />
+    </View>
+  </View>
+</View>
+`;
+
+exports[`基础组件快照 Skeleton list 1`] = `
+<View
+  accessibilityElementsHidden={true}
+  ariaHidden={true}
+  className="flex flex-col px-page"
+  importantForAccessibility="no-hide-descendants"
+>
+  <View
+    className="flex flex-row items-center mb-4"
+  >
+    <View
+      className="bg-paper-dark w-[4.5rem] h-24 rounded-md mr-3 jl-skeleton"
+    />
+    <View
+      className="flex flex-col flex-1"
+    >
+      <View
+        className="bg-paper-dark h-5 w-2/3 rounded-sm mb-2 jl-skeleton"
+      />
+      <View
+        className="bg-paper-dark h-4 w-full rounded-sm mb-2 jl-skeleton"
+      />
+      <View
+        className="bg-paper-dark h-4 w-1/3 rounded-sm jl-skeleton"
+      />
+    </View>
+  </View>
+  <View
+    className="flex flex-row items-center mb-4"
+  >
+    <View
+      className="bg-paper-dark w-[4.5rem] h-24 rounded-md mr-3 jl-skeleton"
+    />
+    <View
+      className="flex flex-col flex-1"
+    >
+      <View
+        className="bg-paper-dark h-5 w-2/3 rounded-sm mb-2 jl-skeleton"
+      />
+      <View
+        className="bg-paper-dark h-4 w-full rounded-sm mb-2 jl-skeleton"
+      />
+      <View
+        className="bg-paper-dark h-4 w-1/3 rounded-sm jl-skeleton"
+      />
+    </View>
+  </View>
+</View>
+`;
+
+exports[`基础组件快照 Skeleton reader 1`] = `
+<View
+  accessibilityElementsHidden={true}
+  ariaHidden={true}
+  className="flex flex-col px-page"
+  importantForAccessibility="no-hide-descendants"
+>
+  <View
+    className="flex flex-col mb-4"
+  >
+    <View
+      className="bg-paper-dark h-3 w-3/4 rounded-sm mb-2 jl-skeleton"
+    />
+    <View
+      className="bg-paper-dark h-7 w-full rounded-sm jl-skeleton"
+    />
+  </View>
+  <View
+    className="flex flex-col mb-4"
+  >
+    <View
+      className="bg-paper-dark h-3 w-3/4 rounded-sm mb-2 jl-skeleton"
+    />
+    <View
+      className="bg-paper-dark h-7 w-full rounded-sm jl-skeleton"
+    />
+  </View>
+</View>
+`;
+
+exports[`基础组件快照 Skeleton text 1`] = `
+<View
+  accessibilityElementsHidden={true}
+  ariaHidden={true}
+  className="flex flex-col px-page"
+  importantForAccessibility="no-hide-descendants"
+>
+  <View
+    className="bg-paper-dark h-4 w-full rounded-sm mb-3 jl-skeleton"
+  />
+  <View
+    className="bg-paper-dark h-4 w-2/3 rounded-sm mb-3 jl-skeleton"
+  />
+</View>
+`;

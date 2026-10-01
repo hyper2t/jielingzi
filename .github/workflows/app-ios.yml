@@ -1,0 +1,95 @@
+# 结灵子 App · iOS 构建（编译验证 + 未签名归档）
+#
+# 目前只做「能不能编过」的验证：pod install → 预打 JS bundle → xcodebuild Release（不签名）。
+# 正式签名 / 上传 TestFlight 需要开发者账号证书，届时启用 fastlane（ios/fastlane）或 .github/scripts/import-*.sh 再补签名步骤。
+name: App iOS
+
+on:
+  push:
+    branches: [main]
+    tags: ['app-v*']
+    paths:
+      - 'src/**'
+      - 'config/**'
+      - 'ios/**'
+      - 'index.js'
+      - 'package.json'
+      - 'yarn.lock'
+      - 'babel.config.js'
+      - 'metro.config.js'
+      - 'react-native.config.js'
+      - 'scripts/rn/**'
+      - '.github/workflows/app-ios.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: app-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-13 # Xcode 15；RN 0.70 / expo 47 尚未在 Xcode 16 上验证（见 docs/mvp/prompts/rn-next-phase.md Phase 0）
+    timeout-minutes: 60
+    env:
+      CI: 'true'
+      TARO_APP_DATA_SOURCE: cloud
+      TARO_APP_CLOUD_ENV_ID: ${{ secrets.TARO_APP_CLOUD_ENV_ID }}
+      TARO_APP_CLOUD_REGION: ${{ secrets.TARO_APP_CLOUD_REGION }}
+      TARO_APP_CLOUD_ACCESS_KEY: ${{ secrets.TARO_APP_CLOUD_ACCESS_KEY }}
+      # 微信登录（Repository Variables，可公开；与 app-android.yml 相同）。iOS 必须两个都配，且与 Info.plist / entitlements 一致，
+      # 否则下面 bundle --strict 的 ios-native-check 会失败；都不配则 App 内隐藏微信登录（只剩手机号 / Apple 登录）
+      TARO_APP_WX_APP_ID: ${{ vars.TARO_APP_WX_APP_ID }}
+      TARO_APP_WX_UNIVERSAL_LINK: ${{ vars.TARO_APP_WX_UNIVERSAL_LINK }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Bundle JS（scripts/rn/bundle.mjs，产物 ios/main.jsbundle）
+        run: node scripts/rn/bundle.mjs --platform ios --strict
+
+      - uses: actions/cache@v4
+        with:
+          path: ios/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: ${{ runner.os }}-pods-
+
+      - name: Pod install
+        working-directory: ios
+        run: pod install --repo-update
+
+      - name: Build (Release, unsigned)
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -workspace taroDemo.xcworkspace \
+            -scheme taroDemo \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tee xcodebuild.log | grep -E "error:|warning: .*deprecated|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" xcodebuild.log
+
+      - name: Package unsigned .app
+        working-directory: ios
+        run: |
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -n 1)
+          echo "app=$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" ../jielingzi-ios-unsigned.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned
+          path: |
+            jielingzi-ios-unsigned.zip
+            ios/xcodebuild.log
+          retention-days: 14

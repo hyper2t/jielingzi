@@ -1,0 +1,156 @@
+# 结灵子 App · Android 构建
+#
+# 触发：push 到 main（只在 App 相关文件变化时）、打 app-v* 标签、手动（可选 variant=debug 构建开发客户端）。
+# 产物：release APK（有正式签名 Secrets 时为可上架签名，否则 debug 签名仅供验证编译）、JS bundle 体积报告；
+#       variant=debug 时为 debug APK（开发客户端：启动时若能连上 Metro 就走热更新，否则用内置的 JS bundle；用法见 docs/ops/rn-dev-client.md）。
+#
+# 需要在仓库 Settings → Secrets 配置（可选；缺省时用 debug 签名）：
+#   ANDROID_KEYSTORE_BASE64      上传密钥 keystore 的 base64（base64 -w0 upload.keystore）
+#   ANDROID_KEYSTORE_PASSWORD    keystore 口令
+#   ANDROID_KEY_ALIAS            key 别名
+#   ANDROID_KEY_PASSWORD         key 口令
+#   TARO_APP_CLOUD_ENV_ID / TARO_APP_CLOUD_REGION / TARO_APP_CLOUD_ACCESS_KEY  云开发环境与可发布密钥（只允许 publishable key，构建脚本会校验）
+# 需要在 Settings → Variables（Repository Variables，非 Secret，可公开）配置（可选；缺省时 App 内不显示微信登录）：
+#   TARO_APP_WX_APP_ID           微信开放平台「移动应用」AppID（FE-L06）
+#   TARO_APP_WX_UNIVERSAL_LINK   iOS Universal Link（Android 构建可留空）
+name: App Android
+
+on:
+  push:
+    branches: [main]
+    tags: ['app-v*']
+    paths:
+      - 'src/**'
+      - 'config/**'
+      - 'android/**'
+      - 'index.js'
+      - 'package.json'
+      - 'yarn.lock'
+      - 'babel.config.js'
+      - 'metro.config.js'
+      - 'react-native.config.js'
+      - 'scripts/rn/**'
+      - '.github/workflows/app-android.yml'
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: 'release：正式 / 验证包；debug：开发客户端（可连 Metro 热更新，Taro Playground 已不能运行本 App）'
+        type: choice
+        options: [release, debug]
+        default: release
+
+concurrency:
+  group: app-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      VARIANT: ${{ github.event.inputs.variant || 'release' }}
+      TARO_APP_DATA_SOURCE: cloud
+      TARO_APP_CLOUD_ENV_ID: ${{ secrets.TARO_APP_CLOUD_ENV_ID }}
+      TARO_APP_CLOUD_REGION: ${{ secrets.TARO_APP_CLOUD_REGION }}
+      TARO_APP_CLOUD_ACCESS_KEY: ${{ secrets.TARO_APP_CLOUD_ACCESS_KEY }}
+      # 微信登录（可公开配置，Repository Variables）；未配置时为空字符串，App 内隐藏微信登录按钮
+      TARO_APP_WX_APP_ID: ${{ vars.TARO_APP_WX_APP_ID }}
+      TARO_APP_WX_UNIVERSAL_LINK: ${{ vars.TARO_APP_WX_UNIVERSAL_LINK }}
+      # step 级 if 里不能直接引用 secrets 上下文，先在 job 级 env 折算成布尔字符串
+      HAS_ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 用提交计数生成 versionCode
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: yarn
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11' # RN 0.70 + AGP 7.2.1
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Check required secrets
+        run: |
+          test -n "$TARO_APP_CLOUD_ENV_ID" || { echo "::error::缺少 Secret TARO_APP_CLOUD_ENV_ID"; exit 1; }
+          test -n "$TARO_APP_CLOUD_ACCESS_KEY" || { echo "::error::缺少 Secret TARO_APP_CLOUD_ACCESS_KEY（Publishable Key）"; exit 1; }
+          echo "签名：$([ "$HAS_ANDROID_KEYSTORE" = "true" ] && echo '正式 keystore' || echo '未配置 ANDROID_KEYSTORE_*，将用 debug 签名（不可上架）')"
+          echo "微信登录：$([ -n "$TARO_APP_WX_APP_ID" ] && echo "AppID 已配置（${TARO_APP_WX_APP_ID:0:4}…）" || echo '未配置 TARO_APP_WX_APP_ID，App 内隐藏微信登录')"
+          echo "构建类型：$VARIANT"
+
+      - name: Typecheck + unit tests（保证小程序侧不受影响）
+        run: |
+          npm run typecheck
+          npx jest --ci --silent
+
+      - name: Bundle JS（scripts/rn/bundle.mjs，产物落到 android/app/src/main/assets）
+        run: node scripts/rn/bundle.mjs --platform android --strict
+
+      - name: Prepare release signing
+        id: signing
+        if: env.HAS_ANDROID_KEYSTORE == 'true'
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+          {
+            echo "JIELINGZI_UPLOAD_STORE_FILE=$GITHUB_WORKSPACE/android/app/release.keystore"
+            echo "JIELINGZI_UPLOAD_STORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+            echo "JIELINGZI_UPLOAD_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}"
+            echo "JIELINGZI_UPLOAD_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}"
+          } >> "$GITHUB_ENV"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve version
+        id: version
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          NAME=$(node -p "require('./package.json').version || '1.0.0'")
+          if [[ "$GITHUB_REF" == refs/tags/app-v* ]]; then NAME="${GITHUB_REF#refs/tags/app-v}"; fi
+          echo "code=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "versionCode=$COUNT versionName=$NAME"
+
+      - name: Assemble (${{ env.VARIANT }})
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          TASK=$([ "$VARIANT" = "debug" ] && echo assembleDebug || echo assembleRelease)
+          ./gradlew "$TASK" --no-daemon --stacktrace \
+            -PappVersionCode=${{ steps.version.outputs.code }} \
+            -PappVersionName=${{ steps.version.outputs.name }}
+
+      - name: Rename artifacts
+        run: |
+          mkdir -p out
+          if [ "$VARIANT" = "debug" ]; then
+            # 开发客户端：debug 签名配置在有正式 keystore 时也复用它（NA-L02），微信回调才收得到
+            cp android/app/build/outputs/apk/debug/app-debug.apk "out/jielingzi-${{ steps.version.outputs.name }}-${{ steps.version.outputs.code }}-devclient.apk"
+          else
+            SUFFIX=${{ steps.signing.outputs.signed == 'true' && 'release' || 'release-debugsigned' }}
+            cp android/app/build/outputs/apk/release/app-release.apk "out/jielingzi-${{ steps.version.outputs.name }}-${{ steps.version.outputs.code }}-$SUFFIX.apk"
+          fi
+          cp android/app/src/main/assets/index.android.bundle.map out/ 2>/dev/null || true
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ env.VARIANT }}
+          path: out/*
+          retention-days: 14
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/app-v') && env.VARIANT == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: ${{ contains(github.ref, 'beta') }}
+          files: out/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
