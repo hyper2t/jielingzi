@@ -13,10 +13,11 @@
  * - 圈子（M4）：circleId 先恒为 null；传 circleId 暂时 40001。M4 接入成员校验后放开。
  */
 const {
-  badParam, notFound, unauthorized, AppError, CODES, validate, pageSchema, requireOpenid, guardWrite, checkText,
+  badParam, notFound, validate, pageSchema, guardWrite, checkText,
   logModeration, enqueueReview, withCollection, isCollectionMissingError, TEXT_RULES, TOPIC_RULES,
 } = require('./_shared')
 const { ensureProfile, textLength, cleanLine, INVISIBLE_RE } = require('./profile')
+const { findById, findRows, countRows, requireReader } = require('./common')
 
 const TOPICS = 'topics'
 const REPLIES = 'replies'
@@ -86,45 +87,6 @@ function parseReply(params) {
 }
 
 // ---------- 读取与脱敏 ----------
-
-async function findById(db, collection, id) {
-  try {
-    const res = await db.collection(collection).doc(id).get()
-    return (res && res.data && res.data[0]) || null
-  } catch (e) {
-    if (isCollectionMissingError(e)) return null
-    throw e
-  }
-}
-
-async function findRows(query) {
-  try {
-    const res = await query.get()
-    return (res && res.data) || []
-  } catch (e) {
-    if (isCollectionMissingError(e)) return []
-    throw e
-  }
-}
-
-async function countRows(query) {
-  try {
-    const res = await query.count()
-    return (res && res.total) || 0
-  } catch (e) {
-    if (isCollectionMissingError(e)) return 0
-    throw e
-  }
-}
-
-/** 读内容要求已确认 18+（PRD C5）；返回当前账号 id */
-async function requireReader(ctx) {
-  const me = requireOpenid(ctx.identity)
-  const rows = await findRows(ctx.db.collection('users').where({ _openid: me }).limit(1))
-  if (!rows[0]) throw unauthorized('未获取到用户信息，请重新登录')
-  if (typeof rows[0].adultConfirmedAt !== 'number') throw new AppError(CODES.ADULT_REQUIRED)
-  return me
-}
 
 async function readProfiles(db, uids) {
   const ids = [...new Set(uids.filter((u) => typeof u === 'string' && u))]
