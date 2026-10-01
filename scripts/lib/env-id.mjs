@@ -22,3 +22,17 @@ export function resolveEnvId (rawEnvId, env = {}) {
   }
   return id
 }
+
+/**
+ * 腾讯云 API 地域（X-TC-Region / SCF Region）：只接受 ap-<城市> 形态；
+ * 常见误填 cn-shanghai（不是合法地域，API 会报 InvalidParameterValue X-TC-Region）按城市名映射为 ap-shanghai；
+ * 空 / 无法识别时回落 ap-shanghai。
+ * @param {unknown} raw  如 TCB_REGION / TARO_APP_CLOUD_REGION
+ */
+export function normalizeRegion (raw) {
+  const s = typeof raw === 'string' ? raw.trim().toLowerCase() : ''
+  if (/^ap-[a-z]+(-[a-z]+)?$/.test(s)) return s
+  const m = /^cn-([a-z]+)$/.exec(s)
+  if (m) return `ap-${m[1]}`
+  return 'ap-shanghai'
+}

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readFileSync } from 'node:fs'
 import { COLLECTION_RULES, FUNCTION_RULE, createTcbApi, validateFunctionRule } from './security-rules.mjs'
-import { resolveEnvId } from '../lib/env-id.mjs'
+import { normalizeRegion, resolveEnvId } from '../lib/env-id.mjs'
 
 test('内置规则本身合法：业务函数需登录，其余拒绝；全部集合只允许云函数读写', () => {
   assert.deepEqual(validateFunctionRule(FUNCTION_RULE), FUNCTION_RULE)
@@ -62,4 +62,13 @@ test('resolveEnvId：cloudbaserc.json 的 {{env.X}} 模板替换为 .env 变量�
   assert.throws(() => resolveEnvId(rc.envId, {}), /TARO_APP_CLOUD_ENV_ID/)
   assert.throws(() => resolveEnvId('', { TARO_APP_CLOUD_ENV_ID: 'x' }), /TARO_APP_CLOUD_ENV_ID/)
   assert.throws(() => resolveEnvId('{{env.TARO_APP_CLOUD_ENV_ID}}', { TARO_APP_CLOUD_ENV_ID: '{{oops}}' }), /环境 ID/)
+})
+
+test('normalizeRegion：ap-* 原样；cn-<城市> 误填映射为 ap-<城市>；空 / 非法回落 ap-shanghai', () => {
+  assert.equal(normalizeRegion('ap-guangzhou'), 'ap-guangzhou')
+  assert.equal(normalizeRegion(' AP-Singapore '), 'ap-singapore')
+  assert.equal(normalizeRegion('cn-shanghai'), 'ap-shanghai')
+  assert.equal(normalizeRegion(''), 'ap-shanghai')
+  assert.equal(normalizeRegion(undefined), 'ap-shanghai')
+  assert.equal(normalizeRegion('shanghai'), 'ap-shanghai')
 })

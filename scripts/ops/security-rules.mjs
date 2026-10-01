@@ -19,7 +19,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { fetchWithEnvProxy } from '../lib/fetch-proxy.mjs'
-import { resolveEnvId } from '../lib/env-id.mjs'
+import { normalizeRegion, resolveEnvId } from '../lib/env-id.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -137,7 +137,8 @@ async function main() {
   const env = loadEnv()
   const rc = JSON.parse(readFileSync(join(ROOT, 'cloudbaserc.json'), 'utf8'))
   if (!env.CLOUDBASE_SECRET_ID || !env.CLOUDBASE_SECRET_KEY) throw new Error('.env 缺少 CLOUDBASE_SECRET_ID / CLOUDBASE_SECRET_KEY')
-  const api = createTcbApi({ secretId: env.CLOUDBASE_SECRET_ID, secretKey: env.CLOUDBASE_SECRET_KEY, region: env.TARO_APP_CLOUD_REGION || 'ap-shanghai' })
+  // 地域：TCB_REGION 优先，其次 TARO_APP_CLOUD_REGION；cn-shanghai 之类的误填按城市映射成 ap-shanghai（否则 X-TC-Region 非法）
+  const api = createTcbApi({ secretId: env.CLOUDBASE_SECRET_ID, secretKey: env.CLOUDBASE_SECRET_KEY, region: normalizeRegion(env.TCB_REGION || env.TARO_APP_CLOUD_REGION) })
   // cloudbaserc.json 的 envId 是 tcb CLI 模板（{{env.TARO_APP_CLOUD_ENV_ID}}），直接用会把模板原文当环境 ID
   const EnvId = resolveEnvId(rc.envId, env)
   const out = { envId: EnvId }

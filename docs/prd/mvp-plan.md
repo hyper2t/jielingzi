@@ -30,7 +30,7 @@
 
 ## M0 · 准备（0.5 周）
 
-> **进度（2026-10-01 复核）**：代码与文档已完成，自动化全绿，三端构建通过（`docs/test/cases/M0.md` M0-13）。Windows 实机复核修复 3 处：RN 打包脚本 spawn `npx.cmd` 报 EINVAL；运维脚本把 cloudbaserc 的 envId 模板原文当环境 ID；moderation 云函数误用 App 的微信凭证（应为小程序凭证）。待办（非代码，需人工 / 授权）：OPS-M0-01 资质申请（需企业材料）、M0-12 云端建集合 / 下发规则（需确认后执行）、M0-11 真机视觉走查。
+> **进度（2026-10-01 复核）**：代码与文档已完成，自动化全绿，三端构建通过（`docs/test/cases/M0.md` M0-13）。Windows 实机复核修复 3 处：RN 打包脚本 spawn `npx.cmd` 报 EINVAL；运维脚本把 cloudbaserc 的 envId 模板原文当环境 ID；moderation 云函数误用 App 的微信凭证（应为小程序凭证）。2026-10-01 已部署 user / community / moderation，并执行 M0-12（下发安全规则、建 16 个集合）。待办（非代码，需人工）：OPS-M0-01 资质申请（需企业材料）、控制台建索引（`docs/ops/collections.md` §3）、M0-11 真机视觉走查。
 > 产出：`cloudfunctions/_shared/{collections,config,guard}.js`、`cloudfunctions/{community,moderation,practice}/`、`docs/ops/{compliance-checklist,collections}.md`、`docs/prd/{wording,community-rules}.md`、`docs/test/`、练习 Tab 与两个新分包、品牌色令牌（竹青）与新标志。
 
 | 编号 | 负责 | 任务 | 验收 |

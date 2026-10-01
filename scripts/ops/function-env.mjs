@@ -19,7 +19,7 @@ import { createHash, createHmac } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolveEnvId } from '../lib/env-id.mjs'
+import { normalizeRegion, resolveEnvId } from '../lib/env-id.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -109,7 +109,7 @@ async function main () {
   if (!secretId || !secretKey) throw new Error('.env 缺少 CLOUDBASE_SECRET_ID / CLOUDBASE_SECRET_KEY')
   let envId = env.TARO_APP_CLOUD_ENV_ID
   if (!envId) envId = resolveEnvId(JSON.parse(readFileSync(join(ROOT, 'cloudbaserc.json'), 'utf8')).envId, env)
-  const region = env.TCB_REGION || 'ap-shanghai'
+  const region = normalizeRegion(env.TCB_REGION)
   const base = { secretId, secretKey, region }
 
   const fn = await callScf({ ...base, action: 'GetFunction', payload: { FunctionName: name, Namespace: envId } })
