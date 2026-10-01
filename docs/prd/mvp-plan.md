@@ -68,7 +68,7 @@
 
 > **进度（2026-10-01，首批）**：BE-M2-01（词库 + msgSecCheck，档案已接入）、BE-M2-03（举报 / 自动折叠 / 队列 / 处理）、BE-M2-04（站内通知）、BE-M2-05（`scripts/ops/set-role.mjs`）、
 > FE-M2-01（`ReportSheet`）、FE-M2-02（`pkg-admin/pages/queue`，入口仅 mod / admin）、FE-M2-03（首次发布前阅读公约）、QA-M2-01（样本集 37 + 20，命中率 100%、误杀 0）已完成，用例见 `docs/test/cases/M2.md`，契约见 `docs/api/moderation.md`。
-> 待办：BE-M2-02 图片异步机审（mediaCheckAsync + 消息推送回调）与自定义头像上传；部署 community / moderation 新版本；配置 `WX_MP_APP_ID / SECRET` 后 msgSecCheck 才生效；三端真机执行。
+> 2026-10-01 已部署（含小程序凭证与手机号哈希密钥）、建好 19 个索引、设置第一个管理员。待办：BE-M2-02 图片异步机审（mediaCheckAsync + 消息推送回调）与自定义头像上传；三端真机执行。
 
 | 编号 | 负责 | 任务 | 验收 |
 |---|---|---|---|

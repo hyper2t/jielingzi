@@ -45,9 +45,9 @@
 |---|---|---|
 | 小程序《用户隐私保护指引》 | 声明收集「手机号」（发布前实名）与用户主动填写的档案信息；未声明时 getPhoneNumber 等隐私接口不可用 | ☐ |
 | 手机号快捷验证组件计费 | 微信对手机号验证组件按次计费（有免费额度），以微信公众平台最新说明为准；上线前确认额度 / 余额，避免实名入口失效 | ☐ |
-| 云函数环境变量 | `user`：`WX_MP_APP_ID` / `WX_MP_APP_SECRET` / `PHONE_HASH_SECRET`；`moderation`：`WX_MP_APP_ID` / `WX_MP_APP_SECRET`（见 `.env.example`） | ☐ |
-| `PHONE_HASH_SECRET` 保管 | 随机生成后离线备份；**启用后不可更换**（更换会让已绑定的手机号全部失效） | ☐ |
-| 索引 | `profiles._openid` 唯一、`profiles.anonAlias` 唯一（`docs/ops/collections.md` §3） | ☐ |
+| 云函数环境变量 | `user`：`WX_MP_APP_ID` / `WX_MP_APP_SECRET` / `PHONE_HASH_SECRET`；`community` / `moderation`：`WX_MP_APP_ID` / `WX_MP_APP_SECRET`（见 `.env.example`） | ✅ 2026-10-01 已配置并部署（凭证经 stable_token 校验有效） |
+| `PHONE_HASH_SECRET` 保管 | 2026-10-01 已随机生成写入 `.env`（不入库）；**请离线备份**，启用后不可更换（更换会让已绑定的手机号全部失效） | ☐ 待备份 |
+| 索引 | `node scripts/ops/ensure-indexes.mjs --apply`（`docs/ops/collections.md` §3） | ✅ 2026-10-01 已建 19 个（users / profiles 的 `_openid` 改为唯一）；TTL 待控制台确认 |
 
 ## 4. 待你提供 / 确认
 
