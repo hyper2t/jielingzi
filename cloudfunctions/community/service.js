@@ -8,6 +8,7 @@
 const { getProfile, updateProfile, setAvatar } = require('./profile')
 const { createTopic, listTopics, getTopic, createReply, listReplies, deleteMine } = require('./topics')
 const { listCircles, getCircle } = require('./circles')
+const { listInvites, createInvite, redeemInvite } = require('./invites')
 
 /** 不要求身份的动作（入口据此不因副作用建号） */
 const IDENTITY_FREE_ACTIONS = ['ping']
@@ -32,7 +33,10 @@ const actions = {
   /** M4 官方圈子（BE-M4-01，docs/api/community.md「圈子与邀请码」） */
   listCircles,
   getCircle,
-  // TODO(M4)：createInvite / listInvites / redeemInvite（BE-M4-02）
+  /** M4 邀请码（BE-M4-02） */
+  listInvites,
+  createInvite,
+  redeemInvite,
 }
 
 module.exports = { actions, IDENTITY_FREE_ACTIONS }

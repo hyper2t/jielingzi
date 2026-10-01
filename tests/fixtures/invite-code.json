@@ -1,0 +1,75 @@
+{
+  "_comment": "邀请码规范化共享用例：后端 cloudfunctions/community/invites.js 的 normalizeInviteCode 与前端同名函数都必须通过。字母表 0123456789ABCDEFGHJKMNPQRSTVWXYZ，8 位；去空白与连字符，大写，O→0，I/L→1。",
+  "valid": [
+    {
+      "input": "ABCD2345",
+      "expected": "ABCD2345"
+    },
+    {
+      "input": "abcd2345",
+      "expected": "ABCD2345"
+    },
+    {
+      "input": "  abcd-2345  ",
+      "expected": "ABCD2345"
+    },
+    {
+      "input": "ABCD 2345",
+      "expected": "ABCD2345"
+    },
+    {
+      "input": "ab cd-23 45",
+      "expected": "ABCD2345"
+    },
+    {
+      "input": "ABCD–2345",
+      "expected": "ABCD2345"
+    },
+    {
+      "input": "oOiIlL01",
+      "expected": "00111101"
+    },
+    {
+      "input": "zzzzzzzz",
+      "expected": "ZZZZZZZZ"
+    },
+    {
+      "input": "0123456\n7",
+      "expected": "01234567"
+    }
+  ],
+  "invalid": [
+    {
+      "input": "",
+      "message": "邀请码为 8 位"
+    },
+    {
+      "input": "   ",
+      "message": "邀请码为 8 位"
+    },
+    {
+      "input": "ABCD234",
+      "message": "邀请码为 8 位"
+    },
+    {
+      "input": "ABCD23456",
+      "message": "邀请码为 8 位"
+    },
+    {
+      "input": "ABCU2345",
+      "message": "邀请码含有不支持的字符"
+    },
+    {
+      "input": "ABCD-234!",
+      "message": "邀请码含有不支持的字符"
+    },
+    {
+      "input": "ＡＢＣＤ２３４５",
+      "message": "邀请码含有不支持的字符"
+    },
+    {
+      "input": "邀请码邀请码邀请",
+      "message": "邀请码含有不支持的字符"
+    }
+  ]
+}

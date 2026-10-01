@@ -134,7 +134,7 @@
 
 ## 圈子与邀请码（M4，草案）
 
-> **状态：契约草案**（2026-10-01）。**已实现：`listCircles`、`getCircle`**（`cloudfunctions/community/circles.js`，用例 `tests/cloudfunctions/m4.test.js`，未部署）；邀请码三个动作与话题成员校验尚未实现。实施计划与决策见 [`docs/prd/m4-plan.md`](../prd/m4-plan.md)；落地时以本节为准并同步更新。所有动作沿用本文件前面的通则：扁平入参、**拒绝未声明参数（40001）**、读要求 18+（40303）、写走 `guardWrite`。
+> **状态：契约草案**（2026-10-01）。**已实现：`listCircles`、`getCircle`、`listInvites`、`createInvite`、`redeemInvite`**（`cloudfunctions/community/{circles,invites}.js`，用例 `tests/cloudfunctions/m4*.test.js`，未部署）；话题 / 回复 / 举报的成员校验（BE-M4-03）尚未实现。实施计划与决策见 [`docs/prd/m4-plan.md`](../prd/m4-plan.md)；落地时以本节为准并同步更新。所有动作沿用本文件前面的通则：扁平入参、**拒绝未声明参数（40001）**、读要求 18+（40303）、写走 `guardWrite`。
 
 ### 数据
 
@@ -189,6 +189,8 @@
 
 - 入参：`{ circleId }`（必填）；我必须是该圈子的成员且圈子为 `open`，否则 40301（「加入圈子后才能邀请」）。
 - 出参：`{ invite, quota }`（`invite` 同上；`quota` 为扣减后的剩余名额）。
+- 副作用：签发前同样先做名额懒初始化与「过期退额度」，所以名额为 0 但有过期未用的码时仍可签发。生成的码撞唯一索引时自动重试（最多 5 次）。
+- 圈子不存在 / 已关闭 / 我不是成员返回同一句 40301，不泄露圈子是否存在。
 - 名额用完：42901（msg「邀请名额已用完」；前端以 `quota = 0` 判断，不依赖 code）。写库失败时名额自动退回。
 - 错误：40001、40101、40301、40302、40303、40304、40305、42901。
 
