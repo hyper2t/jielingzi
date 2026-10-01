@@ -7,6 +7,9 @@
 1. TODO(business)：确认云端已有可展示的业务数据（否则切 cloud 后首页是空的），可仿照 luming 的 `ops:check-online` 写一个只读检查脚本。
 2. `.env`：`TARO_APP_DATA_SOURCE=cloud`（本地想回 mock 演示，用 `.env.local` 覆盖，不要改 `.env`）。
 3. 云函数与前端契约一致：`node scripts/sync-shared.mjs` 后重新部署 `user`（及业务云函数）；`node scripts/ops/ensure-collections.mjs` 建账号层集合，`node scripts/ops/security-rules.mjs --apply` 下发规则。
+   - 部署云函数：`tcb fn deploy <name> --force`（只部署改动的函数）。**先确认 `.env` 里该函数 `envVariables` 引用的键都有值**（部署会整体覆盖线上环境变量，缺键 = 清空；`node scripts/ops/function-env.mjs <name>` 可查看线上现状）。
+   - **`tcb` 的全局登录可能是别的账号**（`tcb env list` 看不到本环境时会报 `env not found`）。不想动全局登录，可在单次命令里把 `USERPROFILE` / `HOME` 指向临时目录，再用 `.env` 的 `CLOUDBASE_SECRET_ID / KEY` 执行 `tcb login --apiKeyId … --apiKey …`，部署完删掉该临时目录。
+   - 冒烟调用别用 `data` 包一层：云函数入参是平铺的（`{"action":"listTopics"}`），多余字段会 40001；PowerShell 5 传 JSON 要把引号转义成 `\"`。
 4. `npm run test:functions && npm test && npm run typecheck` 全绿；App 端再跑 `npm run rn:smoke`。
 5. 真机回归：同意 → 登录（手机号 / 微信 / Apple）→ 设置页查看登录方式 → 退出 → 重新登录 → 注销账号回到同意弹窗；「清除本机数据」后保留登录态。
 

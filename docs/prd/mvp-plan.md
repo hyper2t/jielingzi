@@ -84,9 +84,9 @@
 
 ## M3 · 深度话题（1.5 周）
 
-> **进度（2026-10-01，纯文字版，未部署）**：BE-M3-01～04（`cloudfunctions/community/topics.js` + `service.js` 6 个 action：`createTopic / listTopics / getTopic / createReply / listReplies / deleteMine`；限额在 `_shared/config`；匿名脱敏）、FE-M3-01～03（首页话题流 + `TopicCard`、`pkg-community/pages/topic-new`、`pkg-community/pages/topic`、`Toggle`）、QA-M3-01 自动化部分已完成，用例见 `docs/test/cases/M3.md`，契约见 `docs/api/community.md`。审核页对机审待复核的内容显示「通过」（放行）。
+> **进度（2026-10-01，纯文字版，已部署）**：BE-M3-01～04（`cloudfunctions/community/topics.js` + `service.js` 6 个 action：`createTopic / listTopics / getTopic / createReply / listReplies / deleteMine`；限额在 `_shared/config`；匿名脱敏）、FE-M3-01～03（首页话题流 + `TopicCard`、`pkg-community/pages/topic-new`、`pkg-community/pages/topic`、`Toggle`）、QA-M3-01 自动化部分已完成，用例见 `docs/test/cases/M3.md`，契约见 `docs/api/community.md`。审核页对机审待复核的内容显示「通过」（放行）。
 > **范围决策**：先做纯文字版；话题配图（PRD / 本计划均未含，新增范围）与 App 头像上传暂缓，**统一挂在「原生选图」任务上**（新增原生选图组件、重新打包一次；话题配图复用 `media.js` 图片审核流程，App 上传走人工复核）。`TopicSummary.images` 暂为 `[]`。
-> 待办：部署 community / moderation 并为 `topics` 集合建索引（status + createdAt）；三端真机执行与匿名抓包留存；M4 接入圈子可见性。
+> 2026-10-01 已部署 community / moderation，`topics` 建好索引（status + createdAt）。待办：三端真机执行与匿名抓包留存；M4 接入圈子可见性。
 
 | 编号 | 负责 | 任务 | 验收 |
 |---|---|---|---|
