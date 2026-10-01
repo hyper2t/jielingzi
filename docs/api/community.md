@@ -132,8 +132,89 @@
 
 > 部署后需要执行一次 `scripts/ops/ensure-indexes.mjs`（见 `docs/ops/collections.md`）。
 
-## 待实现（M4）
+## 圈子与邀请码（M4，草案）
 
+> **状态：契约草案，尚未实现**（2026-10-01）。实施计划与决策见 [`docs/prd/m4-plan.md`](../prd/m4-plan.md)；落地时以本节为准并同步更新。所有动作沿用本文件前面的通则：扁平入参、**拒绝未声明参数（40001）**、读要求 18+（40303）、写走 `guardWrite`。
+
+### 数据
+
+- `circles`：`slug`（稳定标识，唯一）、`name`、`desc`、`cover`（`circle:<slug>` 或 `null`）、`rules`（`string[]`）、`memberCount` / `topicCount`（**展示用近似值**）、`sort`、`status`（`open` / `closed`）。
+- `memberships`：`circleId`、`_openid`、`joinedAt`、`invitedBy`（**不下发**）、`inviteCode`、`role = 'member'`；唯一 `(circleId, _openid)`。
+- `invites`：`code`（8 位）、`circleId`、`_openid`（签发人；官方码为 `null`）、`official`、`createdAt`、`expiresAt`、`usedBy`（**不下发**）、`usedAt`、`refunded`。
+- `users.inviteQuota`：剩余名额；字段缺失 = 未初始化，首次 `listInvites` / `createInvite` 时用「字段不存在」条件写入 `INVITE_RULES.initialQuota`。
+
+| 规则 | 值（唯一来源 `_shared/config.js` 的 `INVITE_RULES` / `CIRCLE_RULES` / `DAILY_LIMITS`） |
+|---|---|
+| 初始名额 | 3 |
+| 邀请码 | 8 位，字母表 `0123456789ABCDEFGHJKMNPQRSTVWXYZ`（Crockford base32，无 I L O U）；一次性；绑定签发它的圈子；**7 天**有效 |
+| 过期退额度 | 过期未使用的码退回 1 个名额，每个码只退一次；官方码（运维签发）不占名额也不退 |
+| 额度（北京时间切日） | `createInvite` 5 次 / 天；`redeemInvite` 10 次 / 天（**含失败尝试**） |
+
+**邀请码规范化**（服务端与前端同一算法，共享 fixture `tests/fixtures/invite-code.json`）：去首尾空白与中间空格 / `-` → 大写 → `O→0`、`I/L→1`；必须恰好 8 位且都在字母表内，否则 40001（「邀请码为 8 位」「邀请码含有不支持的字符」）。
+
+### 圈子对象
+
+```json
+{ "id": "…", "slug": "mindful", "name": "静观练习", "desc": "冥想、正念、内观的日常练习与困惑",
+  "cover": "circle:mindful", "memberCount": 12, "topicCount": 30, "joined": true }
 ```
-M4：listCircles、getCircle、createInvite、redeemInvite；话题 / 回复接入 circleId 与成员校验
+
+不含成员名单、`invitedBy` 等任何成员标识。
+
+### listCircles
+
+- 入参：无。出参：`{ list }`（只含 `open`，按 `sort`；圈子数量很少，不分页）。
+- 非成员也能看到（用于「未入圈」引导页），`joined` 标明我是否已加入。
+- 错误：40101、40303。
+
+### getCircle
+
+- 入参：`{ id }`；出参：`{ circle }`：圈子对象加 `rules: string[]`（圈子公约，在全站公约基础上的补充）。
+- 错误：40001、40101、40303、40401（不存在 / 已 `closed`）。
+
+### listInvites
+
+- 入参：无。出参：`{ quota, ttlDays, list }`；`list` 为我签发的码，新的在前，最多 50 条：
+
+```json
+{ "code": "ABCD2345", "circle": { "id": "…", "name": "静观练习" }, "status": "active | used | expired",
+  "createdAt": 1790000000000, "expiresAt": 1790604800000, "usedAt": null }
 ```
+
+- 完整的码只返回给签发人本人；**不返回兑换人**（`usedBy`）。
+- 副作用：触发「过期退额度」（见上，幂等）与名额懒初始化。
+- 错误：40101、40303。
+
+### createInvite
+
+- 入参：`{ circleId }`（必填）；我必须是该圈子的成员且圈子为 `open`，否则 40301（「加入圈子后才能邀请」）。
+- 出参：`{ invite, quota }`（`invite` 同上；`quota` 为扣减后的剩余名额）。
+- 名额用完：42901（msg「邀请名额已用完」；前端以 `quota = 0` 判断，不依赖 code）。写库失败时名额自动退回。
+- 错误：40001、40101、40301、40302、40303、40304、40305、42901。
+
+### redeemInvite
+
+- 入参：`{ code }`（规范化见上）。出参：`{ circle, joined: true }`。
+- 校验顺序：规范化（40001）→ 码不存在 / 已用 / 已过期（**同一条 40401「邀请码无效、已被使用或已过期」**，不泄露码是否存在）→ 我已是该圈子成员（40901「你已在这个圈子里」，**不消耗码**）→ 条件更新标记已用（被抢先 → 40401）→ 写 `memberships`（撞唯一索引 → 还原码并 40901）→ `circles.memberCount` +1。
+- 要求：已登录、已确认 18+、已实名、未封禁（禁言不影响加入）；每次调用（含失败）计 1 次日额度，超出 42901。
+- 错误：40001、40101、40302、40303、40304、40401、40901、42901。
+
+### 对话题与回复接口的改动（BE-M4-03）
+
+| 接口 | 改动 |
+|---|---|
+| `createTopic` | 新增 `circleId`：必须是我加入的 `open` 圈子，否则 40301。**缺省**：恰好加入 1 个圈子 → 默认归到该圈子；多个 → 40001「请选择圈子」；没有 → 40301。返回体 `topic.circle = { id, name }` |
+| `listTopics` | `circleId` 可选。不传 = 我所有圈子的话题聚合（没有任何圈子 → 空列表，不是错误）；传了必须是成员，否则 40301（「加入圈子后才能查看」）。列表项新增 `circle: { id, name }` |
+| `getTopic` / `listReplies` / `createReply` | 话题所在圈子必须有我，否则 **40401**（与「不存在」一致，防遍历 ID）；`circleId = null` 的旧话题对任何人不可见。`topic.circle` 同上 |
+| `deleteMine` | 不要求是成员（作者随时能删自己的内容） |
+| `moderation.report` | 目标内容所在圈子须有我，否则 40401；`queue` / `decide` 不变（审核员没有额外读圈内内容的特权，审核页只给摘要） |
+
+### 新增索引（M4）
+
+| 集合 | 索引 | 类型 |
+|---|---|---|
+| circles | `uniq_slug`：`slug` | 唯一 |
+| memberships | `idx_member`：`_openid` + `joinedAt` | 普通 |
+| invites | `idx_owner_time`：`_openid` + `createdAt`（倒序） | 普通 |
+
+> 落地后需执行 `scripts/ops/ensure-indexes.mjs`；运维脚本（`circles.mjs`、`invite-quota.mjs`）见 `m4-plan.md` §8。

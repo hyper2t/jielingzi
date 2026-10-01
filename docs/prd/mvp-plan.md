@@ -101,14 +101,21 @@
 
 ## M4 · 官方圈子 + 邀请码（1 周）
 
+> **状态（2026-10-01）**：计划已完善，**未开工**。完整的决策、数据模型差异、成员校验矩阵、并发 / 幂等设计、运维脚本、测试与上线 / 回滚方案见 [`m4-plan.md`](./m4-plan.md)；接口契约草案见 `docs/api/community.md`「圈子与邀请码（M4，草案）」。
+> **关键决策（默认，可推翻）**：3 个官方圈子（`wording.md` §5）；邀请码绑定圈子、一次性、7 天、初始名额 3、过期未用退名额；圈内内容仅成员可见（非成员详情 40401）；首页聚合我的圈子；发帖缺省圈子在「只加入 1 个圈子」时自动归属（兼容 M3 客户端）；审核员无额外读圈内内容的特权；第一批成员靠运维脚本签发官方码 / 直接加入。
+> **待产品确认**：圈子名称与公约、第一批成员入圈方式、M3 期间旧话题处理（见 `m4-plan.md` §2.2）。
+
 | 编号 | 负责 | 任务 | 验收 |
 |---|---|---|---|
-| BE-M4-01 | BE | 圈子种子数据脚本；`community.listCircles / getCircle` | 单测 |
-| BE-M4-02 | BE | 邀请码：`createInvite`（扣名额、7 天有效）、`redeemInvite`（一次性、写 memberships） | 单测：过期 / 已用 / 名额不足 |
-| BE-M4-03 | BE | 话题读写加成员校验；名额增发规则（每月按有效回复数）先做手动脚本 | 非成员读圈内话题被拒 |
-| FE-M4-01 | FE | 圈子列表/详情、输入邀请码入圈、我的邀请码（分享卡片：小程序 `onShareAppMessage`，App 复制文本） | 三端走通 |
-| FE-M4-02 | FE | 首页话题流按"我的圈子"聚合；未入圈用户看到引导页 | 快照测试 |
-| QA-M4-01 | QA | 用例：邀请全链路、越权读取、名额边界、注销后成员关系清理 | 通过 |
+| BE-M4-00 | BE | 前置：`INVITE_RULES` / `CIRCLE_RULES` / `redeemInvite` 日限；3 个新索引；`fakeDb` 支持 `$gte / $gt / $lt / $exists / $ne`；测试夹具 `seedCircle / seedMember / seedInvite` | M3 的 165 例不回归 |
+| BE-M4-01 | BE | `community.listCircles / getCircle`（含 `joined`、公约；非成员可见简介） | 单测 |
+| OPS-M4-01 | OPS | 圈子种子数据脚本与运维工具：`scripts/ops/circles.mjs`（seed / grant / issue / audit / migrate-topics / recount）、`invite-quota.mjs`（--report / --add）、`circles.seed.json` | 脚本单测（预览不写、幂等）；云端 `audit` |
+| BE-M4-02 | BE | 邀请码：`createInvite`（成员才能签发、名额懒初始化 + 原子扣减、7 天有效）、`listInvites`（状态、过期退名额）、`redeemInvite`（一次性、写 memberships、已是成员不消耗码、日限含失败尝试） | 单测：过期 / 已用 / 名额不足 / 并发抢最后名额 / 并发重复兑换 / 退名额只退一次 |
+| BE-M4-03 | BE | 话题读写加成员校验（`listTopics` 聚合我的圈子；`getTopic / listReplies / createReply` 非成员 40401；`createTopic` 缺省圈子规则；`moderation.report` 成员校验）；名额增发规则（每月按有效回复数）先做手动脚本（`invite-quota.mjs`，见 OPS-M4-01） | 非成员读圈内话题被拒；M3 用例补成员种子后全绿 |
+| FE-M4-00 | FE | 类型 / 常量 / 邀请码规范化（共享 fixture）/ 服务层 / mock 云端（`reset()` 默认 1 个圈子 + 默认账号是成员）/ `app.config` / `router` | `tsc` 无错；规则单测 |
+| FE-M4-01 | FE | 圈子列表 `circles` / 详情 `circle`、输入邀请码入圈 `join-circle`（支持 `?code=` 预填）、我的邀请码 `invites`（分享卡片：小程序 `onShareAppMessage`，App 复制文本）、「我的」入口 | 三端走通；页面测试 |
+| FE-M4-02 | FE | 首页话题流按"我的圈子"聚合（`FilterChips` 切换）；未入圈用户看到引导页；发起话题选圈子；卡片 / 详情显示圈子名 | 快照测试 |
+| QA-M4-01 | QA | 用例：邀请全链路、越权读取、名额边界、注销后成员关系清理（`docs/test/cases/M4.md`，用例清单见 `m4-plan.md` §10） | 自动化全绿 + 真机清单入库 |
 
 ## M5 · 冥想计时 + 打卡（1 周，可并行）
 
