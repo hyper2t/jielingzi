@@ -19,7 +19,7 @@
 
 ### 数据
 
-`topics`：`_openid`（作者 accountId，PRD 里的 authorUid；注销时 detach → `null` + `authorDeleted: true`）、`circleId`（M3 恒为 `null`，M4 接入）、`anon`、`title`、`body`、`tags`、`images`（预留，M3 恒为 `[]`）、`status`（`pending` / `ok` / `folded` / `removed`）、`featured`、`replyCount`、`reportCount`、`createdAt`、`lastReplyAt`；删除时另有 `removedBy: 'author'`、`removedAt`。
+`topics`：`_openid`（作者 accountId，PRD 里的 authorUid；注销时 detach → `null` + `authorDeleted: true`）、`circleId`（M4 起必填：话题所属圈子；M3 期间的旧话题为 `null`，对任何人不可见）、`anon`、`title`、`body`、`tags`、`images`（预留，M3 恒为 `[]`）、`status`（`pending` / `ok` / `folded` / `removed`）、`featured`、`replyCount`、`reportCount`、`createdAt`、`lastReplyAt`；删除时另有 `removedBy: 'author'`、`removedAt`。
 `replies`：`_openid`、`topicId`、`circleId`、`anon`、`body`、`short`、`quoteId`、`status`、`reportCount`、`createdAt`。
 
 | 规则 | 值（唯一来源 `_shared/config.js` 的 `TEXT_RULES` / `TOPIC_RULES` / `DAILY_LIMITS`，前端 `src/constants/community.ts` 同名常量由测试比对） |
@@ -74,7 +74,7 @@
 
 ### listTopics
 
-话题流：`status = ok`，新的在前。入参 `page`（默认 1）、`size`（1–50，默认 20）；`circleId` 暂不支持（传了 40001，M4 接入成员校验）。
+话题流：`status = ok`，新的在前。入参 `page`（默认 1）、`size`（1–50，默认 20）；`circleId` 可选：不传 = 我所有开放圈子的聚合（没有圈子则空列表）；传了必须是成员（40301）。详见「圈子与邀请码」。
 
 - 出参：`{ list, total, page, size, hasMore }`；list 项只给摘要：`{ id, title, excerpt（≤ 80 字）, tags, anon, author, replyCount, createdAt, lastReplyAt, featured, images, folded, pending }`，**不含正文**。
 - 错误：40101、40303。
@@ -134,7 +134,7 @@
 
 ## 圈子与邀请码（M4，草案）
 
-> **状态：契约草案**（2026-10-01）。**已实现：`listCircles`、`getCircle`、`listInvites`、`createInvite`、`redeemInvite`**（`cloudfunctions/community/{circles,invites}.js`，用例 `tests/cloudfunctions/m4*.test.js`，未部署）；话题 / 回复 / 举报的成员校验（BE-M4-03）尚未实现。实施计划与决策见 [`docs/prd/m4-plan.md`](../prd/m4-plan.md)；落地时以本节为准并同步更新。所有动作沿用本文件前面的通则：扁平入参、**拒绝未声明参数（40001）**、读要求 18+（40303）、写走 `guardWrite`。
+> **状态：契约草案**（2026-10-01）。**已实现：`listCircles`、`getCircle`、`listInvites`、`createInvite`、`redeemInvite`**（`cloudfunctions/community/{circles,invites}.js`，用例 `tests/cloudfunctions/m4*.test.js`，未部署）；话题 / 回复 / 举报的成员校验（BE-M4-03）已实现（`topics.js`、`moderation/service.js`，用例 `m4-topics.test.js`）。`circles.topicCount` 为近似值：发布 +1、作者删除 −1（不会减到 0 以下），运维脚本 `recount` 校正。实施计划与决策见 [`docs/prd/m4-plan.md`](../prd/m4-plan.md)；落地时以本节为准并同步更新。所有动作沿用本文件前面的通则：扁平入参、**拒绝未声明参数（40001）**、读要求 18+（40303）、写走 `guardWrite`。
 
 ### 数据
 

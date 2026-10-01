@@ -34,6 +34,22 @@ async function isMember(db, accountId, circleId) {
   return rows.length > 0
 }
 
+/** 我加入的、且仍开放的圈子：Map<circleId, circleDoc>（话题读写的成员校验入口；已关闭的圈子视同不存在） */
+async function myOpenCircles(db, accountId) {
+  const ids = await myCircleIds(db, accountId)
+  const map = new Map()
+  if (!ids.length) return map
+  const rows = await findRows(db.collection(CIRCLES).where({ _id: db.command.in(ids), status: 'open' }).limit(MEMBER_WINDOW))
+  for (const c of rows) map.set(c._id, c)
+  return map
+}
+/** 我能否访问这个圈子的内容：圈子开放且我是成员 → 圈子文档；否则 null（circleId 为空的旧话题恒为 null） */
+async function circleAccess(db, accountId, circleId) {
+  if (!accountId || typeof circleId !== 'string' || !circleId) return null
+  const circle = await findById(db, CIRCLES, circleId)
+  if (!circle || circle.status !== 'open') return null
+  return (await isMember(db, accountId, circleId)) ? circle : null
+}
 /** 圈子对象（列表项）；getCircle 在此基础上加 rules */
 function presentCircle(doc, joined) {
   return {
@@ -70,4 +86,4 @@ async function getCircle(params, ctx) {
   return { circle: { ...presentCircle(doc, joined), rules: presentRules(doc) } }
 }
 
-module.exports = { listCircles, getCircle, myCircleIds, isMember, presentCircle, presentRules }
+module.exports = { listCircles, getCircle, myCircleIds, myOpenCircles, circleAccess, isMember, presentCircle, presentRules }

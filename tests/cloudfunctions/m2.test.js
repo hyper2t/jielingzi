@@ -11,6 +11,7 @@ const S = require('../../cloudfunctions/_shared')
 const moderation = require('../../cloudfunctions/moderation/service')
 const community = require('../../cloudfunctions/community/service')
 const { createFakeDb } = require('./fakeDb')
+const { circleDoc, memberDoc } = require('./circleFixtures')
 const SAMPLES = require('./fixtures/moderation-samples.json')
 
 beforeEach(() => S.restoreOwnedCollections())
@@ -20,7 +21,16 @@ const NOW = Date.UTC(2026, 9, 1, 4, 0, 0)
 const silent = { info() {}, error() {} }
 const ADULT = { adultConfirmedAt: 1 }
 
+/** M4 起圈内内容只有圈子成员能举报：种子话题 / 回复都放进同一个圈子，相关账号都是成员 */
+const M2_CIRCLE = circleDoc({ slug: 'm2' })
 function world() {
+  const db = baseWorld()
+  db.store.circles = [M2_CIRCLE]
+  db.store.memberships = ['A', 'R1', 'R2', 'R3', 'Mod', 'Adm'].map((id) => memberDoc(M2_CIRCLE._id, id))
+  for (const c of [...db.store.topics, ...db.store.replies]) c.circleId = M2_CIRCLE._id
+  return db
+}
+function baseWorld() {
   return createFakeDb({
     unique: { profiles: ['_openid', 'anonAlias'] },
     data: {
@@ -204,8 +214,8 @@ test('注销：两个举报过同一目标的人先后注销都成功（举报�
 })
 
 test('report：每日 30 次额度（S.DAILY_LIMITS.report）', async () => {
-  const topics = Array.from({ length: S.DAILY_LIMITS.report + 1 }, (_, i) => ({ _id: `x${i}`, _openid: 'A', title: 't', body: 'b', status: 'ok' }))
-  const db = createFakeDb({ data: { users: [{ _openid: 'R1', ...ADULT }], topics } })
+  const topics = Array.from({ length: S.DAILY_LIMITS.report + 1 }, (_, i) => ({ _id: `x${i}`, circleId: M2_CIRCLE._id, _openid: 'A', title: 't', body: 'b', status: 'ok' }))
+  const db = createFakeDb({ data: { users: [{ _openid: 'R1', ...ADULT }], topics, circles: [M2_CIRCLE], memberships: [memberDoc(M2_CIRCLE._id, 'R1')] } })
   const me = as(db, 'R1')
   for (let i = 0; i < S.DAILY_LIMITS.report; i++) assert.equal((await me({ action: 'report', targetType: 'topic', targetId: `x${i}`, reason: 'spam' })).code, 0)
   assert.equal((await me({ action: 'report', targetType: 'topic', targetId: `x${S.DAILY_LIMITS.report}`, reason: 'spam' })).code, 42901)

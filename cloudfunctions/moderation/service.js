@@ -71,6 +71,17 @@ const excerpt = (doc) => {
   return chars.length > 60 ? `${chars.slice(0, 60).join('')}…` : s
 }
 
+/** 举报人是否是内容所在圈子的成员（circleId 为空的旧内容对任何人不可见） */
+async function isCircleMember(db, accountId, circleId) {
+  if (!accountId || typeof circleId !== 'string' || !circleId) return false
+  try {
+    const res = await db.collection('memberships').where({ circleId, _openid: accountId }).limit(1).get()
+    return !!(res && res.data && res.data.length)
+  } catch (e) {
+    if (isCollectionMissingError(e)) return false
+    throw e
+  }
+}
 // ---------- 举报 ----------
 
 async function report(params, ctx) {
@@ -85,6 +96,8 @@ async function report(params, ctx) {
   const g = await guardWrite(ctx, 'report', { requirePhone: false, allowMuted: true })
   const content = await findContent(ctx.db, contentType, input.targetId)
   if (!content) throw notFound('内容不存在或已删除')
+  // 圈内内容只有圈子成员能举报（与读取一致：不是成员 / 旧话题一律当作不存在）
+  if (!(await isCircleMember(ctx.db, g.accountId, content.circleId))) throw notFound('内容不存在或已删除')
   if (content._openid && content._openid === g.accountId) throw badParam('不能举报自己发布的内容')
   const now = ctx.now()
 

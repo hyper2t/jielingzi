@@ -10,6 +10,7 @@ const S = require('../../cloudfunctions/_shared')
 const community = require('../../cloudfunctions/community/service')
 const moderation = require('../../cloudfunctions/moderation/service')
 const { createFakeDb } = require('./fakeDb')
+const { CIRCLE_UNIQUE, circleDoc, memberDoc } = require('./circleFixtures')
 
 beforeEach(() => S.restoreOwnedCollections())
 
@@ -24,10 +25,14 @@ const ID = { alice: 'acct-alice-001', bob: 'acct-bob-002', cara: 'acct-cara-003'
 const BODY = '今天站桩二十分钟，感觉呼吸慢慢沉下来，身体也松开了很多，心里安静了。'.repeat(2)
 const TITLE = '如何面对练习中的枯燥期'
 
+/** M4 起话题必须属于圈子：所有测试账号（除未确认 18+ 的 kid）都加入同一个官方圈子，发帖时默认归到它 */
+const CIRCLE = circleDoc({ slug: 'mindful', name: '静观练习', topicCount: 0 })
 function world() {
   return createFakeDb({
-    unique: { profiles: ['_openid', 'anonAlias'] },
+    unique: { profiles: ['_openid', 'anonAlias'], ...CIRCLE_UNIQUE },
     data: {
+      circles: [CIRCLE],
+      memberships: ['alice', 'bob', 'cara', 'nophone', 'muted', 'mod'].map((k) => memberDoc(CIRCLE._id, ID[k])),
       users: [
         { _openid: ID.alice, ...ADULT, phoneVerified: true },
         { _openid: ID.bob, ...ADULT, phoneVerified: true },
@@ -76,7 +81,7 @@ test('createTopic 校验：标题 5–40、正文有效字数 ≥ 50（空白不
   assert.equal(await code({ tags: 'x' }), 40001)
   assert.equal(await code({ anon: 'yes' }), 40001)
   for (const extra of [{ status: 'ok' }, { images: [] }, { _openid: 'x' }, { featured: true }, { replyCount: 99 }]) assert.equal(await code(extra), 40001, `夹带 ${Object.keys(extra)}`)
-  assert.equal(await code({ circleId: 'c1' }), 40001, '圈子 M4 才开放')
+  assert.equal(await code({ circleId: 'c1' }), 40301, '圈子不存在 / 没加入：40301（圈子读写的详细用例见 m4-topics.test.js）')
   assert.equal((await topicOf(a, { body: '字'.repeat(50) })).code, 0, '恰好 50 字')
   assert.equal((await topicOf(a, { body: `${'字'.repeat(49)}   ` })).code, 40001)
 })
@@ -96,7 +101,7 @@ test('createTopic：落库字段、清洗（换行 / 标签去重去 #）、实�
   assertNoLeak(r.data)
   const saved = db.store.topics[0]
   assert.equal(saved._openid, ID.alice, '作者存在 _openid（注销时 detach）')
-  assert.deepEqual([saved.status, saved.circleId, saved.replyCount, saved.reportCount, saved.featured], ['ok', null, 0, 0, false])
+  assert.deepEqual([saved.status, saved.circleId, saved.replyCount, saved.reportCount, saved.featured], ['ok', CIRCLE._id, 0, 0, false])
   assert.equal(saved.createdAt, saved.lastReplyAt)
 })
 
@@ -159,9 +164,10 @@ test('listTopics：只含 ok、新的在前、分页 + hasMore、只给摘要；
   for (const i of [1, 2]) made.push((await topicOf(a, { title: `第${i}个话题标题`, body: `${BODY}${'。'.repeat(i)}` })).data.topic.id)
   const b = as(db, ID.bob)
   made.push((await topicOf(b, { title: '第3个话题标题', anon: true })).data.topic.id)
-  db.store.topics.push({ _id: 'old1', _openid: ID.bob, anon: false, title: '早先的话题标题', body: BODY, status: 'ok', createdAt: 1, replyCount: 0 })
-  db.store.topics.push({ _id: 'rm1', _openid: ID.bob, anon: false, title: '已下架的话题', body: BODY, status: 'removed', createdAt: tick + 5 })
-  db.store.topics.push({ _id: 'pd1', _openid: ID.bob, anon: false, title: '待复核的话题', body: BODY, status: 'pending', createdAt: tick + 6 })
+  db.store.topics.push({ _id: 'old1', circleId: CIRCLE._id, _openid: ID.bob, anon: false, title: '早先的话题标题', body: BODY, status: 'ok', createdAt: 1, replyCount: 0 })
+  db.store.topics.push({ _id: 'legacy1', _openid: ID.bob, anon: false, title: '没有圈子的旧话题', body: BODY, status: 'ok', createdAt: tick + 4 })
+  db.store.topics.push({ _id: 'rm1', circleId: CIRCLE._id, _openid: ID.bob, anon: false, title: '已下架的话题', body: BODY, status: 'removed', createdAt: tick + 5 })
+  db.store.topics.push({ _id: 'pd1', circleId: CIRCLE._id, _openid: ID.bob, anon: false, title: '待复核的话题', body: BODY, status: 'pending', createdAt: tick + 6 })
 
   const p1 = (await as(db, ID.cara)({ action: 'listTopics', size: 2 })).data
   assert.equal(p1.total, 4)
@@ -174,7 +180,7 @@ test('listTopics：只含 ok、新的在前、分页 + hasMore、只给摘要；
   assert.ok(p1.list.every((x) => !('body' in x) && typeof x.excerpt === 'string'))
   assert.equal(p1.list[1].excerpt.length <= 81, true)
   assertNoLeak(p1)
-  assert.equal((await as(db, ID.cara)({ action: 'listTopics', circleId: 'c1' })).code, 40001)
+  assert.equal((await as(db, ID.cara)({ action: 'listTopics', circleId: 'c1' })).code, 40301)
   assert.equal((await as(db, ID.cara)({ action: 'listTopics', size: 51 })).code, 40001)
   assert.equal((await as(world(), ID.cara)({ action: 'listTopics' })).data.total, 0, '没有 topics 集合也不报错')
 })

@@ -1,7 +1,7 @@
 # M4 实施计划：官方圈子 + 邀请码
 
 > 范围：PRD §5 G1 / G2 / G3（`docs/prd/README.md`）、§7.1 / §7.5 线框；任务编号沿用 `mvp-plan.md` M4，并补充拆分项。
-> 状态：**BE-M4-00、BE-M4-01、BE-M4-02 已完成（2026-10-01）**，其余任务未开工。BE-M4-02 产出：`cloudfunctions/community/invites.js`（`listInvites` / `createInvite` / `redeemInvite` / `normalizeInviteCode`）、`tests/fixtures/invite-code.json`（前后端共享的规范化用例）、`tests/cloudfunctions/m4-invites.test.js`（19 例，含并发与回滚）。BE-M4-01 产出：`cloudfunctions/community/circles.js`（`listCircles` / `getCircle` + 成员关系读取入口 `myCircleIds` / `isMember`）、`common.js`（从 `topics.js` 抽出的 `findById` / `findRows` / `countRows` / `requireReader`，避免循环引用）、`tests/cloudfunctions/m4.test.js`（11 例）。BE-M4-00 产出：`config.js` 的 `INVITE_RULES` / `CIRCLE_RULES` / `DAILY_LIMITS.redeemInvite`（前端 `constants/community.ts` 同名并由测试比对）；`collections.js` 的 3 个新索引；`fakeDb` 支持 `gt / gte / lt / lte / neq / nin / exists`（并与云端一致：等值 `null` 匹配缺失字段、比较不匹配缺失字段、不认识的条件直接抛错）；夹具 `tests/cloudfunctions/circleFixtures.js`；`tests/cloudfunctions/m4-base.test.js`（10 例，含「抢最后一个名额 / 同一个码」的原子性模式）。接口契约草案见 `docs/api/community.md`「圈子与邀请码（M4，草案）」。
+> 状态：**BE-M4-00 ~ BE-M4-03 已完成（2026-10-01）**，其余任务未开工。BE-M4-03 产出：`topics.js` 的成员校验（`createTopic` 选圈子 / 默认归属、`listTopics` 聚合与过滤、`getTopic` / `listReplies` / `createReply` 越权 40401、`circle` 展示字段、`topicCount` 近似维护）、`circles.js` 的 `myOpenCircles` / `circleAccess`、`moderation.report` 的成员校验、`tests/cloudfunctions/m4-topics.test.js`（12 例；M2 / M3 既有用例的种子数据已补圈子与成员）。BE-M4-02 产出：`cloudfunctions/community/invites.js`（`listInvites` / `createInvite` / `redeemInvite` / `normalizeInviteCode`）、`tests/fixtures/invite-code.json`（前后端共享的规范化用例）、`tests/cloudfunctions/m4-invites.test.js`（19 例，含并发与回滚）。BE-M4-01 产出：`cloudfunctions/community/circles.js`（`listCircles` / `getCircle` + 成员关系读取入口 `myCircleIds` / `isMember`）、`common.js`（从 `topics.js` 抽出的 `findById` / `findRows` / `countRows` / `requireReader`，避免循环引用）、`tests/cloudfunctions/m4.test.js`（11 例）。BE-M4-00 产出：`config.js` 的 `INVITE_RULES` / `CIRCLE_RULES` / `DAILY_LIMITS.redeemInvite`（前端 `constants/community.ts` 同名并由测试比对）；`collections.js` 的 3 个新索引；`fakeDb` 支持 `gt / gte / lt / lte / neq / nin / exists`（并与云端一致：等值 `null` 匹配缺失字段、比较不匹配缺失字段、不认识的条件直接抛错）；夹具 `tests/cloudfunctions/circleFixtures.js`；`tests/cloudfunctions/m4-base.test.js`（10 例，含「抢最后一个名额 / 同一个码」的原子性模式）。接口契约草案见 `docs/api/community.md`「圈子与邀请码（M4，草案）」。
 > 约定：「默认」= 我按 PRD 与已有代码取的值，没有被推翻前照此实现；标 ❓ 的是需要产品确认的开放项（§2）。
 
 ## 1. 已有基础（盘点，M4 不重复做）
@@ -10,7 +10,7 @@
 |---|---|---|
 | 集合登记 | `circles`（无索引）、`memberships`（`uniq_circle_member`：`circleId` + `_openid`，合并按 `circleId` 去重保留主账号，注销删除）、`invites`（`uniq_code`，合并改归属，注销删除）均已登记并在云端存在 | `cloudfunctions/_shared/collections.js` |
 | 话题索引 | `topics.idx_circle_status_time`（`circleId` + `status` + `createdAt` 倒序）已建好；`replies` 已冗余 `circleId` | 同上、`docs/ops/collections.md` |
-| 话题钩子 | `createTopic` / `listTopics` 已声明 `circleId` 参数，**非空一律 40001「圈子话题暂未开放」**；`createReply` 已把话题的 `circleId` 复制到回复 | `cloudfunctions/community/topics.js` |
+| 话题钩子 | `createTopic` / `listTopics` 已声明 `circleId` 参数，~~非空一律 40001「圈子话题暂未开放」~~（BE-M4-03 已放开）；`createReply` 已把话题的 `circleId` 复制到回复 | `cloudfunctions/community/topics.js` |
 | 额度 | `DAILY_LIMITS.createInvite = 5` 已在 config；guard 支持 `limit` 覆盖与「成功后才计额度」 | `_shared/config.js`、`_shared/guard.js` |
 | 邀请名额字段 | `users.inviteQuota` 只出现在**账号合并**的补齐字段里，**没有任何代码初始化它** → 需要明确的懒初始化（§4） | `_shared/account.js` |
 | 前端占位 | `app.config.ts`（`TODO(M4)：circle-detail、join-circle、invites`）、`router.ts` 注释、`FilterChips`、`requirePhone`、`useRequest` / `usePaged`、`Toggle` / `TopicCard` | `src/` |
