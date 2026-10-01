@@ -10,7 +10,8 @@
 | 字段 | 类型 | 规则 |
 |---|---|---|
 | nickname | string | 2–16 字（按 Unicode 码点计，emoji / 生僻字算 1 个）；去首尾空格、折叠连续空白；不得含「结灵子 / 官方 / 管理员 / 客服 / 系统 / 审核」；不得含控制字符、零宽字符、双向控制符 |
-| avatar | string \| null | `preset:<id>`，id ∈ `AVATAR_PRESETS`（12 款预置头像，图片 `src/assets/avatars`）；null = 默认头像。**自定义头像上传随 M2 图片机审上线**（未经机审的图片不展示，PRD §3 / §9） |
+| avatar | string \| null | `preset:<id>`（12 款预置头像，`src/assets/avatars`）、`cloud://…`（**审核通过**的上传头像，见 setAvatar）或 null（默认头像）。updateProfile 只接受预置 / null |
+| avatarPending | string \| null | 自己上传、还在审核中的头像（只有本人能看到），通过后写入 avatar；改选预置头像会作废它 |
 | practices | string[] | 只能取 `PRACTICES` 的 id，去重后 ≤ 5 项 |
 | years | number \| null | 0–80 的整数；null = 不填 |
 | goal | string | ≤ 40 字（同上清洗），可为空串 |
@@ -50,6 +51,21 @@
 // → { "action": "updateProfile", "nickname": " 林 然 ", "practices": ["mindfulness", "taichi", "mindfulness"], "years": 3 }
 // ← { "code": 0, "data": { "profile": { "nickname": "林 然", "practices": ["mindfulness", "taichi"], "years": 3, "anonAlias": "竹影", … } }, "msg": "ok" }
 ```
+
+## setAvatar（BE-M2-02）
+
+上传自定义头像。客户端先把图片传到云存储 `uploads/avatar/<年月>/<随机名>.<jpg|png|webp|gif>`（小程序 `wx.cloud.uploadFile`、H5 js-sdk `uploadFile`；**App 暂未接入存储上传，只能选预置头像**），再调用本接口：
+
+| 参数 | 取值 |
+|---|---|
+| fileID | 上传返回的 `cloud://<envId>.<bucket>/uploads/avatar/…` |
+
+- 校验：fileID 必须属于本环境且在 `uploads/avatar/` 下；读文件头确认是 JPG / PNG / WebP / GIF 且 ≤ 2MB，不合规的文件**立即删除**并 40001
+- 写入链路：同 updateProfile（18+、未封禁、未禁言，不要求实名）；每日上传 10 次（`uploadImage`）
+- 机审：小程序用户调微信 `mediaCheckAsync` v2（scene 1，需 openid）→ `status: 'pending'`，结论由消息推送回调（见 [moderation.md](./moderation.md)「图片机审」）；App 用户 / 接口失败 → `status: 'review'`，进人工复核
+- 通过前头像只记 `avatarPending`（对他人不展示）；通过后写入 `avatar`，旧的自定义头像文件删除；违规 → 删除文件、清掉 avatarPending、站内通知
+- 出参：`{ profile, status: 'pending' | 'review' }`
+- 显示：小程序 `<Image>` 直接支持 `cloud://`；H5 / App 换成 `https://<bucket>.tcb.qcloud.la/<path>`，需要云存储读权限为「所有用户可读」（控制台 → 云存储 → 权限设置）
 
 ## 索引
 

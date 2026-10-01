@@ -52,8 +52,10 @@ export interface AccountStatus {
 /** 练习档案（community.getProfile / updateProfile，docs/api/profile.md）。只有本人能读，不含任何账号标识 */
 export interface Profile {
   nickname: string
-  /** 'preset:<id>'（预置头像）或 null（默认头像） */
+  /** 'preset:<id>'（预置头像）、'cloud://…'（审核通过的上传头像）或 null（默认头像） */
   avatar: string | null
+  /** 自己上传、还在审核中的头像（只有本人看得到；通过后变成 avatar，BE-M2-02） */
+  avatarPending?: string | null
   /** 练习方式 id（constants/community.ts PRACTICES） */
   practices: string[]
   years: number | null
@@ -102,3 +104,15 @@ export interface ModQueueItem extends Required<Pick<ReportTarget, 'targetType' |
 }
 
 export type ModDecision = 'dismiss' | 'remove' | 'restore' | 'mute' | 'ban'
+
+/** 图片人工复核条目（moderation.mediaQueue，BE-M2-02）：url 为 1 小时临时预览链接，不含上传者标识 */
+export interface MediaQueueItem {
+  mediaId: string
+  purpose: string
+  purposeLabel: string
+  status: 'pending' | 'review'
+  provider: 'wx' | 'manual'
+  label: string | number | null
+  createdAt: number
+  url: string | null
+}

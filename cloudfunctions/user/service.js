@@ -410,6 +410,11 @@ async function deleteAccount(params, ctx) {
     appleAuthorizationCode: { type: 'string', minLen: 8, maxLen: 1024, optional: true },
   })
   const accountId = requireOpenid(ctx.identity)
+  // 用户上传的图片文件一并删除（media 记录由 owned 登记删除；尽力而为，失败不阻断注销）
+  if (ctx.storage) {
+    const files = (await ctx.accountRepo.listOwned('media', accountId)).map((m) => m.fileID).filter(Boolean)
+    if (files.length) await ctx.storage.deleteFiles(files).catch((e) => logger(ctx).error('[deleteAccount] 删除图片失败', e && e.message))
+  }
   const removed = await deleteAccountData(ctx.accountRepo, { accountId, logger: logger(ctx) })
   const out = { ok: true, removed }
   // 数据先删（主流程），撤销尽力而为：失败只记日志，返回 appleRevoked=false 供客户端提示「可在 iPhone 设置里停止使用 Apple 登录」

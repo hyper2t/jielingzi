@@ -75,6 +75,22 @@
         "node_modules",
         "node_modules/**/*"
       ]
+    },
+    {
+      "name": "mediacheck",
+      "description": "图片异步机审回调（消息推送 wxa_media_check → 生效 / 下架，BE-M2-02）；客户端无权调用",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules",
+        "node_modules/**/*"
+      ],
+      "envVariables": {
+        "WX_MP_APP_ID": "{{env.WX_MP_APP_ID}}"
+      }
     }
   ]
 }

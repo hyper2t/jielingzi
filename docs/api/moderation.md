@@ -74,6 +74,30 @@ node scripts/ops/set-role.mjs --phone 13800138000 --role mod           # 预览�
 node scripts/ops/set-role.mjs --account <accountId> --role mod --apply  # 写入（打印旧值便于回滚）
 ```
 
-## 待实现
+## 图片机审（BE-M2-02）
 
-- BE-M2-02 图片异步机审（`mediaCheckAsync` + 消息推送回调 → 更新内容状态），与自定义头像上传、M3 话题图片一起上线
+实现：`cloudfunctions/_shared/media.js`（登记 / 落地）、`cloudfunctions/mediacheck`（回调）。集合 `media`：`{ _openid: 上传者, fileID, purpose: 'avatar', status: pending | review | pass | reject, provider: wx | manual, traceId, label, size, createdAt, checkedAt, checkedBy }`。
+
+```
+客户端上传到 uploads/<用途>/ → community.setAvatar → startImageCheck：校验路径 / 类型 / 大小 → 登记 media
+  ├─ 小程序用户：mediaCheckAsync v2 { media_url: 临时链接, media_type: 2, version: 2, scene: 1, openid } → pending
+  │     └─ 微信「消息推送」事件 wxa_media_check → mediacheck 云函数 → settleMedia
+  │           pass  → 生效（头像写入 avatar，旧的自定义头像文件删除）
+  │           risky → 删除文件（违规图自动下架）+ 清掉 avatarPending + 站内通知 + mod_logs
+  │           review→ 进人工复核
+  └─ App 用户（无 openid）/ 微信接口失败 → review → 人工复核（mediaQueue / decideMedia）
+```
+
+- **mediacheck 只能由平台推送触发**：云函数安全规则 `mediacheck: { invoke: false }`（客户端一律不能调，防伪造结论）；函数内再校验 `appid = WX_MP_APP_ID`、`trace_id` 必须已登记；结论幂等（已 pass / reject 的不再变化）；被新上传替代的图片即使通过也不生效并删除
+- **需要在微信侧配置消息推送**（只需一次）：微信开发者工具 → 云开发控制台 → 设置 → 其他设置 →「消息推送」→ 添加：消息类型 `event`、事件类型 `wxa_media_check`、环境选结灵子环境、云函数 `mediacheck`。没配置时机审结论推不回来，图片会在 30 分钟后进入人工复核队列
+- 注销：`user.deleteAccount` 删除该用户在 `media` 里登记过的全部文件，记录随 owned 登记删除
+
+### mediaQueue（仅 mod / admin）
+
+- 入参：`{ page?, size? }`；出参 `{ list, total, page, size, hasMore }`，list：`{ mediaId, purpose, purposeLabel, status, provider, label, createdAt, url（1 小时临时预览链接） }`
+- 内容：status = review 的，以及 pending 超过 30 分钟（回调没来）的；**不含上传者标识**
+
+### decideMedia（仅 mod / admin）
+
+- 入参：`{ mediaId, decision: 'pass' | 'reject', note? }`；结论同回调落地（reject 删除文件并通知上传者），写 mod_logs（kind = manual）
+- 出参：`{ ok: true, status, changed }`；错误：40001、40101、40301、40401

@@ -120,7 +120,18 @@ function createMpClient(env, opts = {}) {
     return { suggest: ['pass', 'review', 'risky'].includes(r.suggest) ? r.suggest : 'review', label: r.label != null ? r.label : null, traceId: data.trace_id || null }
   }
 
-  return { appId, getAccessToken, getPhoneNumber, msgSecCheck, postJson }
+  /**
+   * 图片异步内容安全 v2（BE-M2-02）：POST /wxa/media_check_async { media_url, media_type: 2, version: 2, scene, openid }。
+   * 返回 { traceId }；结论由「消息推送」事件 wxa_media_check 推给 mediacheck 云函数。
+   */
+  async function mediaCheckAsync(mediaUrl, { scene, openid }) {
+    const data = await postJson('/wxa/media_check_async', { media_url: mediaUrl, media_type: 2, version: 2, scene, openid })
+    if (data.errcode) throw upstream(`图片安全接口失败（${data.errcode}）`)
+    if (typeof data.trace_id !== 'string' || !data.trace_id) throw upstream('图片安全接口未返回 trace_id')
+    return { traceId: data.trace_id }
+  }
+
+  return { appId, getAccessToken, getPhoneNumber, msgSecCheck, mediaCheckAsync, postJson }
 }
 
 module.exports = { createMpClient, MP_TOKEN_ERRCODES: TOKEN_ERRCODES, MP_PHONE_CODE_ERRCODES: PHONE_CODE_ERRCODES }

@@ -3,7 +3,7 @@
  * 切换真实数据：在 .env / .env.local 写 TARO_APP_DATA_SOURCE=cloud（见 services/client.ts），业务层不改。
  * 业务云函数落地时：在 FunctionMap 声明后，这里的 handlers 必须补上同名实现（类型会强制要求）。
  */
-import type { AccountStatus, ModQueueItem, Profile, User, UserSettings } from '@/types/models'
+import type { AccountStatus, MediaQueueItem, ModQueueItem, Profile, User, UserSettings } from '@/types/models'
 import type { AccountIdentities } from '../cloud.types'
 import { CONSENT_VERSION } from '@/constants/community'
 import { normalizeLine, patchError } from '@/features/profile/rules'
@@ -25,6 +25,17 @@ let profile: Profile | null = null
 /** mock 云端举报（moderation.report / queue / decide） */
 interface MockReport { targetType: ModQueueItem['targetType'], targetId: string, contentType: ModQueueItem['contentType'], reason: string, note: string, state: 'open' | 'resolved', by: string }
 let reports: MockReport[] = []
+/** mock 云端图片机审记录（setAvatar / mediaQueue / decideMedia） */
+interface MockMedia { mediaId: string, fileID: string, status: 'pending' | 'review' | 'pass' | 'reject' }
+let media: MockMedia[] = []
+let mediaSeq = 0
+/** 模拟机审结论落地（等价于 mediacheck 回调 / 人工复核） */
+function settleMock (m: MockMedia, verdict: 'pass' | 'reject') {
+  m.status = verdict
+  if (profile && profile.avatarPending === m.fileID) {
+    profile = { ...profile, avatarPending: null, ...(verdict === 'pass' ? { avatar: m.fileID } : {}) }
+  }
+}
 /** getPhoneNumber 回调里以这个前缀开头的 code 视为失效（测试 / 演示「code 失效」分支） */
 export const MOCK_EXPIRED_PHONE_CODE = 'mock-expired'
 /** 视为「号码已绑定其他微信账号」的 code（演示 40901） */
@@ -53,6 +64,12 @@ export const mockControl = {
     reports = list.map(r => ({ note: '', contentType: r.targetType === 'user' ? 'topic' : r.targetType as MockReport['contentType'], ...r, state: 'open' }))
   },
   get reports (): MockReport[] { return reports.map(r => ({ ...r })) },
+  get media (): MockMedia[] { return media.map(m => ({ ...m })) },
+  /** 模拟微信机审回调：最近一张待审头像的结论 */
+  settleAvatar (verdict: 'pass' | 'reject') {
+    const m = [...media].reverse().find(x => x.status === 'pending' || x.status === 'review')
+    if (m) settleMock(m, verdict)
+  },
   get account (): AccountStatus { return { ...account } },
   get profile (): Profile | null { return profile ? { ...profile } : null },
   reset () {
@@ -65,6 +82,8 @@ export const mockControl = {
     account = { ...NO_STATUS }
     profile = null
     reports = []
+    media = []
+    mediaSeq = 0
   }
 }
 
@@ -174,6 +193,18 @@ const handlers: Handlers = {
         updatedAt: Date.now()
       } as Profile
       return { profile: { ...profile } }
+    },
+    // 与云端一致：只接受本应用 uploads/avatar/ 下的文件；mock 一律进 pending（小程序有 openid）
+    setAvatar: ({ fileID }) => {
+      if (!fileID || !/^cloud:\/\/[^/]+\/uploads\/avatar\//.test(fileID)) throw new CloudError(ERROR_CODES.BAD_PARAM, '图片路径不正确，请重新上传')
+      guard({ requirePhone: false })
+      const m: MockMedia = { mediaId: `m${++mediaSeq}`, fileID, status: 'pending' }
+      media.push(m)
+      profile = {
+        nickname: '', avatar: null, practices: [], years: null, goal: '', bio: '', badges: [],
+        anonAlias: MOCK_ALIASES[0], updatedAt: Date.now(), ...(profile || {}), avatarPending: fileID
+      }
+      return { profile: { ...profile }, status: 'pending' }
     }
   },
   // 与云端 moderation 一致：举报需 18+（禁言可举报）、同一人只计一次；队列 / 处理仅 mod / admin
@@ -217,6 +248,21 @@ const handlers: Handlers = {
       if (!n) throw new CloudError(ERROR_CODES.NOT_FOUND, '举报目标不存在')
       const status = input.decision === 'remove' ? 'removed' : input.decision === 'mute' || input.decision === 'ban' ? null : 'ok'
       return { ok: true, resolved: n, status }
+    },
+    mediaQueue: () => {
+      if (account.role !== 'mod' && account.role !== 'admin') throw new CloudError(ERROR_CODES.FORBIDDEN, '无权限')
+      const list: MediaQueueItem[] = media.filter(m => m.status === 'pending' || m.status === 'review').map(m => ({
+        mediaId: m.mediaId, purpose: 'avatar', purposeLabel: '头像', status: m.status as MediaQueueItem['status'], provider: 'wx', label: null, createdAt: Date.now(), url: `https://mock.example/${m.mediaId}.jpg`
+      }))
+      return { list, total: list.length, page: 1, size: 20, hasMore: false }
+    },
+    decideMedia: ({ mediaId, decision }) => {
+      if (account.role !== 'mod' && account.role !== 'admin') throw new CloudError(ERROR_CODES.FORBIDDEN, '无权限')
+      const m = media.find(x => x.mediaId === mediaId)
+      if (!m) throw new CloudError(ERROR_CODES.NOT_FOUND, '图片记录不存在')
+      const changed = m.status === 'pending' || m.status === 'review'
+      if (changed) settleMock(m, decision)
+      return { ok: true, status: m.status, changed }
     }
   }
 }
@@ -282,6 +328,15 @@ const mockAuth: CloudAuth = {
 
 export const mockCloud: CloudClient = {
   platform: 'weapp',
+  // mock 云存储：返回形如 cloud://mock-env.mock-bucket/<cloudPath> 的 fileID
+  storage: {
+    async upload (localPath, cloudPath) {
+      await gate()
+      if (!localPath) throw new CloudError(ERROR_CODES.BAD_PARAM, '没有选择文件')
+      mockControl.calls.push({ name: 'storage', action: 'upload', data: { cloudPath } })
+      return `cloud://mock-env.mock-bucket/${cloudPath}`
+    }
+  },
   init: () => Promise.resolve(),
   identity: () => Promise.resolve({ uid: MOCK_OPENID, anonymous: false, method: mockSession?.method || null, accountId: mockSession?.accountId || null }),
   signOut: () => mockAuth.signOut(),

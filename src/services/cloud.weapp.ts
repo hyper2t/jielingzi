@@ -48,6 +48,19 @@ export const cloud: CloudClient = {
     return identityCache
   },
 
+  storage: {
+    async upload (localPath, cloudPath) {
+      await cloud.init()
+      try {
+        const res: any = await ensureCloud().uploadFile({ cloudPath, filePath: localPath } as any)
+        if (!res || !res.fileID) throw new CloudError(ERROR_CODES.NETWORK, '上传失败')
+        return res.fileID as string
+      } catch (e) {
+        throw toCloudError(e)
+      }
+    }
+  },
+
   db: {
     async query (collection, opts = {}) {
       await cloud.init()

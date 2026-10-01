@@ -42,6 +42,20 @@ function toCloudError (e: any): CloudError {
 }
 
 export const cloud: CloudClient = {
+  storage: {
+    async upload (localPath, cloudPath, file) {
+      try {
+        const app = await getApp()
+        // H5：chooseImage 给的是 blob URL，js-sdk 需要原始 File 对象
+        const res = await app.uploadFile({ cloudPath, filePath: file || localPath })
+        if (!res || !res.fileID) throw new CloudError(ERROR_CODES.NETWORK, '上传失败')
+        return res.fileID as string
+      } catch (e) {
+        throw toCloudError(e)
+      }
+    }
+  },
+
   platform: 'h5',
 
   async init () {

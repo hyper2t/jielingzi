@@ -40,7 +40,7 @@ describe('审核页（FE-M2-02）', () => {
     useUserStore.setState({ account: { ...STATUS, role: 'mod' } })
     const r = render(<AdminQueue />)
     await flush()
-    expect(mockControl.calls.map(c => c.action)).toEqual(['queue'])
+    expect(mockControl.calls.map(c => c.action).sort()).toEqual(['mediaQueue', 'queue'])
     expect(texts(r)).toContain(NO_PERMISSION)
   })
 

@@ -24,3 +24,13 @@ export function decide (target: ReportTarget, decision: ModDecision, extra: { da
   assertCanWrite()
   return getClient().fn.call('moderation', 'decide', { ...target, decision, ...extra })
 }
+
+/** 图片人工复核队列（BE-M2-02，仅 mod / admin） */
+export function getMediaQueue (page = 1) {
+  return getClient().fn.call('moderation', 'mediaQueue', { page, size: 20 })
+}
+
+export function decideMedia (mediaId: string, decision: 'pass' | 'reject', note?: string) {
+  assertCanWrite()
+  return getClient().fn.call('moderation', 'decideMedia', note ? { mediaId, decision, note } : { mediaId, decision })
+}

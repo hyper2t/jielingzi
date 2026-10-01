@@ -8,7 +8,9 @@ export const DAILY_LIMITS = {
   answerPrompt: 1,
   report: 30,
   createInvite: 5,
-  updateProfile: 20
+  updateProfile: 20,
+  /** 上传图片（头像等） */
+  uploadImage: 10
 } as const
 
 export const TEXT_RULES = {

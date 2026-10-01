@@ -31,6 +31,7 @@ node scripts/ops/security-rules.mjs --apply       # 下发：全部集合 {read:
 | daily_prompts | 每日一题 | — | — | 私有 |
 | prompt_answers | 每日一题作答 | 按 promptId 去重 | **保留，解除归属** | 私有 |
 | notifications | 站内消息 | 改归属 | 删除 | 私有 |
+| media | 用户上传图片的机审记录（BE-M2-02） | 改归属 | 删除（文件由 user.deleteAccount 一并删除） | 私有 |
 | rate_limits | 频控计数（_id = accountId:action:日期，expireAt 2 天） | — | 过期自动清理 | 私有 |
 
 "私有" = `{ read: false, write: false }`：客户端 SDK 不能直读直写，所有读写经云函数。
@@ -58,6 +59,9 @@ node scripts/ops/security-rules.mjs --apply       # 下发：全部集合 {read:
 | checkins | `uniq_owner_day` | `_openid` + `dayKey` | 唯一 |
 | daily_prompts | `uniq_date` | `date` | 唯一 |
 | prompt_answers | `idx_prompt_owner` | `promptId` + `_openid` | 普通 |
+| media | `idx_traceId` | `traceId` | 普通 |
+| media | `idx_status_time` | `status` + `createdAt`(desc) | 普通 |
+| media | `idx_owner_time` | `_openid` + `createdAt`(desc) | 普通 |
 | notifications | `idx_owner_read_time` | `_openid` + `read` + `createdAt`(desc) | 普通 |
 | rate_limits | `idx_expireAt` | `expireAt` | 普通 |
 

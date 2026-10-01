@@ -11,6 +11,7 @@
 const {
   validate, badParam, notFound, forbidden, guardWrite, guardRole, isDuplicateKeyError, isCollectionMissingError,
   withCollection, logModeration, notify, REPORT_REASONS, REPORT_FOLD_THRESHOLD, PUNISH_DAYS, pageSchema,
+  settleMedia, MEDIA_COLLECTION, PENDING_STALE_MS, MEDIA_PURPOSES,
 } = require('./_shared')
 
 const REPORTS = 'reports'
@@ -238,6 +239,57 @@ async function decide(params, ctx) {
   return { ok: true, resolved: open.length, status }
 }
 
+// ---------- 图片人工复核（BE-M2-02） ----------
+
+async function listMedia(db, status) {
+  try {
+    const res = await db.collection(MEDIA_COLLECTION).where({ status }).orderBy('createdAt', 'asc').limit(QUEUE_SCAN_LIMIT).get()
+    return (res && res.data) || []
+  } catch (e) {
+    if (isCollectionMissingError(e)) return []
+    throw e
+  }
+}
+
+/** 待人工复核的图片：status=review（App 用户 / 机审要求复核 / 微信接口失败），以及等回调超过 30 分钟的 pending */
+async function mediaQueue(params, ctx) {
+  const input = validate(params, pageSchema(50))
+  await guardRole(ctx)
+  const now = ctx.now()
+  const rows = [...await listMedia(ctx.db, 'review'), ...(await listMedia(ctx.db, 'pending')).filter((m) => now - (m.createdAt || 0) > PENDING_STALE_MS)]
+  const start = (input.page - 1) * input.size
+  const list = []
+  for (const m of rows.slice(start, start + input.size)) {
+    list.push({
+      mediaId: m._id,
+      purpose: m.purpose,
+      purposeLabel: (MEDIA_PURPOSES[m.purpose] && MEDIA_PURPOSES[m.purpose].label) || m.purpose,
+      status: m.status,
+      provider: m.provider,
+      label: m.label,
+      createdAt: m.createdAt,
+      // 预览用临时链接（1 小时）；不含上传者标识
+      url: ctx.storage ? await ctx.storage.tempUrl(m.fileID) : null,
+    })
+  }
+  return { list, total: rows.length, page: input.page, size: input.size, hasMore: start + input.size < rows.length }
+}
+
+async function decideMedia(params, ctx) {
+  const input = validate(params, { mediaId: { type: 'id' }, decision: { type: 'enum', values: ['pass', 'reject'] }, note: { type: 'string', maxLen: 200, optional: true } })
+  const { accountId: actor } = await guardRole(ctx)
+  let media = null
+  try {
+    const res = await ctx.db.collection(MEDIA_COLLECTION).doc(input.mediaId).get()
+    media = (res && res.data && res.data[0]) || null
+  } catch (e) {
+    if (!isCollectionMissingError(e)) throw e
+  }
+  if (!media) throw notFound('图片记录不存在')
+  const r = await settleMedia(ctx, media, { verdict: input.decision, label: input.note || null, actor })
+  return { ok: true, status: r.status, changed: r.changed }
+}
+
 const actions = {
   /** 健康检查：部署 / 安全规则验证用，不读写数据库 */
   async ping(_params, ctx) {
@@ -246,7 +298,9 @@ const actions = {
   report,
   queue,
   decide,
-  // TODO(BE-M2-02)：图片异步机审回调（mediaCheckAsync 结果 → 更新内容状态）
+  mediaQueue,
+  decideMedia,
+  // 图片机审回调不在这里：消息推送推给独立的 mediacheck 云函数（客户端无权调用），见 cloudfunctions/mediacheck
 }
 
 module.exports = { actions, IDENTITY_FREE_ACTIONS }

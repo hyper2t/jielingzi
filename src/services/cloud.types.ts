@@ -6,7 +6,7 @@
  * - RN：cloud.rn.ts（CloudBase HTTP API：公开读用 Publishable Key；身份类调用用登录后的会话，见 `CloudAuth`）
  * 云函数入参 / 出参以 docs/api/*.md 为准（starter：docs/api/user.md）。
  */
-import type { AccountStatus, ModDecision, ModQueueItem, Profile, ProfilePatch, ReportTarget, User, UserSettings } from '@/types/models'
+import type { AccountStatus, MediaQueueItem, ModDecision, ModQueueItem, Profile, ProfilePatch, ReportTarget, User, UserSettings } from '@/types/models'
 
 /** 客户端可直读的集合（安全规则见 docs/api/README.md「安全规则」）；业务集合落地时在这里补充 */
 export interface CollectionMap {
@@ -111,6 +111,8 @@ export interface FunctionMap {
     getProfile: [void, { profile: Profile | null }]
     /** 部分更新（只传要改的字段）；首次保存时建档并分配匿名代号。需已确认 18+（40303），不要求实名 */
     updateProfile: [ProfilePatch, { profile: Profile }]
+    /** 上传头像后登记并机审（BE-M2-02）：pending = 等微信机审回调；review = 人工复核（App 用户等）。通过前只记 avatarPending */
+    setAvatar: [{ fileID: string }, { profile: Profile, status: 'pending' | 'review' }]
   }
   /** 内容安全（docs/api/moderation.md，M2） */
   moderation: {
@@ -120,6 +122,10 @@ export interface FunctionMap {
     queue: [{ state?: 'open' | 'resolved', page?: number, size?: number }, { list: ModQueueItem[], total: number, page: number, size: number, hasMore: boolean }]
     /** 处理（仅 mod / admin）：decision 不叫 action（action 是路由字段）；mute 需 days 1–30，ban 不传 days = 永久 */
     decide: [ReportTarget & { decision: ModDecision, days?: number, note?: string }, { ok: true, resolved: number, status: string | null }]
+    /** 图片人工复核队列（仅 mod / admin） */
+    mediaQueue: [{ page?: number, size?: number }, { list: MediaQueueItem[], total: number, page: number, size: number, hasMore: boolean }]
+    /** 图片复核结论（仅 mod / admin）：pass 生效；reject 删除文件并通知上传者 */
+    decideMedia: [{ mediaId: string, decision: 'pass' | 'reject', note?: string }, { ok: true, status: string, changed: boolean }]
   }
   // 业务云函数在这里按同样格式声明：<函数名>: { <action>: [入参, 出参] }，并在 cloud.rn.ts 标注公开 / 免身份动作
 }
@@ -247,8 +253,16 @@ export interface CloudAuth {
   deleteCloudUser(): Promise<void>
 }
 
+/** 云存储上传（小程序 / H5 / mock 实现；App 暂未实现，见 docs/api/profile.md setAvatar） */
+export interface CloudStorage {
+  /** 把本地临时文件传到 cloudPath（如 uploads/avatar/202610/xxx.jpg），返回 fileID（cloud://…） */
+  upload(localPath: string, cloudPath: string, file?: unknown): Promise<string>
+}
+
 export interface CloudClient {
   platform: 'weapp' | 'h5' | 'rn'
+  /** 云存储（没有实现的端为 undefined：不显示上传入口） */
+  storage?: CloudStorage
   /** 幂等；多次调用返回同一个 Promise */
   init(): Promise<void>
   identity(): Promise<CloudIdentity>

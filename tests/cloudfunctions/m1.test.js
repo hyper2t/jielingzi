@@ -350,7 +350,7 @@ test('getProfile / updateProfile：首次保存建档并分配匿名代号；部
   const p = r.data.profile
   assert.deepEqual([p.nickname, p.practices, p.years, p.goal, p.bio, p.avatar], ['林 然', ['mindfulness', 'taichi'], 3, '每天 20 分钟', '在呼吸里找回自己', 'preset:leaf'])
   assert.match(p.anonAlias, /^[\u4e00-\u9fa5]{2}$/)
-  assert.deepEqual(Object.keys(p).sort(), ['anonAlias', 'avatar', 'badges', 'bio', 'goal', 'nickname', 'practices', 'updatedAt', 'years'])
+  assert.deepEqual(Object.keys(p).sort(), ['anonAlias', 'avatar', 'avatarPending', 'badges', 'bio', 'goal', 'nickname', 'practices', 'updatedAt', 'years'])
   assert.deepEqual(db.store.profiles.map((x) => x._openid), ['U'])
   const r2 = await me({ action: 'updateProfile', bio: '' })
   assert.deepEqual([r2.data.profile.bio, r2.data.profile.nickname, r2.data.profile.anonAlias], ['', '林 然', p.anonAlias])

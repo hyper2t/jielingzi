@@ -11,7 +11,7 @@ import { View, Text, Input } from '@tarojs/components'
 import { AuthorBadge, Avatar, Button, ConsentSheet, Icon, Screen, showToast } from '@/components'
 import { AVATAR_PRESETS, PRACTICES, PROFILE_RULES, TEXT_RULES } from '@/constants/community'
 import type { AvatarPreset } from '@/constants/community'
-import { getProfile, PROFILE_KEY, updateProfile } from '@/services/community'
+import { canUploadAvatar, getProfile, PROFILE_KEY, updateProfile, uploadAvatar } from '@/services/community'
 import { needsAdultConfirm, userFacingMessage } from '@/services/errors'
 import { useRequest } from '@/hooks/useRequest'
 import { useTrackPage } from '@/hooks/useTrackPage'
@@ -29,6 +29,9 @@ export const SAVED_TEXT = '已保存'
 export const NO_CHANGE_TEXT = '没有修改'
 export const ALIAS_PENDING = '首次保存后分配匿名代号，匿名发布时显示'
 export const ALIAS_HINT = '匿名发布时显示，不会关联你的档案'
+export const AVATAR_UPLOAD = '上传照片'
+export const AVATAR_PENDING_HINT = '头像审核中，通过后对他人展示'
+export const AVATAR_SUBMITTED = '已提交审核'
 
 /** 预置头像的读屏名 */
 const AVATAR_LABELS: Record<AvatarPreset, string> = {
@@ -63,6 +66,27 @@ export default function ProfileEdit () {
   const [errors, setErrors] = useState<ProfileErrors>({})
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [pending, setPending] = useState<string | null>(null)
+  const avatarPending = pending || data?.avatarPending || null
+
+  const onUpload = async () => {
+    if (uploading || saving) return
+    setUploading(true)
+    setErrors(e => ({ ...e, avatar: undefined }))
+    try {
+      const r = await uploadAvatar()
+      if (!r) return
+      setPending(r.profile.avatarPending || null)
+      track('profile_save', { created: !data })
+      showToast(AVATAR_SUBMITTED)
+    } catch (e) {
+      if (needsAdultConfirm(e)) void navigate('adult', { reason: '上传头像' })
+      else setErrors(er => ({ ...er, avatar: userFacingMessage(e) }))
+    } finally {
+      setUploading(false)
+    }
+  }
 
   // 档案到达后填表（用户还没动过表单时）
   useEffect(() => {
@@ -135,8 +159,23 @@ export default function ProfileEdit () {
             : <Text {...tw('font-body text-caption text-ink-faint')}>{ALIAS_PENDING}</Text>}
         </View>
 
-        <Field label='头像' hint='自定义头像将在内容审核上线后开放' error={errors.avatar}>
+        <Field label='头像' hint={canUploadAvatar() ? '上传照片需审核，或选择预置头像' : '选择预置头像'} error={errors.avatar}>
+          {!!avatarPending && (
+            <View {...tw('flex flex-row items-center mb-2')}>
+              <Avatar avatar={avatarPending} size='md' />
+              <Text {...tw('font-body text-caption text-ink-soft ml-2')}>{AVATAR_PENDING_HINT}</Text>
+            </View>
+          )}
           <View {...tw('flex flex-row flex-wrap')}>
+            {canUploadAvatar() && (
+              <View
+                {...tw('flex items-center justify-center w-12 h-12 mr-2 mb-2 rounded-full border-2 border-dashed border-ink-faint')}
+                onClick={() => { void onUpload() }}
+                {...a11yButton(uploading ? '正在上传' : AVATAR_UPLOAD)}
+              >
+                <Text {...tw('font-body text-caption text-ink-soft')}>{uploading ? '…' : '上传'}</Text>
+              </View>
+            )}
             {[null, ...AVATAR_PRESETS].map(id => {
               const value = id ? `preset:${id}` : null
               const on = form.avatar === value

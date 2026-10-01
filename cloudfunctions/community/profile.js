@@ -13,7 +13,7 @@
 const {
   badParam, validate, requireOpenid, guardWrite, checkText, AppError, CODES,
   TEXT_RULES, PRACTICE_IDS, PROFILE_RULES, AVATAR_PRESETS, RESERVED_NICKNAME_WORDS,
-  isDuplicateKeyError, isCollectionMissingError, withCollection, logModeration,
+  isDuplicateKeyError, isCollectionMissingError, withCollection, logModeration, startImageCheck,
 } = require('./_shared')
 const { generateAlias } = require('./alias')
 
@@ -46,7 +46,7 @@ function cleanNickname(value) {
 function cleanAvatar(value) {
   if (value === null) return null
   const m = typeof value === 'string' ? AVATAR_RE.exec(value) : null
-  if (!m || !AVATAR_PRESETS.includes(m[1])) throw badParam('请选择预置头像（自定义头像将在内容审核上线后开放）')
+  if (!m || !AVATAR_PRESETS.includes(m[1])) throw badParam('请选择预置头像（自定义头像请用上传，审核通过后生效）')
   return value
 }
 
@@ -89,6 +89,8 @@ function present(doc) {
   return {
     nickname: typeof doc.nickname === 'string' ? doc.nickname : '',
     avatar: typeof doc.avatar === 'string' ? doc.avatar : null,
+    /** 自己上传、还在审核中的头像（只有本人看得到，BE-M2-02） */
+    avatarPending: typeof doc.avatarPending === 'string' ? doc.avatarPending : null,
     practices: Array.isArray(doc.practices) ? doc.practices : [],
     years: typeof doc.years === 'number' ? doc.years : null,
     goal: typeof doc.goal === 'string' ? doc.goal : '',
@@ -172,9 +174,34 @@ async function updateProfile(params, ctx) {
   if (verdict.verdict === 'reject') throw badParam('内容不符合社区公约，请修改后再保存')
   // review：档案只对本人可见（M3 起作者信息对他人展示前再按 pending 处理），这里只留痕待人工复核
   const { doc, created } = await ensureProfile(ctx, g.accountId, now, input)
-  if (!created) await ctx.db.collection(COLLECTION).doc(doc._id).update({ ...input, updatedAt: now })
+  const patch = { ...input }
+  // 改选预置 / 默认头像：作废审核中的上传（删文件）
+  if (input.avatar !== undefined && doc.avatarPending) {
+    patch.avatarPending = null
+    if (ctx.storage) await ctx.storage.deleteFiles([doc.avatarPending]).catch(() => {})
+  }
+  if (!created) await ctx.db.collection(COLLECTION).doc(doc._id).update({ ...patch, updatedAt: now })
   await g.commit()
-  return { profile: present({ ...doc, ...input, updatedAt: now }) }
+  return { profile: present({ ...doc, ...patch, updatedAt: now }) }
 }
 
-module.exports = { getProfile, updateProfile, ensureProfile, parseUpdate, present, textLength, PROFILE_COLLECTION: COLLECTION }
+/**
+ * community.setAvatar（BE-M2-02 + FE-M1-03 自定义头像）：客户端已把图片传到 uploads/avatar/ 下，这里登记并发起机审。
+ * 审核通过前头像只记在 avatarPending（只有本人看得到）；通过后由 mediacheck 回调 / 人工复核写入 avatar。
+ * 写入链路同 updateProfile（18+、未封禁、未禁言，不要求实名），每日上传 10 次。
+ */
+async function setAvatar(params, ctx) {
+  const { fileID } = validate(params, { fileID: { type: 'string', minLen: 10, maxLen: 512 } })
+  const g = await guardWrite(ctx, 'uploadImage', { requirePhone: false })
+  const media = await startImageCheck(ctx, { fileID, purpose: 'avatar', accountId: g.accountId })
+  const now = ctx.now()
+  const { doc, created } = await ensureProfile(ctx, g.accountId, now, { avatarPending: fileID })
+  if (!created) {
+    if (doc.avatarPending && doc.avatarPending !== fileID && ctx.storage) await ctx.storage.deleteFiles([doc.avatarPending]).catch(() => {})
+    await ctx.db.collection(COLLECTION).doc(doc._id).update({ avatarPending: fileID, updatedAt: now })
+  }
+  await g.commit()
+  return { profile: present({ ...doc, avatarPending: fileID, updatedAt: now }), status: media.status }
+}
+
+module.exports = { getProfile, updateProfile, setAvatar, ensureProfile, parseUpdate, present, textLength, PROFILE_COLLECTION: COLLECTION }

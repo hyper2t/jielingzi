@@ -8,6 +8,8 @@ test('内置规则本身合法：业务函数需登录，其余拒绝；全部�
   assert.deepEqual(validateFunctionRule(FUNCTION_RULE), FUNCTION_RULE)
   for (const fn of ['user', 'community', 'moderation', 'practice']) assert.equal(FUNCTION_RULE[fn].invoke, 'auth != null')
   assert.equal(FUNCTION_RULE['*'].invoke, false)
+  // 图片机审回调只由微信消息推送触发，客户端不能调（防伪造审核结论，BE-M2-02）
+  assert.equal(FUNCTION_RULE.mediacheck.invoke, false)
   const names = Object.keys(COLLECTION_RULES)
   for (const n of ['users', 'account_links', 'account_merges', 'profiles', 'topics', 'replies', 'reports', 'rate_limits']) assert.ok(names.includes(n), n)
   for (const rule of Object.values(COLLECTION_RULES)) assert.deepEqual(rule, { read: false, write: false })

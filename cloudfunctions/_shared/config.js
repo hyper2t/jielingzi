@@ -11,6 +11,8 @@ const DAILY_LIMITS = Object.freeze({
   report: 30,
   createInvite: 5,
   updateProfile: 20,
+  /** 上传图片（头像等，BE-M2-02） */
+  uploadImage: 10,
 })
 
 /** 字数规则（PRD T1 / T2 / P1） */

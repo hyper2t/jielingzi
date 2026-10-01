@@ -11,7 +11,7 @@
   - 通过 Apple 登录（仅 iOS 13+，NA-L04 / BE-L09，审核指南 4.8）：系统 AuthenticationServices 授权 → `user.appleLogin` 校验 identityToken 换自定义登录票据。采集：Apple 用户标识 `sub`（不申请邮箱、姓名）。注销账号时重新授权一次并撤销 Apple 授权（审核指南 5.1.1(v)）。
   - 会话：access_token 2 h + refresh_token（30 天滚动），存 AsyncStorage（`auth_session`）；退出登录 `POST /auth/v1/revoke`；注销 `user.deleteAccount` + `DELETE /auth/v1/user/me`。
 - 设备标识：仅一个**安装时随机生成的 UUID**（`x-device-id`，存 AsyncStorage，身份认证接口要求），不读取 IMEI / Android ID / IDFA / MAC。
-- 上传到云端的数据：设置、同意时间、18+ 确认时间、手机号哈希（不存号码）、用户主动填写的练习档案（昵称、预置头像、练习方式、年限、目标、介绍；系统分配匿名代号），全部挂在账号（accountId）下；`user.deleteAccount` 连账号与 `_shared/owned.js` 登记的业务集合一起删（档案删除；话题 / 回复保留但解除归属）。
+- 上传到云端的数据：设置、同意时间、18+ 确认时间、手机号哈希（不存号码）、用户主动填写的练习档案（昵称、头像（预置或上传；上传的图片先经微信内容安全审核）、练习方式、年限、目标、介绍；系统分配匿名代号），全部挂在账号（accountId）下；`user.deleteAccount` 连账号与 `_shared/owned.js` 登记的业务集合一起删（档案删除；话题 / 回复保留但解除归属）。
 - 无广告、无第三方统计 / 推送 / 支付 / 分享 SDK。
 
 ## 2. 安装包内的原生模块

@@ -71,6 +71,14 @@ const COLLECTIONS = Object.freeze([
   // 每日一次在应用层判断（注销会解除归属，不能建含 _openid 的唯一索引）
   { name: 'prompt_answers', desc: '每日一题作答', owned: { key: 'promptId', keep: 'primary', onDelete: 'detach' }, indexes: [{ name: 'idx_prompt_owner', keys: [['promptId', 1], ['_openid', 1]] }] },
 
+  // 用户上传图片的机审记录（BE-M2-02）；注销时记录删除，文件由 user.deleteAccount 一并删除
+  {
+    name: 'media',
+    desc: '用户上传图片的机审记录（头像等）',
+    owned: {},
+    indexes: [{ name: 'idx_traceId', keys: [['traceId', 1]] }, { name: 'idx_status_time', keys: [['status', 1], ['createdAt', -1]] }, { name: 'idx_owner_time', keys: [['_openid', 1], ['createdAt', -1]] }],
+  },
+
   // 通知与频控
   { name: 'notifications', desc: '站内消息', owned: {}, indexes: [{ name: 'idx_owner_read_time', keys: [['_openid', 1], ['read', 1], ['createdAt', -1]] }] },
   { name: 'rate_limits', desc: '频控计数（_id = accountId:action:日期）', indexes: [{ name: 'idx_expireAt', keys: [['expireAt', 1]] }] },

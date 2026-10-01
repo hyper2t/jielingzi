@@ -6,11 +6,11 @@
  */
 import { useState } from 'react'
 import Taro from '@tarojs/taro'
-import { View, Text } from '@tarojs/components'
-import type { ModDecision, ModQueueItem, ReportTarget } from '@/types/models'
+import { View, Text, Image } from '@tarojs/components'
+import type { MediaQueueItem, ModDecision, ModQueueItem, ReportTarget } from '@/types/models'
 import { Button, Screen, Sheet } from '@/components'
 import { MUTE_DAY_OPTIONS, REPORT_REASONS } from '@/constants/moderation'
-import { decide, getQueue } from '@/services/moderation'
+import { decide, decideMedia, getMediaQueue, getQueue } from '@/services/moderation'
 import { errorCode, userFacingMessage } from '@/services/errors'
 import { ERROR_CODES } from '@/services/cloud.types'
 import { useRequest } from '@/hooks/useRequest'
@@ -23,6 +23,8 @@ export const ADMIN_TITLE = '审核队列'
 export const NO_PERMISSION = '仅审核员可访问'
 export const QUEUE_EMPTY = '暂无待处理的举报'
 export const QUEUE_KEY = 'admin:queue:open'
+export const MEDIA_KEY = 'admin:media'
+export const MEDIA_TITLE = '图片待审'
 
 const STATUS_TEXT: Record<string, string> = { ok: '正常', pending: '待审', folded: '已折叠', removed: '已删除' }
 const TYPE_TEXT: Record<string, string> = { topic: '话题', reply: '回复', user: '用户' }
@@ -43,6 +45,24 @@ export default function AdminQueue () {
   const role = useUserStore(s => s.account?.role)
   const allowed = role === 'mod' || role === 'admin'
   const q = useRequest(allowed ? QUEUE_KEY : null, () => getQueue('open'), { ttl: 0 })
+  const mq = useRequest(allowed ? MEDIA_KEY : null, () => getMediaQueue(), { ttl: 0 })
+  const media: MediaQueueItem[] = mq.data?.list || []
+
+  const actMedia = async (item: MediaQueueItem, decision: 'pass' | 'reject') => {
+    const res = await Taro.showModal({ title: '确认处理', content: decision === 'pass' ? '通过这张图片？会对他人展示' : '驳回并删除这张图片？上传者会收到通知' })
+    if (!res || !res.confirm) return
+    setBusy(`media:${item.mediaId}`)
+    setError('')
+    try {
+      await decideMedia(item.mediaId, decision)
+      showToast('已处理')
+      await mq.refresh()
+    } catch (e) {
+      setError(userFacingMessage(e))
+    } finally {
+      setBusy('')
+    }
+  }
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [muteFor, setMuteFor] = useState<ModQueueItem | null>(null)
@@ -66,7 +86,7 @@ export default function AdminQueue () {
   }
 
   const list = q.data?.list || []
-  const status = denied ? 'empty' : q.data === undefined && q.loading ? 'loading' : q.data === undefined && q.error ? 'error' : list.length ? 'ready' : 'empty'
+  const status = denied ? 'empty' : q.data === undefined && q.loading ? 'loading' : q.data === undefined && q.error ? 'error' : list.length || media.length ? 'ready' : 'empty'
 
   return (
     <Screen
@@ -86,6 +106,24 @@ export default function AdminQueue () {
     >
       <View {...tw('flex flex-col px-page pt-3 pb-section')}>
         {!!error && <Text {...tw('font-body text-caption text-danger mb-3')}>{error}</Text>}
+        {media.length > 0 && (
+          <View {...tw('flex flex-col mb-3')}>
+            <Text {...tw('font-body font-bold text-body text-ink mb-2')}>{`${MEDIA_TITLE}（${media.length}）`}</Text>
+            {media.map(m => (
+              <View key={m.mediaId} {...tw('flex flex-row items-center p-3 mb-2 rounded-md bg-paper-light')}>
+                {m.url ? <Image src={m.url} mode='aspectFill' {...tw('w-16 h-16 rounded-md')} /> : <View {...tw('w-16 h-16 rounded-md bg-paper-dark')} />}
+                <View {...tw('flex flex-col flex-1 ml-3')}>
+                  <Text {...tw('font-body text-body text-ink')}>{`${m.purposeLabel} · ${m.status === 'review' ? '待人工复核' : '机审超时'}`}</Text>
+                  <Text {...tw('font-body text-caption text-ink-faint')}>{m.provider === 'manual' ? '无法机审（App 上传或接口失败）' : '微信机审未返回结论'}</Text>
+                  <View {...tw('flex flex-row')}>
+                    <Button variant='text' disabled={!!busy} label={`通过图片 ${m.mediaId}`} onClick={() => { void actMedia(m, 'pass') }}>通过</Button>
+                    <Button variant='text' disabled={!!busy} label={`驳回图片 ${m.mediaId}`} onClick={() => { void actMedia(m, 'reject') }}>驳回</Button>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
         {list.map(item => {
           const key = `${item.targetType}:${item.targetId}`
           const st = item.target?.status || 'ok'

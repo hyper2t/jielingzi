@@ -30,6 +30,7 @@ export function useReachBottom (cb: () => void) {
 const Taro: any = {
   showToast: jest.fn(() => Promise.resolve()),
   showModal: jest.fn(() => Promise.resolve({ confirm: true })),
+  chooseImage: jest.fn(() => Promise.resolve({ tempFilePaths: ['wxfile://tmp/avatar.jpg'], tempFiles: [{ path: 'wxfile://tmp/avatar.jpg', size: 80 * 1024 }] })),
   __routerParams: {} as Record<string, string>,
   getCurrentInstance: jest.fn(() => ({ router: { params: Taro.__routerParams } })),
   hideToast: jest.fn(() => Promise.resolve()),

@@ -1,7 +1,7 @@
 'use strict'
 /** user 云函数：login / consent / confirmAdult / updateSettings / whoami / wechatAppLogin / bindWechat / appleLogin / bindApple / linkPhoneSession / bindPhoneWeapp / deleteAccount（契约见 docs/api/user.md） */
 const { randomBytes } = require('node:crypto')
-const { createMain, getApp, resolveCaller, createMpClient, createPhoneHasher } = require('./_shared')
+const { createMain, getApp, resolveCaller, createMpClient, createPhoneHasher, createStorage } = require('./_shared')
 const { actions, IDENTITY_FREE_ACTIONS } = require('./service')
 const { createUserRepo } = require('./repo.nosql')
 const { createWechatClient } = require('./wechat')
@@ -35,6 +35,7 @@ exports.main = createMain({
       authApi,
       mp,
       phoneHash,
+      storage: createStorage(app),
       randomToken: () => randomBytes(24).toString('base64url'),
     }
   },

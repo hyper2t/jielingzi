@@ -33,6 +33,8 @@ export const FUNCTION_RULE = {
   community: { invoke: 'auth != null' },
   moderation: { invoke: 'auth != null' },
   practice: { invoke: 'auth != null' },
+  // 图片机审回调：只由微信消息推送触发，客户端一律不能调用（防伪造审核结论）
+  mediacheck: { invoke: false },
   '*': { invoke: false },
 }
 

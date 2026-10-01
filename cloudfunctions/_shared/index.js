@@ -22,4 +22,5 @@ module.exports = {
   ...require('./moderation'),
   ...require('./wordlist'),
   ...require('./notify'),
+  ...require('./media'),
 }
