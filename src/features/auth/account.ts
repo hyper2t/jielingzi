@@ -2,15 +2,15 @@
  * 退出登录与注销账号（FE-L04，决策 L9）。
  * - signOut：撤销会话（尽力）→ 清本地登录态 → 失效缓存。本机的同意状态、设置、本地进度保留（换个账号登录时进度会再补传一次）。
  * - deleteAccount：user.deleteAccount（删云端 favorites / play_progress / users / account_links）→ DELETE CloudBase 用户（尽力）
- *   → 清空本机全部数据（含登录态）→ 回首页重新走同意流程。云端删除失败时抛出，本地不动，家长可重试。
+ *   → 清空本机全部数据（含登录态）→ 回首页重新走同意流程。云端删除失败时抛出，本地不动，可重试。
  *   关联了 Apple ID 的账号（iOS）：先重新走一次 Apple 授权拿 authorizationCode，随注销交给云端撤销 Apple 授权（审核指南 5.1.1(v)）；
- *   家长在 Apple 授权里取消 → 抛 AUTH_CANCELLED，不注销。非 iOS 设备上无法重新授权时照常注销（云端数据同样删除）。
+ *   用户在 Apple 授权里取消 → 抛 AUTH_CANCELLED，不注销。非 iOS 设备上无法重新授权时照常注销（云端数据同样删除）。
  */
 import { CloudError, ERROR_CODES } from '@/services/cloud.types'
 import { getClient } from '@/services/client'
 import { invalidate } from '@/hooks/requestCache'
 import { isSignedIn, useUserStore } from '@/store/user'
-import { resetLocalData } from '@/features/parent/clear'
+import { resetLocalData } from '@/features/auth/clear'
 import { track } from '@/utils/track'
 import { isAppleLoginAvailable, requestAppleAuth } from './apple'
 

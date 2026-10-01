@@ -1,16 +1,16 @@
 /**
- * 家长登录页（FE-L02，App 专用；app.config.ts 只在 RN 注册，docs/mvp/prompts/rn-login.md §7.2）。
- * 流程：家长验证（ParentGate，5 分钟内免重复）→ 协议勾选（默认不勾，未勾禁用按钮）→ 手机号 + 验证码（+86 固定、11 位、60s 倒计时、6 位自动提交）
+ * 登录页（FE-L02，App 专用；app.config.ts 只在 RN 注册，docs/mvp/prompts/rn-login.md §7.2）。
+ * 流程：协议勾选（默认不勾，未勾禁用按钮）→ 手机号 + 验证码（+86 固定、11 位、60s 倒计时、6 位自动提交）
  *      → 登录成功：user.login（上报本机同意时间）→ 补传本机进度 → 回跳（returnTo 时 redirect，否则返回上一页）。
- * 「微信登录」按钮只在 SDK 可用时显示（features/auth/wechat.rn.ts：已配置 AppID、家长已同意、本机装了微信）；探测在同意后才做（决策 L8）。
+ * 「微信登录」按钮只在 SDK 可用时显示（features/auth/wechat.rn.ts：已配置 AppID、用户已同意、本机装了微信）；探测在同意后才做（决策 L8）。
  * 「通过 Apple 登录」（NA-L04，iOS 13+，审核指南 4.8）同理只在 features/auth/apple.rn.ts 判定可用时显示，用 Apple 官方样式按钮。
- * mode=bind：给已登录（微信）账号绑定手机号（features/auth/session.ts bindPhone），流程相同，成功后返回家长中心。
+ * mode=bind：给已登录（微信）账号绑定手机号（features/auth/session.ts bindPhone），流程相同，成功后返回上一页。
  * 倒计时按截止时间戳计算（切后台再回来仍正确）。手机号只发给 CloudBase 身份认证服务；本机只留脱敏显示串。
  */
 import { useEffect, useRef, useState } from 'react'
 import Taro from '@tarojs/taro'
 import { View, Text, Input } from '@tarojs/components'
-import { Button, ConsentSheet, Icon, ParentGate, Screen, showToast } from '@/components'
+import { Button, ConsentSheet, Icon, Screen, showToast } from '@/components'
 import type { VerificationInfo } from '@/services/cloud.types'
 import { ERROR_CODES } from '@/services/cloud.types'
 import { authErrorMessage, errorCode, isAuthCancelled } from '@/services/errors'
@@ -19,7 +19,6 @@ import { bindPhone, sendCode, signInWithApple, signInWithCode, signInWithWechat 
 import { isWechatLoginAvailable } from '@/features/auth/wechat'
 import { isAppleLoginAvailable } from '@/features/auth/apple'
 import AppleSignInButton from '@/features/auth/AppleSignInButton'
-import { gateFresh, markGatePassed } from '@/features/parent/gate'
 import { useTrackPage } from '@/hooks/useTrackPage'
 import { back, navigate, parseParams, redirect, RouteName } from '@/utils/router'
 import { a11yButton } from '@/utils/a11y'
@@ -63,7 +62,6 @@ export default function Login () {
   const consent = useUserStore(s => s.consent)
   const auth = useUserStore(s => s.auth)
 
-  const [gateOpen, setGateOpen] = useState(() => !gateFresh())
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
   const [agreed, setAgreed] = useState(false)
@@ -77,12 +75,12 @@ export default function Login () {
   const [appleOk, setAppleOk] = useState(false)
   const done = useRef(false)
 
-  // 已拒绝协议的家长直接进到登录页：先请其同意（unknown 时 ConsentSheet 自己会显示）
+  // 已拒绝协议的用户直接进到登录页：先请其同意（unknown 时 ConsentSheet 自己会显示）
   useEffect(() => {
     if (consent === 'declined') useUserStore.getState().openConsentSheet('登录需同意协议后可用')
   }, [consent])
 
-  // 微信能力探测会 registerApp：只在家长已同意后进行
+  // 微信能力探测会 registerApp：只在用户已同意后进行
   useEffect(() => {
     if (consent !== 'agreed') { setWechatOk(false); setAppleOk(false); return }
     let alive = true
@@ -132,7 +130,7 @@ export default function Login () {
       setHint(`验证码已发送至 ${maskPhone(phone)}`)
     } catch (e) {
       setHint(authErrorMessage(e))
-      // 发送过于频繁：同样进入 60s 倒计时，避免家长连点
+      // 发送过于频繁：同样进入 60s 倒计时，避免连点
       if (errorCode(e) === ERROR_CODES.TOO_MANY) setDeadline(Date.now() + COUNTDOWN_SEC * 1000)
     } finally {
       setSending(false)
@@ -179,7 +177,7 @@ export default function Login () {
       showToast('登录成功')
       finish()
     } catch (e) {
-      // 家长自己取消：静默收起，不当错误提示
+      // 用户自己取消：静默收起，不当错误提示
       setHint(isAuthCancelled(e) ? '' : authErrorMessage(e))
     } finally {
       setSubmitting(false)
@@ -209,12 +207,7 @@ export default function Login () {
   return (
     <Screen
       nav={{ title, showBack: true }}
-      overlay={(
-        <>
-          <ConsentSheet />
-          <ParentGate open={gateOpen} onPass={() => { markGatePassed(); setGateOpen(false) }} onClose={() => { void back() }} />
-        </>
-      )}
+      overlay={<ConsentSheet />}
     >
       <View {...tw('flex flex-col px-page py-4')}>
         {!!reason && (

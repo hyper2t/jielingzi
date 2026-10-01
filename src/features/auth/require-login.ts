@@ -1,7 +1,7 @@
 /**
  * 登录门禁（FE-L03，docs/mvp/prompts/rn-login.md 决策 L1「软登录」）。
- * 首页 / 分类 / 专辑详情 / 播放器试听不需要登录；收藏、收藏页、最近播放（云端）、家长中心、云端进度同步前调用 ensureSignedIn。
- * 顺序：未同意 → 打开家长同意弹层（与小程序一致）；已同意但 App 端未登录 → 跳家长登录页；都满足 → 返回 true 让调用方继续。
+ * 浏览不需要登录；设置、练习档案等云端读写前调用 ensureSignedIn（发布类动作用 features/auth/gates.ts requirePhone）。
+ * 顺序：未同意 → 打开同意弹层（与小程序一致）；已同意但 App 端未登录 → 跳登录页；都满足 → 返回 true 让调用方继续。
  * 小程序 / H5 恒为已登录，这里退化为原来的「同意拦截」。未满足时不会发出任何身份类请求。
  */
 import type { ConsentState } from '@/types/models'
@@ -46,7 +46,7 @@ export function ensureSignedIn (opts: EnsureOptions = {}): boolean {
   return false
 }
 
-/** 打开家长登录页（只在 App 端有意义） */
+/** 打开登录页（只在 App 端有意义） */
 export function goLogin (opts: EnsureOptions = {}): void {
   if (!HAS_LOGIN) return
   const params: { reason?: string, returnTo?: RouteName } = {}

@@ -1,8 +1,6 @@
-/** 登录前验证（ParentGate，与 luming 相同）/ 设置页 / 清除本机数据 */
+/** 设置页 / 清除本机数据 */
 import { act, create, ReactTestRenderer } from 'react-test-renderer'
 import Taro from '@tarojs/taro'
-import { ParentGate, GATE_TITLE, GATE_WRONG } from '@/components'
-import { newQuestion, checkAnswer, __resetGateForTest, COOLDOWN_MS } from '@/features/parent/gate'
 import Settings, { CLEAR_TITLE } from '@/pkg-user/pages/settings/index'
 import { mockControl } from '@/services/mock/client'
 import { invalidate } from '@/hooks/requestCache'
@@ -17,11 +15,6 @@ afterEach(() => { mounted.splice(0).forEach(r => act(() => r.unmount())) })
 const hosts = (r: ReactTestRenderer, pred: (n: any) => boolean) => r.root.findAll(n => typeof n.type === 'string' && pred(n))
 const texts = (r: ReactTestRenderer) => hosts(r, n => n.type === 'Text').map(n => String(n.props.children))
 const click = (r: ReactTestRenderer, label: string) => act(() => { hosts(r, n => n.props.ariaLabel === label && typeof n.props.onClick === 'function')[0].props.onClick() })
-const typeAnswer = (r: ReactTestRenderer, n: number) => { String(n).split('').forEach(d => click(r, d)); click(r, '确定') }
-const question = (r: ReactTestRenderer) => {
-  const m = /^(\d+) \+ (\d+) = \?$/.exec(texts(r).find(t => /\+/.test(t)) || '')
-  return m ? Number(m[1]) + Number(m[2]) : NaN
-}
 
 beforeEach(() => {
   mockControl.reset()
@@ -30,43 +23,7 @@ beforeEach(() => {
   ;(Taro as any).__storage.clear()
   useUserStore.setState({ consent: 'agreed', sheetOpen: false })
   useSettingsStore.setState({ settings: {} })
-  __resetGateForTest()
   jest.clearAllMocks()
-})
-
-describe('家长验证', () => {
-  it('题目：两位数、和 < 100、每次换题', () => {
-    let seed = 0
-    const rand = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280)
-    let prev = newQuestion(rand)
-    for (let i = 0; i < 50; i++) {
-      const q = newQuestion(rand, prev)
-      expect(q.a).toBeGreaterThanOrEqual(10)
-      expect(q.b).toBeLessThan(50)
-      expect(q.answer).toBeLessThan(100)
-      expect([q.a, q.b]).not.toEqual([prev.a, prev.b])
-      prev = q
-    }
-  })
-  it('连错 3 次冷却 30s，冷却期内正确答案也不通过', () => {
-    const q = { a: 10, b: 10, answer: 20 }
-    expect(checkAnswer(q, 1, 0)).toBe('wrong')
-    expect(checkAnswer(q, 1, 0)).toBe('wrong')
-    expect(checkAnswer(q, 1, 0)).toBe('cooldown')
-    expect(checkAnswer(q, 20, COOLDOWN_MS - 1)).toBe('cooldown')
-    expect(checkAnswer(q, 20, COOLDOWN_MS)).toBe('ok')
-  })
-  it('组件：答错提示且换题、不显示答案；答对 onPass', () => {
-    const onPass = jest.fn()
-    const r = render(<ParentGate open onPass={onPass} />)
-    expect(texts(r)).toContain(GATE_TITLE)
-    const ans = question(r)
-    typeAnswer(r, ans + 1)
-    expect(texts(r)).toContain(GATE_WRONG)
-    expect(texts(r).join()).not.toContain(`= ${ans}`)
-    typeAnswer(r, question(r))
-    expect(onPass).toHaveBeenCalled()
-  })
 })
 
 describe('设置 / 清除本机数据', () => {

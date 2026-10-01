@@ -26,7 +26,7 @@ jest.mock('@/features/auth/wechat', () => ({ __esModule: true, requestWechatAuth
 const mockLogin = jest.fn()
 jest.mock('@/services/me', () => ({ __esModule: true, login: (...a: unknown[]) => mockLogin(...a) }))
 const mockReset = jest.fn(async () => undefined)
-jest.mock('@/features/parent/clear', () => ({ __esModule: true, resetLocalData: (...a: unknown[]) => (mockReset as any)(...a) }))
+jest.mock('@/features/auth/clear', () => ({ __esModule: true, resetLocalData: (...a: unknown[]) => (mockReset as any)(...a) }))
 const mockTrack = jest.fn()
 jest.mock('@/utils/track', () => ({ __esModule: true, track: (...a: unknown[]) => mockTrack(...a) }))
 jest.mock('@/hooks/requestCache', () => ({ __esModule: true, invalidate: jest.fn() }))
@@ -63,7 +63,7 @@ it('signInWithApple：Apple 授权 → user.appleLogin（identityToken + 原始 
   expect(mockTrack).toHaveBeenCalledWith('login', { method: 'apple', is_new: true, merged: false })
 })
 
-it('signInWithApple：家长取消 → 抛 AUTH_CANCELLED，不调云函数', async () => {
+it('signInWithApple：用户取消 → 抛 AUTH_CANCELLED，不调云函数', async () => {
   mockApple.request.mockRejectedValueOnce(new CloudError(ERROR_CODES.AUTH_CANCELLED, '已取消通过 Apple 登录'))
   await expect(session.signInWithApple()).rejects.toMatchObject({ code: ERROR_CODES.AUTH_CANCELLED })
   expect(mockCall).not.toHaveBeenCalled()

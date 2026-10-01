@@ -21,9 +21,7 @@ const { registerAfterSignIn, __resetAfterSignInForTest } = require('@/features/a
 const { ensureSignedIn, loginGate, gateHint } = require('@/features/auth/require-login') as typeof import('@/features/auth/require-login')
 const session = require('@/features/auth/session') as typeof import('@/features/auth/session')
 const account = require('@/features/auth/account') as typeof import('@/features/auth/account')
-const { resetLocalData } = require('@/features/parent/clear') as typeof import('@/features/parent/clear')
-const { __resetGateForTest, markGatePassed } = require('@/features/parent/gate') as typeof import('@/features/parent/gate')
-const { GATE_TITLE } = require('@/components') as typeof import('@/components')
+const { resetLocalData } = require('@/features/auth/clear') as typeof import('@/features/auth/clear')
 const LoginPage = require('@/pkg-user/pages/login/index') as typeof import('@/pkg-user/pages/login/index')
 const Login = LoginPage.default
 const MinePage = require('@/pages/mine/index') as typeof import('@/pages/mine/index')
@@ -43,12 +41,6 @@ const click = (r: ReactTestRenderer, label: string) => act(() => { hosts(r, n =>
 const hasButton = (r: ReactTestRenderer, label: string) => hosts(r, n => n.props.ariaLabel === label && typeof n.props.onClick === 'function').length > 0
 const typeInto = (r: ReactTestRenderer, label: string, value: string) => act(() => { hosts(r, n => n.type === 'Input' && n.props.ariaLabel === label)[0].props.onInput({ detail: { value } }) })
 const inputValue = (r: ReactTestRenderer, label: string) => hosts(r, n => n.type === 'Input' && n.props.ariaLabel === label)[0].props.value
-const typeAnswer = (r: ReactTestRenderer, n: number) => { String(n).split('').forEach(d => click(r, d)); click(r, '确定') }
-const question = (r: ReactTestRenderer) => {
-  // 登录页表单里还有「+86」，只认「a + b = ?」形式的题目
-  const m = /^(\d+) \+ (\d+) = \?$/.exec(texts(r).find(t => /^\d+ \+ \d+ = \?$/.test(t)) || '')
-  return m ? Number(m[1]) + Number(m[2]) : NaN
-}
 const calls = () => mockControl.calls.map(c => `${c.name}.${c.action}`)
 
 async function signInPhone (phone = PHONE) {
@@ -65,7 +57,6 @@ beforeEach(() => {
   __resetAfterSignInForTest()
   useUserStore.setState({ consent: 'agreed', sheetOpen: false, sheetReason: undefined, auth: { signedIn: false } })
   useSettingsStore.setState({ settings: {} })
-  __resetGateForTest()
   jest.clearAllMocks()
 })
 
@@ -207,23 +198,19 @@ describe('同意与登录流程（FE-L01 / FE-L02 编排）', () => {
 })
 
 describe('登录页（FE-L02）', () => {
-  it('先验证；通过后显示表单；未勾选协议点获取验证码只提示不发码', async () => {
+  it('直接显示登录表单（登录前没有算术题验证）；未勾选协议点获取验证码只提示不发码', async () => {
     const r = render(<Login />)
-    expect(texts(r)).toContain(GATE_TITLE)
-    typeAnswer(r, question(r))
     expect(texts(r)).toContain(LoginPage.LOGIN_TITLE)
-    expect(texts(r)).not.toContain(GATE_TITLE)
+    expect(texts(r).some(t => /^\d+ \+ \d+ = \?$/.test(t))).toBe(false)
     click(r, LoginPage.SEND_TEXT)
     expect(texts(r)).toContain(LoginPage.AGREE_HINT)
     expect(mockControl.calls).toEqual([])
     expect(hasButton(r, '微信登录')).toBe(false)
   })
 
-  it('5 分钟内验证过：不再出题；发码 → 倒计时 → 6 位自动提交 → 登录成功回跳 returnTo', async () => {
-    markGatePassed()
+  it('发码 → 倒计时 → 6 位自动提交 → 登录成功回跳 returnTo', async () => {
     ;(Taro as any).__routerParams = { reason: encodeURIComponent('设置'), returnTo: 'settings' }
     const r = render(<Login />)
-    expect(texts(r)).not.toContain(GATE_TITLE)
     expect(texts(r)).toContain('设置需登录后可用')
     click(r, '同意协议')
     click(r, LoginPage.SEND_TEXT)
@@ -245,7 +232,6 @@ describe('登录页（FE-L02）', () => {
   })
 
   it('验证码错误：提示并清空验证码，不回跳；没有 returnTo 时成功后返回上一页', async () => {
-    markGatePassed()
     const r = render(<Login />)
     click(r, '同意协议')
     typeInto(r, '手机号', PHONE)
@@ -268,7 +254,6 @@ describe('登录页（FE-L02）', () => {
   it('绑定模式：标题「绑定手机号」，成功调 linkPhoneSession 并返回', async () => {
     const { getClient } = require('@/services/client') as typeof import('@/services/client')
     await getClient().auth!.custom.signIn('ticket-xyz', 'wechat')
-    markGatePassed()
     ;(Taro as any).__routerParams = { mode: 'bind' }
     const r = render(<Login />)
     expect(texts(r)).toContain(LoginPage.BIND_TITLE)

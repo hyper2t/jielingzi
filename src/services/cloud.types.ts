@@ -3,7 +3,7 @@
  * 业务层（services/me.ts 及后续业务 service）只依赖这里的 `CloudClient`，不感知平台：
  * - 小程序：cloud.weapp.ts（wx.cloud，OPENID 免登录）
  * - H5：cloud.h5.ts（@cloudbase/js-sdk 匿名登录）
- * - RN：cloud.rn.ts（CloudBase HTTP API：公开读用 Publishable Key；身份类调用用家长登录后的会话，见 `CloudAuth`）
+ * - RN：cloud.rn.ts（CloudBase HTTP API：公开读用 Publishable Key；身份类调用用登录后的会话，见 `CloudAuth`）
  * 云函数入参 / 出参以 docs/api/*.md 为准（starter：docs/api/user.md）。
  */
 import type { AccountStatus, Profile, ProfilePatch, User, UserSettings } from '@/types/models'
@@ -52,7 +52,7 @@ export interface AccountIdentities { mp: boolean, wechat: boolean, phone: boolea
 
 export interface LoginInput {
   platform?: 'weapp' | 'app'
-  /** App 端本机记录的家长同意时间（毫秒） */
+  /** App 端本机记录的同意时间（毫秒） */
   consentAt?: number
   consentVersion?: string
   /** wechatAppLogin 返回的一次性关联令牌（兜底，5 分钟有效） */
@@ -78,7 +78,7 @@ export interface FunctionMap {
   user: {
     /**
      * 登录 / 刷新账号（docs/api/user.md）。settings / guardianConsentAt：云端已保存的设置与同意时间，换机 / 重装后前端据此恢复（services/me.ts login）。
-     * App 端把本机记录的家长同意时间随 consentAt 上报（云端只在没有同意时间时写入服务端时间）；identities 为该账号已关联的登录方式；
+     * App 端把本机记录的同意时间随 consentAt 上报（云端只在没有同意时间时写入服务端时间）；identities 为该账号已关联的登录方式；
      * merged 为 true 表示本次登录触发了账号合并（前端应失效收藏 / 进度缓存）。
      */
     login: [LoginInput, LoginResult]
@@ -222,7 +222,7 @@ export interface CloudAuth {
     verifyCode(verificationId: string, code: string): Promise<string>
     /**
      * 用 verification_token 登录（已注册 signin / 未注册 signup 自动选择）。
-     * persist=false 时只返回会话不落盘、不改变当前登录态（家长中心「绑定手机号」用另一份会话调 user.linkPhoneSession）
+     * persist=false 时只返回会话不落盘、不改变当前登录态（设置页「绑定手机号」用另一份会话调 user.linkPhoneSession）
      */
     signIn(input: { phone: string, verificationToken: string, isUser?: boolean }, opts?: { persist?: boolean }): Promise<SessionInfo & { accessToken: string }>
   }

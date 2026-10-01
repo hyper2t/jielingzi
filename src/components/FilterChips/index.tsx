@@ -1,7 +1,7 @@
 /**
  * FilterChips：筛选胶囊（分类、年龄段）。选中 = 竹青底 + 白字 + 对勾（不只靠颜色，04-ui §6）。
  * - size sm：胶囊视觉高 32、字号 13、左右内边距 12（首页分龄、分类页筛选，2026-09-29 按用户要求缩小），但点击热区仍 ≥44（外层透明容器撑高，04-ui §6）；
- *   md：高 44（家长中心设置）；kid：高 56（保留）
+ *   md：高 44（设置页）；kid：高 56（保留）
  * - scroll：单行横向滑动。微信 scroll-view（enhanced）里用 flex 容器做横向内容会被折行，所以这里用经典写法：
  *   scroll-view 设 white-space: nowrap，每个胶囊 inline-flex + vertical-align: middle，不放 flex 容器（RN 端改为 flex-row，见 utils/layout.ts HSCROLL）；
  *   padded 控制是否带页面左右边距（默认带）。

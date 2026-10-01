@@ -2,10 +2,10 @@
  * 微信登录能力（FE-L05）：react-native-wechat-lib@3.0.4（微信 Open SDK Android 6.8.20 / iOS 2.0）。
  *
  * 约定（docs/mvp/prompts/rn-login.md 决策 L8）：
- * - 懒初始化：App 启动不碰 SDK；只有家长已同意、且页面确实要用（登录页 / 家长中心账号区）时才 registerApp(TARO_APP_WX_APP_ID, TARO_APP_WX_UNIVERSAL_LINK)。
+ * - 懒初始化：App 启动不碰 SDK；只有用户已同意、且页面确实要用（登录页 / 设置页账号区）时才 registerApp(TARO_APP_WX_APP_ID, TARO_APP_WX_UNIVERSAL_LINK)。
  * - 只用 sendAuthRequest('snsapi_userinfo', state) 取 code，不调 sns/userinfo，不采集昵称头像；code 交给云函数 user.wechatAppLogin / bindWechat。
  * - state 为本地随机串，回调里 state 不一致视为失败。
- * - 三类失败分别映射：未安装 / 未配置 / SDK 出错 → WECHAT_UNAVAILABLE；家长取消（-2）→ AUTH_CANCELLED；家长拒绝（-4）→ AUTH_DENIED。
+ * - 三类失败分别映射：未安装 / 未配置 / SDK 出错 → WECHAT_UNAVAILABLE；用户取消（-2）→ AUTH_CANCELLED；用户拒绝（-4）→ AUTH_DENIED。
  * - 3.0.4 的 sendAuthRequest 只在收到微信回调时才 resolve/reject：微信未安装、未 registerApp、拉起失败时会永远挂起，
  *   所以这里先自查安装状态，再加「切回 App 后宽限期无回调 → 视为取消」与总超时两道保险。
  * - iOS（NA-L03）：微信 SDK 2.x 必须带 Universal Link 注册，所以 iOS 要求 TARO_APP_WX_UNIVERSAL_LINK 也已配置才算可用；
@@ -95,7 +95,7 @@ function ensureRegistered (s: WechatSdk): Promise<boolean> {
 }
 
 /**
- * 是否可以显示「微信登录 / 绑定微信」：已配置 && 家长已同意 && SDK 可用 && registerApp 成功 && 本机装了微信。
+ * 是否可以显示「微信登录 / 绑定微信」：已配置 && 用户已同意 && SDK 可用 && registerApp 成功 && 本机装了微信。
  * 未同意时不会初始化 SDK（决策 L8）。
  */
 export async function isWechatLoginAvailable (): Promise<boolean> {
@@ -122,7 +122,7 @@ function unavailable (msg: string): CloudError {
   return new CloudError(ERROR_CODES.WECHAT_UNAVAILABLE, msg)
 }
 
-/** 把 react-native-wechat-lib 的 WechatError（code = 微信 errCode）映射成家长可读的 CloudError */
+/** 把 react-native-wechat-lib 的 WechatError（code = 微信 errCode）映射成用户可读的 CloudError */
 export function mapWechatError (e: unknown): CloudError {
   if (e instanceof CloudError) return e
   const code = e && typeof e === 'object' ? (e as { code?: unknown }).code : undefined
@@ -133,7 +133,7 @@ export function mapWechatError (e: unknown): CloudError {
 }
 
 /**
- * 等待微信回调，同时监听前后台：家长切到微信后再切回 App，宽限期内仍无回调 → 视为取消（微信被手动划掉 / 未完成授权）；
+ * 等待微信回调，同时监听前后台：用户切到微信后再切回 App，宽限期内仍无回调 → 视为取消（微信被手动划掉 / 未完成授权）；
  * 总时长超过 AUTH_TIMEOUT_MS 也按取消处理。
  */
 function waitForResp (pending: Promise<WechatAuthResp>): Promise<WechatAuthResp> {
@@ -165,8 +165,8 @@ function waitForResp (pending: Promise<WechatAuthResp>): Promise<WechatAuthResp>
 }
 
 /**
- * 拉起微信授权，成功返回 { code, state }（state 已校验）。调用方：features/auth/session.ts signInWithWechat / 家长中心绑定微信。
- * 前置：家长已同意（否则 CONSENT_REQUIRED）。
+ * 拉起微信授权，成功返回 { code, state }（state 已校验）。调用方：features/auth/session.ts signInWithWechat / 设置页绑定微信。
+ * 前置：用户已同意（否则 CONSENT_REQUIRED）。
  */
 export async function requestWechatAuth (): Promise<WechatAuthResult> {
   if (!isWechatConfigured()) throw unavailable('微信登录暂未开放，请先用手机号登录')

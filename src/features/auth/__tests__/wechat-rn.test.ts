@@ -124,7 +124,7 @@ test('randomState：32 位十六进制且每次不同', () => {
   expect(randomState()).not.toBe(a)
 })
 
-test('家长未同意：不可用，且不会 registerApp（决策 L8）；requestWechatAuth 抛 CONSENT_REQUIRED', async () => {
+test('用户未同意：不可用，且不会 registerApp（决策 L8）；requestWechatAuth 抛 CONSENT_REQUIRED', async () => {
   useUserStore.setState({ consent: 'unknown' })
   const sdk = makeSdk()
   __setWechatSdkForTest(sdk)

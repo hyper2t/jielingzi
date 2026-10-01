@@ -9,7 +9,7 @@ import Taro from '@tarojs/taro'
 import { View, Text } from '@tarojs/components'
 import { Button, Screen } from '@/components'
 import { HAS_LOGIN, useUserStore } from '@/store/user'
-import { CLEAR_CONFIRM, resetLocalData } from '@/features/parent/clear'
+import { CLEAR_CONFIRM, resetLocalData } from '@/features/auth/clear'
 import { tw } from '@/utils/tw'
 import AccountSection, { ACCOUNT_NOTE } from './account'
 

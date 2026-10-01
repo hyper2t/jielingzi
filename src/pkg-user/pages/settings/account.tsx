@@ -1,7 +1,7 @@
 /**
- * 家长中心「账号」区（FE-L04，决策 L9；只在 App 端渲染，HAS_LOGIN 为 false 时父页面不挂载）。
+ * 设置页「账号」区（FE-L04，决策 L9；只在 App 端渲染，HAS_LOGIN 为 false 时父页面不挂载）。
  * 已登录：登录方式、已关联的登录方式、绑定手机号（微信账号）、退出登录、注销账号（二次确认 + 输入「注销」）。
- * 未登录（会话在页面停留期间过期）：提示 + 家长登录。
+ * 未登录（会话在页面停留期间过期）：提示 + 登录。
  * 「绑定微信」按钮只在微信 SDK 可用时显示（features/auth/wechat.rn.ts）：拉起微信授权 → user.bindWechat({ code })；对方微信已有账号时合并（merged）。
  * 「绑定 Apple ID」只在 iOS 可用时显示（features/auth/apple.rn.ts）：Apple 授权 → user.bindApple。关联了 Apple ID 的账号注销前会再走一次 Apple 授权（撤销授权用）。
  */

@@ -1,7 +1,7 @@
 /**
  * 跨端布局常量（类名必须是完整静态字符串，供 Tailwind 扫描）。
  *
- * HSCROLL：scroll-view 里横排一行（分龄胶囊、家长中心的横滑卡片）。
+ * HSCROLL：scroll-view 里横排一行（筛选胶囊、横滑卡片）。
  * - 小程序 / H5：微信 enhanced scroll-view 里的 flex 容器会折行，所以用经典写法：
  *   容器 white-space: nowrap，子项 inline-flex + vertical-align: middle，末尾放一个 inline-block 占位当右边距
  * - RN：没有 inline 概念（block / inline-flex / whitespace-nowrap 在 twrnc 下是未知类），

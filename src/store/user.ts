@@ -2,7 +2,7 @@
  * 用户状态：协议同意（FE-22）+ 18+ 确认与账号状态（FE-M1-01 / M1-02）+ App 端登录态（FE-L01/L03）。
  * - consent 决定是否允许任何云端写入：只有 'agreed' 才放行（见 services/guard.ts）。
  *   同意弹层（components/ConsentSheet）：consent 为 unknown 时始终显示；已拒绝的用户可从「我的」、收藏入口等主动打开。
- * - auth：App 端家长登录后的会话摘要（不含令牌，令牌在 services/cloud.rn.ts）。小程序 / H5 由平台提供身份，恒为已登录。
+ * - auth：App 端登录后的会话摘要（不含令牌，令牌在 services/cloud.rn.ts）。小程序 / H5 由平台提供身份，恒为已登录。
  *   云端读写的总开关是 canSync() = 已同意 && 已登录：小程序上等价于原来的 isConsented()，App 上多一道登录门禁。
  */
 import { create } from 'zustand'
@@ -26,7 +26,7 @@ interface UserState {
   consent: ConsentState
   /** 主动打开的同意弹层（consent 为 unknown 时无论如何都显示） */
   sheetOpen: boolean
-  /** 弹层顶部的触发原因，如「收藏需家长同意后可用」 */
+  /** 弹层顶部的触发原因，如「发起话题需同意协议后可用」 */
   sheetReason?: string
   auth: AuthState
   /** 18+ 确认（本机；云端已确认时 setAccount 会同步为 confirmed） */
@@ -155,7 +155,7 @@ export function isConsented (): boolean {
   return getConsent() === 'agreed'
 }
 
-/** 是否已有云端身份：小程序 / H5 恒为 true；App 端 = 家长已登录 */
+/** 是否已有云端身份：小程序 / H5 恒为 true；App 端 = 已登录 */
 export function isSignedIn (): boolean {
   return !HAS_LOGIN || useUserStore.getState().auth.signedIn
 }
