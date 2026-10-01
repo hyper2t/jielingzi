@@ -53,6 +53,8 @@
 | note | ≤ 200 字（可选） | 处理备注，写 mod_logs |
 
 - `remove`：内容 `status = removed`；`restore`：恢复为 `ok`；`dismiss`：驳回，折叠的内容恢复为 `ok`
+- **机审待复核的内容（M3，`status = pending`）**：`restore` / `dismiss` = 放行（`ok`），`remove` = 下架；队列里它以「系统待复核」举报的形式出现（`_openid = null`、`system: true`），不需要另建审核页
+- **作者自己删除的内容**（`removedBy = author`，见 `community.md` 的 `deleteMine`）不能 `restore`：40001「作者已自行删除该内容，不能恢复」
 - `mute` / `ban`：对象是内容作者（举报用户时为 `targetUid`）；写 `users.mutedUntil` / `bannedUntil`（取较晚，不缩短已有处罚），`guardWrite` 立即生效（40305 / 40304）；作者已注销 → 40001
 - mod 不能处罚 mod / admin（40301），只有 admin 可以；举报用户只能 dismiss / mute / ban
 - 关闭该目标全部 open 举报（`state = resolved`，`result`，`handledBy`，`handledAt`）；写 mod_logs（kind = manual）

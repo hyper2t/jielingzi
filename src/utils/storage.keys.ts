@@ -28,5 +28,7 @@ export const STORAGE_KEYS = {
   /** 云端账号状态镜像（AccountStatus：实名 / 18+ / 角色 / 处罚），启动时先用它渲染，login 后刷新 */
   accountStatus: 'account_status',
   /** 已阅读的社区公约版本（= CONSENT_VERSION 时视为已读；首次发布前强制阅读一次，FE-M2-03） */
-  rulesRead: 'rules_read'
+  rulesRead: 'rules_read',
+  /** 发起话题的本地草稿（TopicForm + savedAt）；发布成功 / 手动清除后删除，「清除本机数据」一并清空 */
+  topicDraft: 'topic_draft'
 } as const

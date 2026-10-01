@@ -116,3 +116,66 @@ export interface MediaQueueItem {
   createdAt: number
   url: string | null
 }
+
+/** 话题状态（docs/api/community.md M3）：pending = 机审待复核（只有作者看得到）；folded = 被举报自动折叠 */
+export type TopicStatus = 'pending' | 'ok' | 'folded' | 'removed'
+
+/** 话题流条目（community.listTopics）：只有摘要，不含正文；author 已按匿名脱敏 */
+export interface TopicSummary {
+  id: string
+  title: string
+  excerpt: string
+  tags: string[]
+  anon: boolean
+  author: AuthorView
+  replyCount: number
+  createdAt: number
+  lastReplyAt: number
+  featured: boolean
+  /** M3 恒为 []，话题配图随统一原生选图一起做 */
+  images: string[]
+  folded: boolean
+  pending: boolean
+}
+
+/** 话题详情（community.getTopic / createTopic）：用 body 代替 excerpt；折叠时 body 为 null */
+export interface TopicDetail extends Omit<TopicSummary, 'excerpt'> {
+  body: string | null
+}
+
+/** 回复里的引用：被引用的回复折叠 / 删除 / 待审时 unavailable，authorName 与 excerpt 为 null */
+export interface ReplyQuote {
+  id: string
+  unavailable: boolean
+  authorName: string | null
+  anon: boolean
+  excerpt: string | null
+}
+
+/** 回复（community.listReplies / createReply）：短回复（< 30 字）默认折叠；折叠的回复 body 为 null */
+export interface Reply {
+  id: string
+  topicId: string
+  body: string | null
+  short: boolean
+  anon: boolean
+  author: AuthorView
+  quote: ReplyQuote | null
+  createdAt: number
+  folded: boolean
+  pending: boolean
+}
+
+export interface TopicInput {
+  title: string
+  body: string
+  anon?: boolean
+  tags?: string[]
+}
+
+export interface ReplyInput {
+  topicId: string
+  body: string
+  anon?: boolean
+  quoteId?: string
+}

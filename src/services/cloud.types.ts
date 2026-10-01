@@ -6,7 +6,7 @@
  * - RN：cloud.rn.ts（CloudBase HTTP API：公开读用 Publishable Key；身份类调用用登录后的会话，见 `CloudAuth`）
  * 云函数入参 / 出参以 docs/api/*.md 为准（starter：docs/api/user.md）。
  */
-import type { AccountStatus, MediaQueueItem, ModDecision, ModQueueItem, Profile, ProfilePatch, ReportTarget, User, UserSettings } from '@/types/models'
+import type { AccountStatus, MediaQueueItem, ModDecision, ModQueueItem, Profile, ProfilePatch, Reply, ReplyInput, ReportTarget, TopicDetail, TopicInput, TopicSummary, User, UserSettings } from '@/types/models'
 
 /** 客户端可直读的集合（安全规则见 docs/api/README.md「安全规则」）；业务集合落地时在这里补充 */
 export interface CollectionMap {
@@ -34,6 +34,15 @@ export interface QueryOptions<T> {
 
 export interface PageResult<T> {
   list: T[]
+  page: number
+  size: number
+  hasMore: boolean
+}
+
+/** 云函数分页出参（带 total；与 PageResult 的区别：这是服务端分页，不是集合查询） */
+export interface PagedList<T> {
+  list: T[]
+  total: number
   page: number
   size: number
   hasMore: boolean
@@ -113,6 +122,18 @@ export interface FunctionMap {
     updateProfile: [ProfilePatch, { profile: Profile }]
     /** 上传头像后登记并机审（BE-M2-02）：pending = 等微信机审回调；review = 人工复核（App 用户等）。通过前只记 avatarPending */
     setAvatar: [{ fileID: string }, { profile: Profile, status: 'pending' | 'review' }]
+    /** 发起话题（M3）：标题 5–40 字、正文有效字数 ≥ 50；status = pending 表示机审待复核（只有本人看得到）；机审拒绝 40001 且不占额度 */
+    createTopic: [TopicInput, { status: 'ok' | 'pending', topic: TopicDetail, remaining: number }]
+    /** 话题流：只含 ok，新的在前；条目为摘要，作者已按匿名脱敏。需 18+，不要求实名 */
+    listTopics: [{ page?: number, size?: number }, PagedList<TopicSummary>]
+    /** 话题详情；不存在 / 已下架 / 别人的待审 40401 */
+    getTopic: [{ id: string }, { topic: TopicDetail }]
+    /** 回复：有效字数 ≥ 1，< 30 标记 short；quoteId 必须是同一话题里的正常回复 */
+    createReply: [ReplyInput, { status: 'ok' | 'pending', reply: Reply, remaining: number }]
+    /** 回复列表：时间正序，默认每页 30 */
+    listReplies: [{ topicId: string, page?: number, size?: number }, PagedList<Reply>]
+    /** 作者删除自己的话题 / 回复（软删除，幂等） */
+    deleteMine: [{ type: 'topic' | 'reply', id: string }, { ok: true, changed: boolean }]
   }
   /** 内容安全（docs/api/moderation.md，M2） */
   moderation: {

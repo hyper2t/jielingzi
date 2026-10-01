@@ -68,7 +68,7 @@
 
 > **进度（2026-10-01，首批）**：BE-M2-01（词库 + msgSecCheck，档案已接入）、BE-M2-03（举报 / 自动折叠 / 队列 / 处理）、BE-M2-04（站内通知）、BE-M2-05（`scripts/ops/set-role.mjs`）、
 > FE-M2-01（`ReportSheet`）、FE-M2-02（`pkg-admin/pages/queue`，入口仅 mod / admin）、FE-M2-03（首次发布前阅读公约）、QA-M2-01（样本集 37 + 20，命中率 100%、误杀 0）已完成，用例见 `docs/test/cases/M2.md`，契约见 `docs/api/moderation.md`。
-> 2026-10-01 已部署（含小程序凭证与手机号哈希密钥）、建好 19 个索引、设置第一个管理员。BE-M2-02 图片异步机审 + 自定义头像上传（小程序 / H5）代码完成（`_shared/media.js`、`cloudfunctions/mediacheck`、`community.setAvatar`、`moderation.mediaQueue / decideMedia`）。2026-10-01 已上线（规则、media 集合与索引、4 个函数，客户端调 mediacheck 实测被拒）。待办：微信侧配置消息推送（wxa_media_check → mediacheck）+ 云存储读权限「所有用户可读」；App 端存储上传；三端真机执行。
+> 2026-10-01 已部署（含小程序凭证与手机号哈希密钥）、建好 19 个索引、设置第一个管理员。BE-M2-02 图片异步机审 + 自定义头像上传（小程序 / H5）代码完成（`_shared/media.js`、`cloudfunctions/mediacheck`、`community.setAvatar`、`moderation.mediaQueue / decideMedia`）。2026-10-01 已上线（规则、media 集合与索引、4 个函数，客户端调 mediacheck 实测被拒）。待办：微信侧配置消息推送（wxa_media_check → mediacheck）+ 云存储读权限「所有用户可读」；App 端存储上传（含 App 端头像选图，与话题配图一起放进 M3 之后的「原生选图」任务）；三端真机执行。
 
 | 编号 | 负责 | 任务 | 验收 |
 |---|---|---|---|
@@ -83,6 +83,10 @@
 | QA-M2-01 | QA | 违规样本集（宗教措辞、疗效、引流、辱骂、色情图）→ 自动化跑机审命中率；举报阈值与处罚链路；禁言用户发布被拒 | 样本集入库，命中率报告 |
 
 ## M3 · 深度话题（1.5 周）
+
+> **进度（2026-10-01，纯文字版，未部署）**：BE-M3-01～04（`cloudfunctions/community/topics.js` + `service.js` 6 个 action：`createTopic / listTopics / getTopic / createReply / listReplies / deleteMine`；限额在 `_shared/config`；匿名脱敏）、FE-M3-01～03（首页话题流 + `TopicCard`、`pkg-community/pages/topic-new`、`pkg-community/pages/topic`、`Toggle`）、QA-M3-01 自动化部分已完成，用例见 `docs/test/cases/M3.md`，契约见 `docs/api/community.md`。审核页对机审待复核的内容显示「通过」（放行）。
+> **范围决策**：先做纯文字版；话题配图（PRD / 本计划均未含，新增范围）与 App 头像上传暂缓，**统一挂在「原生选图」任务上**（新增原生选图组件、重新打包一次；话题配图复用 `media.js` 图片审核流程，App 上传走人工复核）。`TopicSummary.images` 暂为 `[]`。
+> 待办：部署 community / moderation 并为 `topics` 集合建索引（status + createdAt）；三端真机执行与匿名抓包留存；M4 接入圈子可见性。
 
 | 编号 | 负责 | 任务 | 验收 |
 |---|---|---|---|

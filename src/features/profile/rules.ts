@@ -7,7 +7,7 @@ import { AVATAR_PRESETS, PRACTICES, PROFILE_RULES, RESERVED_NICKNAME_WORDS, TEXT
 import type { Profile, ProfilePatch } from '@/types/models'
 
 /** 控制字符、零宽字符、双向控制符（可用来伪装昵称） */
-const INVISIBLE_RE = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/
+export const INVISIBLE_RE = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/
 const PRACTICE_IDS: readonly string[] = PRACTICES.map(p => p.id)
 const AVATAR_IDS: readonly string[] = AVATAR_PRESETS
 
@@ -29,7 +29,7 @@ export interface ProfileForm {
 export type ProfileField = keyof ProfileForm
 export type ProfileErrors = Partial<Record<ProfileField, string>>
 
-function lineError (label: string, raw: string, { min = 0, max }: { min?: number, max: number }): string | undefined {
+export function lineError (label: string, raw: string, { min = 0, max }: { min?: number, max: number }): string | undefined {
   if (INVISIBLE_RE.test(raw.replace(/[\t\r\n]/g, ' '))) return `${label}含有不支持的字符`
   const n = textLength(normalizeLine(raw))
   if (min > 0 && n < min) return `${label}至少 ${min} 个字`

@@ -3,10 +3,11 @@
  * 切换真实数据：在 .env / .env.local 写 TARO_APP_DATA_SOURCE=cloud（见 services/client.ts），业务层不改。
  * 业务云函数落地时：在 FunctionMap 声明后，这里的 handlers 必须补上同名实现（类型会强制要求）。
  */
-import type { AccountStatus, MediaQueueItem, ModQueueItem, Profile, User, UserSettings } from '@/types/models'
+import type { AccountStatus, AuthorView, MediaQueueItem, ModQueueItem, Profile, Reply, ReplyQuote, TopicDetail, TopicStatus, TopicSummary, User, UserSettings } from '@/types/models'
 import type { AccountIdentities } from '../cloud.types'
-import { CONSENT_VERSION } from '@/constants/community'
+import { CONSENT_VERSION, DAILY_LIMITS, TOPIC_RULES } from '@/constants/community'
 import { normalizeLine, patchError } from '@/features/profile/rules'
+import { clip, isShortReply, normalizeBody, replyError, topicInputError } from '@/features/topic/rules'
 import { readAuth, useUserStore } from '@/store/user'
 import { removeItem, setItem, STORAGE_KEYS } from '@/utils/storage'
 import {
@@ -36,6 +37,18 @@ function settleMock (m: MockMedia, verdict: 'pass' | 'reject') {
     profile = { ...profile, avatarPending: null, ...(verdict === 'pass' ? { avatar: m.fileID } : {}) }
   }
 }
+/**
+ * mock 云端话题 / 回复（community.createTopic / listTopics / getTopic / createReply / listReplies / deleteMine，M3）。
+ * 规则与云函数一致（features/topic/rules.ts）；机审可用标记演示：标题 / 正文含 [reject] → 40001 拒绝，含 [review] → 待复核（pending，只有本人看得到）。
+ */
+interface MockTopic { id: string, title: string, body: string, tags: string[], anon: boolean, mine: boolean, authorName: string, status: TopicStatus, replyCount: number, createdAt: number, lastReplyAt: number, featured: boolean }
+interface MockReply { id: string, topicId: string, body: string, anon: boolean, mine: boolean, authorName: string, status: TopicStatus, quoteId: string | null, createdAt: number }
+let topics: MockTopic[] = []
+let replies: MockReply[] = []
+let postSeq = 0
+let postedToday = { topic: 0, reply: 0 }
+export const MOCK_REJECT_MARK = '[reject]'
+export const MOCK_REVIEW_MARK = '[review]'
 /** getPhoneNumber 回调里以这个前缀开头的 code 视为失效（测试 / 演示「code 失效」分支） */
 export const MOCK_EXPIRED_PHONE_CODE = 'mock-expired'
 /** 视为「号码已绑定其他微信账号」的 code（演示 40901） */
@@ -70,6 +83,22 @@ export const mockControl = {
     const m = [...media].reverse().find(x => x.status === 'pending' || x.status === 'review')
     if (m) settleMock(m, verdict)
   },
+  /** 预置话题（别人发的；mine: true 视为我发的）。未给的字段取默认值，createdAt 默认按顺序递增（后面的更新） */
+  seedTopics (list: Array<Partial<MockTopic> & { title: string, body: string }>) {
+    const base = Date.now() - list.length * 60000
+    list.forEach((t, i) => {
+      const createdAt = t.createdAt ?? base + i * 60000
+      topics.push({ id: `t${++postSeq}`, tags: [], anon: false, mine: false, authorName: '林然', status: 'ok', replyCount: 0, lastReplyAt: createdAt, featured: false, ...t, createdAt })
+    })
+  },
+  seedReplies (list: Array<Partial<MockReply> & { topicId: string, body: string }>) {
+    const base = Date.now() - list.length * 1000
+    list.forEach((r, i) => {
+      replies.push({ id: `r${++postSeq}`, anon: false, mine: false, authorName: '松声', status: 'ok', quoteId: null, createdAt: base + i * 1000, ...r })
+    })
+  },
+  get topics (): MockTopic[] { return topics.map(t => ({ ...t })) },
+  get replies (): MockReply[] { return replies.map(r => ({ ...r })) },
   get account (): AccountStatus { return { ...account } },
   get profile (): Profile | null { return profile ? { ...profile } : null },
   reset () {
@@ -84,6 +113,10 @@ export const mockControl = {
     reports = []
     media = []
     mediaSeq = 0
+    topics = []
+    replies = []
+    postSeq = 0
+    postedToday = { topic: 0, reply: 0 }
   }
 }
 
@@ -121,6 +154,58 @@ function guard (opts: { requirePhone: boolean }) {
 }
 
 const MOCK_ALIASES = ['竹影', '松声', '云眠', '溪语', '石径', '月光']
+
+// ---- 话题 / 回复（M3）：与云函数 topics.js 的脱敏、可见性、机审约定一致 ----
+const badParam = (msg: string) => new CloudError(ERROR_CODES.BAD_PARAM, msg)
+function noUnknown (input: unknown, allowed: string[]) {
+  const bad = Object.keys((input || {}) as object).filter(k => !allowed.includes(k))
+  if (bad.length) throw badParam(`不支持的参数：${bad.join(',')}`)
+}
+function readGuard () {
+  if (!account.adult) throw new CloudError(ERROR_CODES.ADULT_REQUIRED, 'mock: 请先确认年满 18 周岁')
+}
+function ensureMockProfile () {
+  if (!profile) profile = { nickname: '', avatar: null, practices: [], years: null, goal: '', bio: '', badges: [], anonAlias: MOCK_ALIASES[0], updatedAt: Date.now() }
+  return profile
+}
+function mockModerate (text: string): 'ok' | 'pending' {
+  if (text.includes(MOCK_REJECT_MARK)) throw badParam('内容不符合社区公约，请修改后再发布')
+  return text.includes(MOCK_REVIEW_MARK) ? 'pending' : 'ok'
+}
+/** 匿名 → 代号（无头像 / 徽章 / 档案）；实名 → 档案；我自己的匿名内容也能看到 isSelf */
+function mockAuthor (d: { anon: boolean, mine: boolean, authorName: string }): AuthorView {
+  const p = profile
+  const alias = (p && p.anonAlias) || MOCK_ALIASES[0]
+  if (d.anon) return { name: d.mine ? alias : d.authorName, avatar: null, badges: [], practices: [], years: null, isSelf: d.mine, anon: true, deleted: false }
+  if (d.mine) return { name: (p && p.nickname) || alias, avatar: p ? p.avatar : null, badges: (p && p.badges) || [], practices: (p && p.practices) || [], years: p ? p.years : null, isSelf: true, anon: false, deleted: false }
+  return { name: d.authorName, avatar: null, badges: [], practices: [], years: null, isSelf: false, anon: false, deleted: false }
+}
+/** ok / folded 所有人可见；pending 只有作者；removed 不可见 */
+const canSee = (d: { status: TopicStatus, mine: boolean }) => d.status === 'ok' || d.status === 'folded' || (d.status === 'pending' && d.mine)
+function topicBase (d: MockTopic) {
+  return {
+    id: d.id, title: d.title, tags: [...d.tags], anon: d.anon, author: mockAuthor(d), replyCount: d.replyCount,
+    createdAt: d.createdAt, lastReplyAt: d.lastReplyAt, featured: d.featured, images: [] as string[], folded: d.status === 'folded', pending: d.status === 'pending'
+  }
+}
+const topicSummary = (d: MockTopic): TopicSummary => ({ ...topicBase(d), excerpt: d.status === 'folded' ? '' : clip(d.body, TOPIC_RULES.excerptLen) })
+const topicDetail = (d: MockTopic): TopicDetail => ({ ...topicBase(d), body: d.status === 'folded' ? null : d.body })
+function replyQuote (r: MockReply): ReplyQuote | null {
+  if (!r.quoteId) return null
+  const q = replies.find(x => x.id === r.quoteId)
+  if (!q || q.status !== 'ok') return { id: r.quoteId, unavailable: true, authorName: null, anon: false, excerpt: null }
+  const a = mockAuthor(q)
+  return { id: q.id, unavailable: false, authorName: a.name, anon: !!a.anon, excerpt: clip(q.body, 60) }
+}
+const replyOut = (r: MockReply): Reply => ({
+  id: r.id, topicId: r.topicId, body: r.status === 'folded' ? null : r.body, short: isShortReply(r.body), anon: r.anon, author: mockAuthor(r),
+  quote: replyQuote(r), createdAt: r.createdAt, folded: r.status === 'folded', pending: r.status === 'pending'
+})
+function pageOf<T> (all: T[], input: { page?: number, size?: number } | undefined, defSize: number) {
+  const size = Math.min(Math.max(1, (input && input.size) || defSize), 50)
+  const page = Math.max(1, (input && input.page) || 1)
+  return { list: all.slice((page - 1) * size, page * size), total: all.length, page, size, hasMore: page * size < all.length }
+}
 
 const handlers: Handlers = {
   user: {
@@ -205,6 +290,77 @@ const handlers: Handlers = {
         anonAlias: MOCK_ALIASES[0], updatedAt: Date.now(), ...(profile || {}), avatarPending: fileID
       }
       return { profile: { ...profile }, status: 'pending' }
+    },
+    // 与云端一致：先校验字段，再走写入链路（18+ → 实名 → 禁言 → 当日额度）→ 机审 → 落库
+    createTopic: (input) => {
+      noUnknown(input, ['title', 'body', 'anon', 'tags'])
+      const first = topicInputError(input)
+      if (first) throw badParam(first)
+      guard({ requirePhone: true })
+      if (postedToday.topic >= DAILY_LIMITS.createTopic) throw new CloudError(ERROR_CODES.TOO_MANY, 'mock: 今天发起的话题已达上限')
+      const tags = Array.from(new Set((input.tags || []).map(t => normalizeLine(t.replace(/^#+/, '')))))
+      const status = mockModerate(`${input.title}\n${input.body}\n${tags.join(' ')}`)
+      ensureMockProfile()
+      const now = Date.now()
+      const d: MockTopic = { id: `t${++postSeq}`, title: normalizeLine(input.title), body: normalizeBody(input.body), tags, anon: input.anon === true, mine: true, authorName: '', status, replyCount: 0, createdAt: now, lastReplyAt: now, featured: false }
+      topics.push(d)
+      postedToday.topic += 1
+      return { status: status === 'ok' ? 'ok' : 'pending', topic: topicDetail(d), remaining: DAILY_LIMITS.createTopic - postedToday.topic }
+    },
+    listTopics: (input) => {
+      readGuard()
+      const all = topics.filter(t => t.status === 'ok').sort((a, b) => b.createdAt - a.createdAt)
+      const p = pageOf(all, input, 20)
+      return { ...p, list: p.list.map(topicSummary) }
+    },
+    getTopic: ({ id }) => {
+      readGuard()
+      const t = topics.find(x => x.id === id)
+      if (!t || !canSee(t)) throw new CloudError(ERROR_CODES.NOT_FOUND, '话题不存在或已下架')
+      return { topic: topicDetail(t) }
+    },
+    createReply: (input) => {
+      noUnknown(input, ['topicId', 'body', 'anon', 'quoteId'])
+      const first = replyError(input.body)
+      if (first) throw badParam(first)
+      guard({ requirePhone: true })
+      if (postedToday.reply >= DAILY_LIMITS.createReply) throw new CloudError(ERROR_CODES.TOO_MANY, 'mock: 今天发布的回复已达上限')
+      const t = topics.find(x => x.id === input.topicId)
+      if (!t || t.status !== 'ok') throw new CloudError(ERROR_CODES.NOT_FOUND, '话题不存在或暂时不能回复')
+      if (input.quoteId) {
+        const q = replies.find(x => x.id === input.quoteId)
+        if (!q || q.topicId !== t.id || q.status !== 'ok') throw badParam('引用的回复不存在或已不可用')
+      }
+      const status = mockModerate(input.body)
+      ensureMockProfile()
+      const now = Date.now()
+      const d: MockReply = { id: `r${++postSeq}`, topicId: t.id, body: normalizeBody(input.body), anon: input.anon === true, mine: true, authorName: '', status, quoteId: input.quoteId || null, createdAt: now }
+      replies.push(d)
+      if (status === 'ok') { t.replyCount += 1; t.lastReplyAt = now }
+      postedToday.reply += 1
+      return { status: status === 'ok' ? 'ok' : 'pending', reply: replyOut(d), remaining: DAILY_LIMITS.createReply - postedToday.reply }
+    },
+    listReplies: (input) => {
+      readGuard()
+      const t = topics.find(x => x.id === input.topicId)
+      if (!t || !canSee(t)) throw new CloudError(ERROR_CODES.NOT_FOUND, '话题不存在或已下架')
+      const all = replies.filter(r => r.topicId === t.id && canSee(r)).sort((a, b) => a.createdAt - b.createdAt)
+      const p = pageOf(all, input, 30)
+      return { ...p, list: p.list.map(replyOut) }
+    },
+    deleteMine: (input) => {
+      noUnknown(input, ['type', 'id'])
+      if (input.type !== 'topic' && input.type !== 'reply') throw badParam('type 只能是 topic 或 reply')
+      const doc = input.type === 'topic' ? topics.find(x => x.id === input.id) : replies.find(x => x.id === input.id)
+      if (!doc || !doc.mine) throw new CloudError(ERROR_CODES.NOT_FOUND, '内容不存在或已下架')
+      if (doc.status === 'removed') return { ok: true, changed: false }
+      const wasOk = doc.status === 'ok'
+      doc.status = 'removed'
+      if (input.type === 'reply' && wasOk) {
+        const t = topics.find(x => x.id === (doc as MockReply).topicId)
+        if (t) t.replyCount = Math.max(0, t.replyCount - 1)
+      }
+      return { ok: true, changed: true }
     }
   },
   // 与云端 moderation 一致：举报需 18+（禁言可举报）、同一人只计一次；队列 / 处理仅 mod / admin
@@ -226,9 +382,12 @@ const handlers: Handlers = {
       const groups = new Map<string, ModQueueItem>()
       for (const r of reports.filter(x => x.state === state)) {
         const key = `${r.targetType}:${r.targetId}`
+        const found = r.targetType === 'topic' ? topics.find(x => x.id === r.targetId) : r.targetType === 'reply' ? replies.find(x => x.id === r.targetId) : undefined
         const g: ModQueueItem = groups.get(key) || {
           targetType: r.targetType, targetId: r.targetId, contentType: r.contentType, count: 0, reasons: {}, notes: [], latestAt: Date.now(),
-          target: { status: 'ok', excerpt: `mock 内容 ${r.targetId}`, anon: false, authorDeleted: false }
+          target: found
+            ? { status: found.status, excerpt: clip(found.body, 60), anon: !!found.anon, authorDeleted: false }
+            : { status: 'ok', excerpt: `mock 内容 ${r.targetId}`, anon: false, authorDeleted: false }
         }
         g.count++
         g.reasons[r.reason] = (g.reasons[r.reason] || 0) + 1
@@ -247,6 +406,8 @@ const handlers: Handlers = {
       }
       if (!n) throw new CloudError(ERROR_CODES.NOT_FOUND, '举报目标不存在')
       const status = input.decision === 'remove' ? 'removed' : input.decision === 'mute' || input.decision === 'ban' ? null : 'ok'
+      const hit = input.targetType === 'topic' ? topics.find(x => x.id === input.targetId) : input.targetType === 'reply' ? replies.find(x => x.id === input.targetId) : undefined
+      if (hit && status) hit.status = status
       return { ok: true, resolved: n, status }
     },
     mediaQueue: () => {

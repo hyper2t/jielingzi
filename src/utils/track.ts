@@ -23,6 +23,9 @@ export interface TrackEvents {
   // ---- M1 首次进入 / 练习档案（只记事件，不记内容） ----
   adult_confirm: { result: 'confirmed' | 'declined' }
   profile_save: { created: boolean }
+  // ---- 深度话题（M3） ----
+  topic_create: { anon: boolean, status: string }
+  reply_create: { anon: boolean, quote: boolean, status: string }
 }
 
 export type TrackEventName = keyof TrackEvents

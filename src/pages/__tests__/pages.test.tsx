@@ -1,6 +1,6 @@
 import { act, create, ReactTestRenderer } from 'react-test-renderer'
 import Taro from '@tarojs/taro'
-import Index, { HOME_PLACEHOLDER } from '@/pages/index/index'
+import Index from '@/pages/index/index'
 import Mine, { CONSENT_HINT, H5_NOTICE, MINE_PLACEHOLDER } from '@/pages/mine/index'
 import { mockControl } from '@/services/mock/client'
 import { invalidate } from '@/hooks/requestCache'
@@ -31,11 +31,11 @@ beforeEach(() => {
   jest.clearAllMocks()
 })
 
-describe('首页（空壳）', () => {
-  it('渲染占位；首次进入弹同意；不发云端请求', async () => {
+describe('首页（话题流，细节见 pkg-community/__tests__/m3.test.tsx）', () => {
+  it('未同意：引导空态；首次进入弹同意；不发云端请求', async () => {
     const r = render(<Index />)
     await flush()
-    expect(texts(r)).toEqual(expect.arrayContaining(['结灵子', HOME_PLACEHOLDER, '请阅读并同意']))
+    expect(texts(r)).toEqual(expect.arrayContaining(['结灵子', '同意协议后可浏览话题', '请阅读并同意']))
     expect(mockControl.calls).toHaveLength(0)
   })
 })
@@ -68,14 +68,14 @@ describe('我的', () => {
 })
 
 describe('M0 新页面（空壳）', () => {
-  it('练习 Tab：渲染占位并弹同意；话题 / 计时器占位不发请求', async () => {
+  it('练习 Tab：渲染占位并弹同意；话题详情未同意时引导、计时器占位，都不发请求', async () => {
     const { default: Practice, PRACTICE_PLACEHOLDER } = await import('@/pages/practice/index')
-    const { default: Topic, TOPIC_PLACEHOLDER } = await import('@/pkg-community/pages/topic/index')
+    const { default: Topic } = await import('@/pkg-community/pages/topic/index')
     const { default: Timer, TIMER_PLACEHOLDER } = await import('@/pkg-practice/pages/timer/index')
     const r = render(<Practice />)
     await flush()
     expect(texts(r)).toEqual(expect.arrayContaining(['练习', PRACTICE_PLACEHOLDER, '请阅读并同意']))
-    expect(texts(render(<Topic />))).toEqual(expect.arrayContaining([TOPIC_PLACEHOLDER]))
+    expect(texts(render(<Topic />))).toEqual(expect.arrayContaining(['同意协议后可查看话题']))
     expect(texts(render(<Timer />))).toEqual(expect.arrayContaining([TIMER_PLACEHOLDER]))
     expect(mockControl.calls).toHaveLength(0)
   })
@@ -85,7 +85,7 @@ describe('M0 新页面（空壳）', () => {
     expect(TAB_ROUTES).toEqual(['index', 'practice', 'mine'])
     const fs = await import('fs')
     const cfg = fs.readFileSync(require.resolve('@/app.config'), 'utf8')
-    for (const p of [ROUTES.practice, ROUTES.topic, ROUTES.timer]) {
+    for (const p of [ROUTES.practice, ROUTES.topic, ROUTES.topicNew, ROUTES.timer]) {
       const seg = p.replace(/^\/(pkg-[a-z]+\/)?/, '')
       expect(cfg).toContain(`'${seg}'`)
     }

@@ -5,8 +5,8 @@
  * 页面取数：useRequest(ready ? PROFILE_KEY : null, getProfile)
  */
 import Taro from '@tarojs/taro'
-import type { Profile, ProfilePatch } from '@/types/models'
-import { canSync } from '@/store/user'
+import type { Profile, ProfilePatch, Reply, ReplyInput, TopicDetail, TopicInput, TopicSummary } from '@/types/models'
+import { canSync, isAdultConfirmed } from '@/store/user'
 import { invalidate } from '@/hooks/requestCache'
 import { getClient } from './client'
 import { assertCanWrite } from './guard'
@@ -66,4 +66,76 @@ export async function uploadAvatar (): Promise<{ status: 'pending' | 'review', p
   const res = await getClient().fn.call('community', 'setAvatar', { fileID })
   invalidate(PROFILE_KEY)
   return res
+}
+
+// ---------------------------------------------------------------------------------------------
+// 深度话题与回复（M3，docs/api/community.md）
+// - 读：未同意 / App 未登录 / 未确认 18+ 时不发请求（云端读也要求 18+，否则 40303），返回空
+// - 写：assertCanWrite 拦截未同意 / 未登录；成功后让话题流重新取数
+// ---------------------------------------------------------------------------------------------
+
+/** 话题流 / 回复列表条目：加上 usePaged 要求的 _id（= 接口的 id） */
+export type TopicCard = TopicSummary & { _id: string }
+export type ReplyItem = Reply & { _id: string }
+
+export interface PagedResult<T> { list: T[], total: number, hasMore: boolean }
+
+/** 话题详情的请求缓存 key */
+export const topicKey = (id: string) => `topic:${id}`
+
+/** 话题流版本：发布 / 删除后加 1，首页回到前台时据此决定是否重新取数（不依赖下拉刷新） */
+let feedVersion = 0
+export const getFeedVersion = () => feedVersion
+const touchFeed = () => { feedVersion += 1 }
+
+/** 当前能否读社区内容：已同意（App 还需登录）且已确认 18+ */
+export function canReadCommunity (): boolean {
+  return canSync() && isAdultConfirmed()
+}
+
+export const FEED_PAGE_SIZE = 20
+export const REPLY_PAGE_SIZE = 30
+
+export async function listTopics (page = 1, size = FEED_PAGE_SIZE): Promise<PagedResult<TopicCard>> {
+  if (!canReadCommunity()) return { list: [], total: 0, hasMore: false }
+  const res = await getClient().fn.call('community', 'listTopics', { page, size })
+  return { list: res.list.map(t => ({ ...t, _id: t.id })), total: res.total, hasMore: res.hasMore }
+}
+
+/** 话题详情；没有读权限时返回 null */
+export async function getTopic (id: string): Promise<TopicDetail | null> {
+  if (!canReadCommunity()) return null
+  const res = await getClient().fn.call('community', 'getTopic', { id })
+  return res.topic
+}
+
+export async function listReplies (topicId: string, page = 1, size = REPLY_PAGE_SIZE): Promise<PagedResult<ReplyItem>> {
+  if (!canReadCommunity()) return { list: [], total: 0, hasMore: false }
+  const res = await getClient().fn.call('community', 'listReplies', { topicId, page, size })
+  return { list: res.list.map(r => ({ ...r, _id: r.id })), total: res.total, hasMore: res.hasMore }
+}
+
+/** 发起话题：status = pending 表示机审待复核（只有本人看得到） */
+export async function createTopic (input: TopicInput): Promise<{ status: 'ok' | 'pending', topic: TopicDetail, remaining: number }> {
+  assertCanWrite()
+  const res = await getClient().fn.call('community', 'createTopic', input)
+  touchFeed()
+  return res
+}
+
+export async function createReply (input: ReplyInput): Promise<{ status: 'ok' | 'pending', reply: Reply, remaining: number }> {
+  assertCanWrite()
+  const res = await getClient().fn.call('community', 'createReply', input)
+  invalidate(topicKey(input.topicId))
+  touchFeed()
+  return res
+}
+
+/** 删除自己的话题 / 回复（软删除，幂等） */
+export async function deleteMine (type: 'topic' | 'reply', id: string): Promise<{ changed: boolean }> {
+  assertCanWrite()
+  const res = await getClient().fn.call('community', 'deleteMine', { type, id })
+  if (type === 'topic') invalidate(topicKey(id))
+  touchFeed()
+  return { changed: res.changed }
 }

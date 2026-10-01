@@ -6,6 +6,7 @@
  */
 
 const { getProfile, updateProfile, setAvatar } = require('./profile')
+const { createTopic, listTopics, getTopic, createReply, listReplies, deleteMine } = require('./topics')
 
 /** 不要求身份的动作（入口据此不因副作用建号） */
 const IDENTITY_FREE_ACTIONS = ['ping']
@@ -20,7 +21,14 @@ const actions = {
   updateProfile,
   /** BE-M2-02：上传头像登记并机审 */
   setAvatar,
-  // TODO(M3/M4)：话题 / 回复 / 圈子 / 邀请，按 docs/prd/mvp-plan.md 的任务编号逐个添加
+  /** M3 深度话题（BE-M3-01 ~ 04，docs/api/community.md） */
+  createTopic,
+  listTopics,
+  getTopic,
+  createReply,
+  listReplies,
+  deleteMine,
+  // TODO(M4)：圈子 / 邀请，按 docs/prd/mvp-plan.md 的任务编号逐个添加
 }
 
 module.exports = { actions, IDENTITY_FREE_ACTIONS }

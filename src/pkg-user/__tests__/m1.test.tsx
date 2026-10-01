@@ -9,7 +9,7 @@ import { ConsentSheet, PhoneSheet } from '@/components'
 import Adult, { ADULT_CONFIRM, ADULT_EXIT } from '@/pkg-user/pages/adult/index'
 import ProfileEdit, { SAVE_TEXT } from '@/pkg-user/pages/profile-edit/index'
 import Mine, { ADULT_HINT, PROFILE_SETUP, ProfileCard } from '@/pages/mine/index'
-import Index, { NEW_TOPIC, NEW_TOPIC_SOON } from '@/pages/index/index'
+import Index, { NEW_TOPIC } from '@/pages/index/index'
 import { mockControl, MOCK_EXPIRED_PHONE_CODE, MOCK_TAKEN_PHONE_CODE } from '@/services/mock/client'
 import { invalidate } from '@/hooks/requestCache'
 import { useUserStore } from '@/store/user'
@@ -119,7 +119,7 @@ describe('发布前实名拦截（FE-M1-02）', () => {
     useUserStore.setState({ consent: 'agreed', adult: 'confirmed' })
     const home = render(<Index />)
     click(home, NEW_TOPIC)
-    expect(Taro.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ title: NEW_TOPIC_SOON }))
+    expect(Taro.navigateTo).not.toHaveBeenCalledWith({ url: '/pkg-community/pages/topic-new/index' })
     expect(texts(home)).toEqual(expect.arrayContaining(['验证手机号', '发起话题前请先验证手机号']))
     await act(async () => { await phoneButton(home).props.onGetPhoneNumber({ detail: { code: 'mock-phone-code-0001' } }) })
     expect(mockControl.calls.find(c => c.action === 'bindPhoneWeapp')?.data).toEqual({ code: 'mock-phone-code-0001' })
@@ -131,7 +131,7 @@ describe('发布前实名拦截（FE-M1-02）', () => {
     expect(Taro.navigateTo).toHaveBeenLastCalledWith({ url: '/pkg-user/pages/agreement/index?type=rules&mode=gate' })
     markRulesRead()
     click(home, NEW_TOPIC)
-    expect(Taro.showToast).toHaveBeenCalledWith(expect.objectContaining({ title: NEW_TOPIC_SOON }))
+    expect(Taro.navigateTo).toHaveBeenLastCalledWith({ url: '/pkg-community/pages/topic-new/index' })
   })
 
   it('拒绝授权 / code 失效 / 号码已被他人绑定：留在弹层显示原因，可重试或关闭', async () => {

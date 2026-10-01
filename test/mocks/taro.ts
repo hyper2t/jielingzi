@@ -5,6 +5,7 @@ const listeners: Array<(res: { isConnected: boolean }) => void> = []
 const store = new Map<string, unknown>()
 const showHandlers = new Set<() => void>()
 const bottomHandlers = new Set<() => void>()
+const pullHandlers = new Set<() => void>()
 
 export function useDidShow (cb: () => void) {
   const ref = useRef(cb)
@@ -24,6 +25,16 @@ export function useReachBottom (cb: () => void) {
     const h = () => ref.current()
     bottomHandlers.add(h)
     return () => { bottomHandlers.delete(h) }
+  }, [])
+}
+
+export function usePullDownRefresh (cb: () => void) {
+  const ref = useRef(cb)
+  ref.current = cb
+  useEffect(() => {
+    const h = () => ref.current()
+    pullHandlers.add(h)
+    return () => { pullHandlers.delete(h) }
   }, [])
 }
 
@@ -54,9 +65,12 @@ const Taro: any = {
   clearStorageSync: jest.fn(() => { store.clear() }),
   useDidShow,
   useReachBottom,
+  usePullDownRefresh,
+  stopPullDownRefresh: jest.fn(),
   __emitNetwork (isConnected: boolean) { listeners.forEach(cb => cb({ isConnected })) },
   __emitShow () { showHandlers.forEach(h => h()) },
   __emitReachBottom () { bottomHandlers.forEach(h => h()) },
+  __emitPullDown () { pullHandlers.forEach(h => h()) },
   __storage: store,
   cloud: undefined
 }

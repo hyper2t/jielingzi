@@ -204,4 +204,4 @@ async function setAvatar(params, ctx) {
   return { profile: present({ ...doc, avatarPending: fileID, updatedAt: now }), status: media.status }
 }
 
-module.exports = { getProfile, updateProfile, setAvatar, ensureProfile, parseUpdate, present, textLength, PROFILE_COLLECTION: COLLECTION }
+module.exports = { getProfile, updateProfile, setAvatar, ensureProfile, parseUpdate, present, textLength, cleanLine, INVISIBLE_RE, PROFILE_COLLECTION: COLLECTION }

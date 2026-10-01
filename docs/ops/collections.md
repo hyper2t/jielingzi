@@ -49,6 +49,7 @@ node scripts/ops/security-rules.mjs --apply       # 下发：全部集合 {read:
 | memberships | `uniq_circle_member` | `circleId` + `_openid` | 唯一 |
 | invites | `uniq_code` | `code` | 唯一 |
 | topics | `idx_circle_status_time` | `circleId` + `status` + `createdAt`(desc) | 普通 |
+| topics | `idx_status_time` | `status` + `createdAt`(desc) | 普通 |
 | topics | `idx_author_time` | `_openid` + `createdAt`(desc) | 普通 |
 | replies | `idx_topic_time` | `topicId` + `createdAt` | 普通 |
 | reports | `idx_reporter_target` | `targetType` + `targetId` + `_openid` | 普通 |

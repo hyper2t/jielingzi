@@ -1,7 +1,7 @@
 /** FE-M2-02 审核页（仅 mod / admin）+ FE-M2-03 首次发布前公约阅读页 + 「我的」审核入口 */
 import { act, create, ReactTestRenderer } from 'react-test-renderer'
 import Taro from '@tarojs/taro'
-import AdminQueue, { NO_PERMISSION, QUEUE_EMPTY } from '@/pkg-admin/pages/queue/index'
+import AdminQueue, { NO_PERMISSION, PASS_LABEL, QUEUE_EMPTY } from '@/pkg-admin/pages/queue/index'
 import Agreement, { RULES_ACK } from '@/pkg-user/pages/agreement/index'
 import Mine, { ADMIN_ENTRY } from '@/pages/mine/index'
 import { isRulesRead } from '@/features/consent/rules'
@@ -65,6 +65,41 @@ describe('审核页（FE-M2-02）', () => {
     await flush()
     expect(mockControl.calls.filter(c => c.action === 'decide').pop()?.data).toEqual({ targetType: 'reply', targetId: 'r1', contentType: 'reply', decision: 'mute', days: 7 })
     expect(texts(r)).toContain(QUEUE_EMPTY)
+  })
+})
+
+describe('机审待复核的内容（M3）', () => {
+  it('pending 条目显示「待审」与「通过」（调 dismiss 放行），不再显示「驳回」；放行后话题恢复可见', async () => {
+    useUserStore.setState({ account: { ...STATUS, role: 'mod' } })
+    mockControl.setAccount({ role: 'mod', adult: true })
+    mockControl.seedTopics([{ title: '待复核的话题', body: '正文'.repeat(30), status: 'pending', authorName: '松声' }])
+    const id = mockControl.topics[0].id
+    mockControl.seedReports([{ targetType: 'topic', targetId: id, reason: 'other', by: 'system' }])
+    const r = render(<AdminQueue />)
+    await flush()
+    expect(texts(r)).toContain('待审')
+    expect(hosts(r, n => n.props.ariaLabel === '驳回')).toHaveLength(0)
+    ;(Taro.showModal as jest.Mock).mockClear()
+    click(r, PASS_LABEL)
+    await flush()
+    expect((Taro.showModal as jest.Mock).mock.calls[0][0].content).toContain('通过这条待审内容')
+    expect(mockControl.calls.find(c => c.action === 'decide')?.data).toEqual({ targetType: 'topic', targetId: id, contentType: 'topic', decision: 'dismiss' })
+    expect(mockControl.topics[0].status).toBe('ok')
+    expect(texts(r)).toContain(QUEUE_EMPTY)
+  })
+
+  it('取消确认不调 decide', async () => {
+    useUserStore.setState({ account: { ...STATUS, role: 'mod' } })
+    mockControl.setAccount({ role: 'mod', adult: true })
+    mockControl.seedTopics([{ title: '待复核的话题', body: '正文'.repeat(30), status: 'pending' }])
+    mockControl.seedReports([{ targetType: 'topic', targetId: mockControl.topics[0].id, reason: 'other', by: 'system' }])
+    const r = render(<AdminQueue />)
+    await flush()
+    ;(Taro.showModal as jest.Mock).mockResolvedValueOnce({ confirm: false })
+    click(r, PASS_LABEL)
+    await flush()
+    expect(mockControl.calls.some(c => c.action === 'decide')).toBe(false)
+    expect(mockControl.topics[0].status).toBe('pending')
   })
 })
 

@@ -72,4 +72,16 @@ async function logModeration(db, entry, now) {
   await withCollection(db, MOD_LOG_COLLECTION, () => db.collection(MOD_LOG_COLLECTION).add(doc))
 }
 
-module.exports = { checkText, logModeration, MODERATION_SCENES: SCENES, MODERATION_VERDICTS: VERDICTS, MOD_LOG_COLLECTION }
+/** 系统写入的待复核标记（reports.note），审核页据此显示来源 */
+const REVIEW_NOTE = '机审待复核'
+
+/**
+ * 机审结论为 review 的内容（status = pending，对他人不可见）进人工复核：写一条「系统待复核」举报，复用 M2 的审核队列与审核页。
+ * _openid = null（不是任何用户，decide 通知举报人时会跳过）；审核员 restore / dismiss = 放行（pending → ok），remove = 下架。
+ */
+async function enqueueReview(db, { contentType, targetId, now }) {
+  const doc = { _openid: null, targetType: contentType, targetId, contentType, reason: 'other', note: REVIEW_NOTE, state: 'open', system: true, createdAt: now }
+  await withCollection(db, 'reports', () => db.collection('reports').add(doc))
+}
+
+module.exports = { checkText, logModeration, enqueueReview, REVIEW_NOTE, MODERATION_SCENES: SCENES, MODERATION_VERDICTS: VERDICTS, MOD_LOG_COLLECTION }

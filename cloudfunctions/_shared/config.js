@@ -27,6 +27,13 @@ const TEXT_RULES = Object.freeze({
   goal: { max: 40 },
 })
 
+/** 话题的其余规则（PRD T1）：标签最多几个、每个标签的字数；列表摘要长度（与前端 src/constants/community.ts 一致） */
+const TOPIC_RULES = Object.freeze({
+  tagsMax: 3,
+  tag: { min: 1, max: 12 },
+  excerptLen: 80,
+})
+
 /** 练习方式预置列表（PRD P1；措辞规范见 docs/prd/wording.md）。id 入库，label 仅展示 */
 const PRACTICES = Object.freeze([
   { id: 'meditation', label: '冥想' },
@@ -88,4 +95,4 @@ function cnDate(now) {
   return new Date(now + 8 * 3600 * 1000).toISOString().slice(0, 10)
 }
 
-module.exports = { DAILY_LIMITS, TEXT_RULES, PRACTICES, PRACTICE_IDS, PROFILE_RULES, AVATAR_PRESETS, RESERVED_NICKNAME_WORDS, CONSENT_VERSION, REPORT_REASONS, REPORT_FOLD_THRESHOLD, PUNISH_DAYS, ROLES, cnDate }
+module.exports = { DAILY_LIMITS, TEXT_RULES, TOPIC_RULES, PRACTICES, PRACTICE_IDS, PROFILE_RULES, AVATAR_PRESETS, RESERVED_NICKNAME_WORDS, CONSENT_VERSION, REPORT_REASONS, REPORT_FOLD_THRESHOLD, PUNISH_DAYS, ROLES, cnDate }

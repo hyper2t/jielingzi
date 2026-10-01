@@ -196,8 +196,11 @@ async function decide(params, ctx) {
   if (input.decision === 'remove' || input.decision === 'restore' || input.decision === 'dismiss') {
     if (input.targetType === 'user' && input.decision !== 'dismiss') throw badParam('举报用户只能驳回、禁言或封禁')
     if (!content && input.decision !== 'dismiss') throw notFound('内容不存在或已删除')
+    // 作者自己删除的内容不能被审核员恢复（尊重作者意愿）
+    if (input.decision === 'restore' && content && content.removedBy === 'author') throw badParam('作者已自行删除该内容，不能恢复')
     if (input.decision === 'remove') status = 'removed'
-    else if (content && (input.decision === 'restore' || status === 'folded')) status = 'ok'
+    // pending（机审待复核，见 _shared/moderation.js enqueueReview）：restore / dismiss 都是放行
+    else if (content && (input.decision === 'restore' || status === 'folded' || status === 'pending')) status = 'ok'
     if (content && input.targetType !== 'user' && status !== (content.status || 'ok')) {
       const patch = { status, handledAt: now }
       if (status === 'removed') patch.removedAt = now

@@ -17,8 +17,8 @@ export default defineAppConfig({
   subPackages: [
     {
       root: 'pkg-community',
-      // TODO(M3/M4)：topic-detail、topic-new、circle-detail、join-circle、invites、featured
-      pages: ['pages/topic/index']
+      // M3：话题详情（topic）、发起话题（topic-new）；TODO(M4)：circle-detail、join-circle、invites、featured
+      pages: ['pages/topic/index', 'pages/topic-new/index']
     },
     {
       root: 'pkg-practice',

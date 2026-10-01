@@ -24,6 +24,13 @@ export const TEXT_RULES = {
   goal: { max: 40 }
 } as const
 
+/** 话题的其余规则（PRD T1）：标签最多几个、每个标签的字数；列表摘要长度 */
+export const TOPIC_RULES = {
+  tagsMax: 3,
+  tag: { min: 1, max: 12 },
+  excerptLen: 80
+} as const
+
 export const PRACTICES = [
   { id: 'meditation', label: '冥想' },
   { id: 'mindfulness', label: '正念' },

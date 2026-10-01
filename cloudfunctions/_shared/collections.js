@@ -43,7 +43,12 @@ const COLLECTIONS = Object.freeze([
     name: 'topics',
     desc: '话题',
     owned: { onDelete: 'detach' },
-    indexes: [{ name: 'idx_circle_status_time', keys: [['circleId', 1], ['status', 1], ['createdAt', -1]] }, { name: 'idx_author_time', keys: [['_openid', 1], ['createdAt', -1]] }],
+    indexes: [
+      { name: 'idx_circle_status_time', keys: [['circleId', 1], ['status', 1], ['createdAt', -1]] },
+      // M3 首页话题流（不分圈子）：status = ok，按时间倒序
+      { name: 'idx_status_time', keys: [['status', 1], ['createdAt', -1]] },
+      { name: 'idx_author_time', keys: [['_openid', 1], ['createdAt', -1]] },
+    ],
   },
   { name: 'replies', desc: '回复', owned: { onDelete: 'detach' }, indexes: [{ name: 'idx_topic_time', keys: [['topicId', 1], ['createdAt', 1]] }] },
 

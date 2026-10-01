@@ -1,0 +1,415 @@
+{
+  "_说明": "前后端共用的话题 / 回复校验用例：后端 tests/cloudfunctions/m3-parity.test.js 与前端 src/features/topic/__tests__/rules.test.ts 读同一份。值可以是字符串，或 {repeat, times}（重复拼接）。error 为 null 表示通过。",
+  "topics": [
+    {
+      "name": "合法：标题 + 正文 + 标签",
+      "input": {
+        "title": "静坐时总是走神怎么办",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        },
+        "tags": [
+          "冥想",
+          "呼吸"
+        ]
+      },
+      "error": null
+    },
+    {
+      "name": "合法：不传标签",
+      "input": {
+        "title": "静坐时总是走神怎么办",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        }
+      },
+      "error": null
+    },
+    {
+      "name": "合法：标题含多余空白会被折叠",
+      "input": {
+        "title": "  静坐   走神 怎么办  ",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        }
+      },
+      "error": null
+    },
+    {
+      "name": "标题 4 个字",
+      "input": {
+        "title": "静坐走神",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        }
+      },
+      "error": "标题至少 5 个字"
+    },
+    {
+      "name": "标题 5 个字",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        }
+      },
+      "error": null
+    },
+    {
+      "name": "标题 40 个字",
+      "input": {
+        "title": {
+          "repeat": "字",
+          "times": 40
+        },
+        "body": {
+          "repeat": "静",
+          "times": 60
+        }
+      },
+      "error": null
+    },
+    {
+      "name": "标题 41 个字",
+      "input": {
+        "title": {
+          "repeat": "字",
+          "times": 41
+        },
+        "body": {
+          "repeat": "静",
+          "times": 60
+        }
+      },
+      "error": "标题最多 40 个字"
+    },
+    {
+      "name": "标题含零宽字符",
+      "input": {
+        "title": "静坐时总是​走神",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        }
+      },
+      "error": "标题含有不支持的字符"
+    },
+    {
+      "name": "标题空",
+      "input": {
+        "title": "",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        }
+      },
+      "error": "标题至少 5 个字"
+    },
+    {
+      "name": "正文有效字数 49（带空格凑数）",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "静 ",
+          "times": 49
+        }
+      },
+      "error": "正文至少 50 个字"
+    },
+    {
+      "name": "正文有效字数 50（含空格）",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "静 ",
+          "times": 50
+        }
+      },
+      "error": null
+    },
+    {
+      "name": "正文全是空白与换行",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": " \n",
+          "times": 80
+        }
+      },
+      "error": "正文至少 50 个字"
+    },
+    {
+      "name": "正文 10000 字",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "字",
+          "times": 10000
+        }
+      },
+      "error": null
+    },
+    {
+      "name": "正文 10001 字",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "字",
+          "times": 10001
+        }
+      },
+      "error": "正文最多 10000 个字"
+    },
+    {
+      "name": "正文含控制字符",
+      "input": {
+        "title": "静坐走神吗",
+        "body": "静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐\u0007"
+      },
+      "error": "正文含有不支持的字符"
+    },
+    {
+      "name": "正文含零宽字符",
+      "input": {
+        "title": "静坐走神吗",
+        "body": "静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐静坐​"
+      },
+      "error": "正文含有不支持的字符"
+    },
+    {
+      "name": "标签 3 个",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        },
+        "tags": [
+          "a",
+          "b",
+          "c"
+        ]
+      },
+      "error": null
+    },
+    {
+      "name": "标签 4 个",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        },
+        "tags": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ]
+      },
+      "error": "标签最多 3 个"
+    },
+    {
+      "name": "标签重复算一个",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        },
+        "tags": [
+          "冥想",
+          "冥想",
+          "#冥想",
+          "呼吸"
+        ]
+      },
+      "error": null
+    },
+    {
+      "name": "标签去重后仍超过 3 个",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        },
+        "tags": [
+          "冥想",
+          "冥想",
+          "呼吸",
+          "睡眠",
+          "放松"
+        ]
+      },
+      "error": "标签最多 3 个"
+    },
+    {
+      "name": "标签带 # 前缀",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        },
+        "tags": [
+          "#冥想"
+        ]
+      },
+      "error": null
+    },
+    {
+      "name": "标签 12 个字",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        },
+        "tags": [
+          {
+            "repeat": "字",
+            "times": 12
+          }
+        ]
+      },
+      "error": null
+    },
+    {
+      "name": "标签 13 个字",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        },
+        "tags": [
+          {
+            "repeat": "字",
+            "times": 13
+          }
+        ]
+      },
+      "error": "标签最多 12 个字"
+    },
+    {
+      "name": "标签是空串",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        },
+        "tags": [
+          ""
+        ]
+      },
+      "error": "标签至少 1 个字"
+    },
+    {
+      "name": "标签只有 #",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        },
+        "tags": [
+          "#"
+        ]
+      },
+      "error": "标签至少 1 个字"
+    },
+    {
+      "name": "标签含零宽字符",
+      "input": {
+        "title": "静坐走神吗",
+        "body": {
+          "repeat": "静",
+          "times": 60
+        },
+        "tags": [
+          "冥​想"
+        ]
+      },
+      "error": "标签含有不支持的字符"
+    }
+  ],
+  "replies": [
+    {
+      "name": "1 个字",
+      "body": "好",
+      "error": null,
+      "short": true
+    },
+    {
+      "name": "空串",
+      "body": "",
+      "error": "回复至少 1 个字"
+    },
+    {
+      "name": "只有空白与换行",
+      "body": "  \n \t ",
+      "error": "回复至少 1 个字"
+    },
+    {
+      "name": "29 个字是简短回复",
+      "body": {
+        "repeat": "好",
+        "times": 29
+      },
+      "error": null,
+      "short": true
+    },
+    {
+      "name": "30 个字不是简短回复",
+      "body": {
+        "repeat": "好",
+        "times": 30
+      },
+      "error": null,
+      "short": false
+    },
+    {
+      "name": "空格不计入有效字数：30 个字符含空格仍是简短回复",
+      "body": {
+        "repeat": "好 ",
+        "times": 15
+      },
+      "error": null,
+      "short": true
+    },
+    {
+      "name": "5000 字",
+      "body": {
+        "repeat": "字",
+        "times": 5000
+      },
+      "error": null,
+      "short": false
+    },
+    {
+      "name": "5001 字",
+      "body": {
+        "repeat": "字",
+        "times": 5001
+      },
+      "error": "回复最多 5000 个字"
+    },
+    {
+      "name": "含零宽字符",
+      "body": "说得好​",
+      "error": "回复含有不支持的字符"
+    },
+    {
+      "name": "含控制字符",
+      "body": "说得好\u0007",
+      "error": "回复含有不支持的字符"
+    }
+  ]
+}

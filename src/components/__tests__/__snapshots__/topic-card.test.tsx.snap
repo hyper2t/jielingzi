@@ -1,0 +1,84 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`TopicCard 作者 / 发帖时间 / 标题 / 摘要 / 标签 / 回复数；读屏文案含标题与回复数 1`] = `
+<View
+  accessibilityLabel="话题：静坐走神怎么办，3 条回复"
+  accessibilityRole="button"
+  ariaLabel="话题：静坐走神怎么办，3 条回复"
+  ariaRole="button"
+  className="flex flex-col p-4 mb-3 rounded-md bg-paper-light shadow-card"
+>
+  <View
+    accessibilityLabel="松声，正念  练习 3 年 · 5 分钟前"
+    ariaLabel="松声，正念  练习 3 年 · 5 分钟前"
+    className="flex flex-row items-center"
+  >
+    <Image
+      accessibilityElementsHidden={true}
+      ariaHidden={true}
+      className="rounded-full w-8 h-8"
+      importantForAccessibility="no-hide-descendants"
+      mode="aspectFill"
+      src="file-stub"
+    />
+    <View
+      className="flex flex-col flex-1 ml-2"
+    >
+      <View
+        className="flex flex-row items-center"
+      >
+        <Text
+          className="font-body font-bold text-ink text-caption"
+          numberOfLines={1}
+        >
+          松声
+        </Text>
+      </View>
+      <Text
+        className="font-body text-caption text-ink-faint"
+        numberOfLines={1}
+      >
+        正念  练习 3 年 · 5 分钟前
+      </Text>
+    </View>
+  </View>
+  <Text
+    className="font-title font-bold text-subtitle text-ink mt-3"
+    numberOfLines={2}
+  >
+    静坐走神怎么办
+  </Text>
+  <Text
+    className="font-body text-body text-ink-soft mt-1"
+    numberOfLines={3}
+  >
+    静坐时总是走神，试了数呼吸也很难坚持…
+  </Text>
+  <View
+    className="flex flex-row flex-wrap"
+  >
+    <Text
+      className="mr-2 mt-2 px-2 rounded-sm bg-brand-light font-body text-caption text-brand-dark"
+    >
+      #冥想
+    </Text>
+    <Text
+      className="mr-2 mt-2 px-2 rounded-sm bg-brand-light font-body text-caption text-brand-dark"
+    >
+      #呼吸
+    </Text>
+  </View>
+  <View
+    className="flex flex-row items-center mt-3"
+  >
+    <View
+      className="flex-1"
+    />
+    <Text
+      className="font-body text-caption text-ink-faint"
+    >
+      3 条回复
+    </Text>
+  </View>
+</View>
+`;

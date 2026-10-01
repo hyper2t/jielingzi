@@ -1,7 +1,7 @@
 /**
  * 审核队列（FE-M2-02，PRD S3 / S4）：pkg-admin 分包；入口只对 role = mod / admin 显示（「我的」），
  * 云端 moderation.queue / decide 再校验（40301）——普通用户直接打开页面也只会看到「仅审核员可访问」。
- * 每条：内容摘要与状态、举报人数、原因分布、补充说明；处理：删除 / 恢复 / 驳回（折叠的恢复显示）/ 禁言 N 天 / 封禁，均二次确认。
+ * 每条：内容摘要与状态、举报人数、原因分布、补充说明；处理：删除 / 恢复 / 驳回（折叠的恢复显示；机审待复核的显示为「通过」= 放行）/ 禁言 N 天 / 封禁，均二次确认。
  * 页面不显示任何作者或举报人标识；处理结果由云端写站内消息通知作者与举报人。
  */
 import { useState } from 'react'
@@ -39,6 +39,9 @@ const CONFIRM: Record<ModDecision, string> = {
   mute: '禁言作者？期间不能发布内容',
   ban: '永久封禁作者？此操作影响较大，请确认'
 }
+/** 机审待复核（pending）的内容：「通过」= 放行，对他人展示 */
+const PASS_CONFIRM = '通过这条待审内容？会对他人展示'
+export const PASS_LABEL = '通过'
 
 export default function AdminQueue () {
   useTrackPage('admin_queue')
@@ -69,7 +72,9 @@ export default function AdminQueue () {
   const denied = !allowed || errorCode(q.error) === ERROR_CODES.FORBIDDEN
 
   const act = async (item: ModQueueItem, decision: ModDecision, days?: number) => {
-    const content = decision === 'mute' && days ? `禁言作者 ${days} 天？期间不能发布内容` : CONFIRM[decision]
+    const content = decision === 'mute' && days
+      ? `禁言作者 ${days} 天？期间不能发布内容`
+      : decision === 'dismiss' && item.target?.status === 'pending' ? PASS_CONFIRM : CONFIRM[decision]
     const res = await Taro.showModal({ title: '确认处理', content })
     if (!res || !res.confirm) return
     setBusy(`${item.targetType}:${item.targetId}`)
@@ -142,7 +147,7 @@ export default function AdminQueue () {
               <View {...tw('flex flex-row flex-wrap mt-3')}>
                 {!isUser && st !== 'removed' && <Button variant='text' disabled={!!busy} onClick={() => { void act(item, 'remove') }}>删除</Button>}
                 {!isUser && st === 'removed' && <Button variant='text' disabled={!!busy} onClick={() => { void act(item, 'restore') }}>恢复</Button>}
-                <Button variant='text' disabled={!!busy} onClick={() => { void act(item, 'dismiss') }}>{st === 'folded' ? '驳回并恢复' : '驳回'}</Button>
+                <Button variant='text' disabled={!!busy} onClick={() => { void act(item, 'dismiss') }}>{st === 'folded' ? '驳回并恢复' : st === 'pending' ? PASS_LABEL : '驳回'}</Button>
                 <Button variant='text' disabled={!!busy} onClick={() => setMuteFor(item)}>禁言</Button>
                 <Button variant='text' disabled={!!busy} onClick={() => { void act(item, 'ban') }}>封禁</Button>
               </View>

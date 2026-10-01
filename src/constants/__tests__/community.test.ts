@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { AVATAR_PRESETS, BANNED_UI_WORDS, CONSENT_VERSION, DAILY_LIMITS, PRACTICES, PROFILE_RULES, RESERVED_NICKNAME_WORDS, TEXT_RULES } from '@/constants/community'
+import { AVATAR_PRESETS, BANNED_UI_WORDS, CONSENT_VERSION, DAILY_LIMITS, PRACTICES, PROFILE_RULES, RESERVED_NICKNAME_WORDS, TEXT_RULES, TOPIC_RULES } from '@/constants/community'
 import { AVATARS } from '@/assets/avatars'
 import { PUNISH_DAYS, REPORT_REASONS } from '@/constants/moderation'
 
@@ -12,6 +12,10 @@ describe('社区常量与云函数 _shared/config.js 一致', () => {
     expect(DAILY_LIMITS).toEqual(backend.DAILY_LIMITS)
     expect(TEXT_RULES).toEqual(backend.TEXT_RULES)
     expect(PRACTICES).toEqual(backend.PRACTICES)
+  })
+
+  it('话题规则（M3）', () => {
+    expect(TOPIC_RULES).toEqual(backend.TOPIC_RULES)
   })
 
   it('档案规则 / 预置头像 / 昵称保留词 / 协议版本（M1）', () => {

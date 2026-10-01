@@ -10,8 +10,10 @@ export const ROUTES = {
   index: '/pages/index/index',
   practice: '/pages/practice/index',
   mine: '/pages/mine/index',
-  // pkg-community（M3/M4 补齐：topicNew、circle、joinCircle、invites…）
+  // pkg-community（M4 补齐：circle、joinCircle、invites…）
   topic: '/pkg-community/pages/topic/index',
+  /** 发起话题（FE-M3-02） */
+  topicNew: '/pkg-community/pages/topic-new/index',
   // pkg-practice（M5/M6 补齐：timerDone、calendar、prompt…）
   timer: '/pkg-practice/pages/timer/index',
   // pkg-user
@@ -34,6 +36,7 @@ export interface RouteParams {
   practice: undefined
   mine: undefined
   topic: { id: string }
+  topicNew: undefined
   timer: { minutes?: number }
   settings: undefined
   /** mode=gate：首次发布前的社区公约阅读（底部「我已阅读并遵守」，FE-M2-03） */
