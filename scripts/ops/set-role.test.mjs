@@ -1,17 +1,20 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createRequire } from 'node:module'
-import { parseArgs, planRole, resolveAccountId } from './set-role.mjs'
+import { maskId, parseArgs, planRole, resolveAccountId } from './set-role.mjs'
 
 const require = createRequire(import.meta.url)
 const { createPhoneHasher } = require('../../cloudfunctions/_shared/phone.js')
 
 test('set-role parseArgs：--account / --phone 二选一；role 只能是 user / mod / admin；--list 免其它参数', () => {
-  assert.deepEqual(parseArgs(['--list']), { list: true, account: null, phone: null, role: null, apply: false })
-  assert.deepEqual(parseArgs(['--account', 'oA', '--role', 'mod']), { list: false, account: 'oA', phone: null, role: 'mod', apply: false })
+  assert.deepEqual(parseArgs(['--list']), { list: true, account: null, phone: null, latest: false, role: null, apply: false })
+  assert.deepEqual(parseArgs(['--account', 'oA', '--role', 'mod']), { list: false, account: 'oA', phone: null, latest: false, role: 'mod', apply: false })
+  assert.equal(parseArgs(['--latest', '--role', 'admin']).latest, true)
+  assert.throws(() => parseArgs(['--latest', '--account', 'oA', '--role', 'admin']), /之一/)
+  assert.equal(maskId('oAbcdefghijklmn1234'), 'oAbcde…1234')
   assert.equal(parseArgs(['--phone', '13800138000', '--role', 'admin', '--apply']).apply, true)
-  assert.throws(() => parseArgs(['--role', 'mod']), /--account 或 --phone/)
-  assert.throws(() => parseArgs(['--account', 'oA', '--phone', '13800138000', '--role', 'mod']), /--account 或 --phone/)
+  assert.throws(() => parseArgs(['--role', 'mod']), /之一/)
+  assert.throws(() => parseArgs(['--account', 'oA', '--phone', '13800138000', '--role', 'mod']), /之一/)
   assert.throws(() => parseArgs(['--account', 'oA', '--role', 'root']), /--role/)
   assert.throws(() => parseArgs(['--phone', '12345', '--role', 'mod']), /11 位/)
   assert.throws(() => parseArgs(['--nope']), /未知参数/)

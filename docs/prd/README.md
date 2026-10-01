@@ -376,7 +376,8 @@ users 1─n checkins ; daily_prompts 1─n prompt_answers
 - [x] 小程序上线主体：企业账号（"社交"类目资质见 `mvp-plan.md` OPS-M0-01）
 - [x] 平台：小程序 + RN App；措辞：仅"练习"；MVP 不做私聊（v0.3 再做）
 - [x] Logo 方向：∞ 结 + 种子（见 §2，需放大与出矢量稿）
-- [ ] 小程序正式 AppID（替换 `project.config.json` 的 `touristappid`）；微信开放平台移动应用 AppID 与 Universal Link（`.env` 中 `WX_APP_ID` / `TARO_APP_WX_APP_ID` 目前为空）
+- [x] 小程序正式 AppID：`wxa9a39ea781ab3c58`（project.config.json 与 `.env` WX_MP_APP_ID 一致）
+- [ ] 微信开放平台移动应用 AppID 与 Universal Link（`.env` 中 `WX_APP_ID` / `TARO_APP_WX_APP_ID` 目前为空）
 - [ ] Apple 开发者账号（`APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` 目前为空）
 - [ ] 官方圈子最终名称与圈子公约
 - [ ] 练习方式预置列表

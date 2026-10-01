@@ -5,6 +5,7 @@
  *   node scripts/ops/set-role.mjs --account <accountId> --role mod           # 预览（默认不写）
  *   node scripts/ops/set-role.mjs --phone 13800138000 --role mod --apply      # 按已验证手机号定位并写入
  *   node scripts/ops/set-role.mjs --account <accountId> --role user --apply   # 撤销
+ *   node scripts/ops/set-role.mjs --latest --role admin [--apply]              # 最近活跃的账号（第一个管理员：先在小程序 / App 同意协议建号）
  *
  * --phone 用与云函数 user 相同的 HMAC 哈希定位 phone:<hash> 别名，需要 .env 的 PHONE_HASH_SECRET；不打印手机号。
  * 需要 .env：TARO_APP_CLOUD_ENV_ID、CLOUDBASE_SECRET_ID / CLOUDBASE_SECRET_KEY。写入前打印旧值，便于回滚。
@@ -21,18 +22,19 @@ const { ROLES } = require('../../cloudfunctions/_shared/config.js')
 const { createPhoneHasher } = require('../../cloudfunctions/_shared/phone.js')
 
 export function parseArgs (argv) {
-  const opts = { list: false, account: null, phone: null, role: null, apply: false }
+  const opts = { list: false, account: null, phone: null, latest: false, role: null, apply: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--list') opts.list = true
     else if (a === '--apply') opts.apply = true
+    else if (a === '--latest') opts.latest = true
     else if (a === '--account') opts.account = argv[++i] || null
     else if (a === '--phone') opts.phone = argv[++i] || null
     else if (a === '--role') opts.role = argv[++i] || null
     else throw new Error(`未知参数：${a}`)
   }
   if (opts.list) return opts
-  if (!opts.account === !opts.phone) throw new Error('需要且只能指定 --account 或 --phone 之一')
+  if ([opts.account, opts.phone, opts.latest].filter(Boolean).length !== 1) throw new Error('需要且只能指定 --account、--phone、--latest 之一')
   if (!ROLES.includes(opts.role)) throw new Error(`--role 只能是 ${ROLES.join(' / ')}`)
   if (opts.phone && !/^1\d{10}$/.test(opts.phone.replace(/\D/g, ''))) throw new Error('--phone 需为 11 位大陆手机号')
   return opts
@@ -66,6 +68,8 @@ function loadEnv () {
 }
 
 const first = (res) => (res && res.data && res.data[0]) || null
+/** 账号标识只显示首尾 */
+export const maskId = (s) => (typeof s === 'string' && s.length > 10 ? `${s.slice(0, 6)}…${s.slice(-4)}` : String(s))
 
 async function main () {
   const opts = parseArgs(process.argv.slice(2))
@@ -80,13 +84,23 @@ async function main () {
     console.log(`共 ${(res.data || []).length} 个`)
     return
   }
-  const accountId = await resolveAccountId(opts, {
-    hasher: createPhoneHasher(env),
-    getLink: async (id) => first(await db.collection('account_links').doc(id).get())
-  })
-  const user = first(await db.collection('users').where({ _openid: accountId }).limit(1).get())
+  let accountId
+  let user
+  if (opts.latest) {
+    user = first(await db.collection('users').orderBy('lastActiveAt', 'desc').limit(1).get())
+    if (!user) throw new Error('云端还没有用户：请先在小程序 / App 里「同意并开始」（会自动建号）后再试')
+    accountId = user._openid
+    const at = user.lastActiveAt ? new Date(user.lastActiveAt + 8 * 3600e3).toISOString().slice(0, 16).replace('T', ' ') : '未知'
+    console.log(`最近活跃：${maskId(accountId)}（平台 ${user.lastLoginPlatform || '未知'}，北京时间 ${at}）`)
+  } else {
+    accountId = await resolveAccountId(opts, {
+      hasher: createPhoneHasher(env),
+      getLink: async (id) => first(await db.collection('account_links').doc(id).get())
+    })
+    user = first(await db.collection('users').where({ _openid: accountId }).limit(1).get())
+  }
   const plan = planRole(user, opts.role)
-  console.log(`账号 ${accountId}：${plan.from} → ${plan.to}${plan.changed ? '' : '（无变化）'}`)
+  console.log(`账号 ${maskId(accountId)}：${plan.from} → ${plan.to}${plan.changed ? '' : '（无变化）'}`)
   if (!plan.changed) return
   if (!opts.apply) {
     console.log('预览模式：加 --apply 写入')

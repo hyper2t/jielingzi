@@ -52,7 +52,7 @@
 ## 4. 待你提供 / 确认
 
 - [ ] 企业主体名称与营业执照
-- [ ] 小程序正式 AppID（替换 `project.config.json` 的 `touristappid`）
+- [x] 小程序正式 AppID：`wxa9a39ea781ab3c58`（2026-10-01：`project.config.json` 与 `.env` 的 `WX_MP_APP_ID` 一致；原 project.config.json 是 luming 遗留的 AppID 与描述）
 - [ ] 微信开放平台移动应用 AppID / AppSecret / Universal Link（`.env`：`WX_APP_ID`、`WX_APP_SECRET`、`TARO_APP_WX_APP_ID`、`TARO_APP_WX_UNIVERSAL_LINK`）
 - [ ] Apple 开发者账号（`.env`：`APPLE_TEAM_ID`、`APPLE_KEY_ID`、`APPLE_PRIVATE_KEY`）
 - [ ] 用于备案的域名
