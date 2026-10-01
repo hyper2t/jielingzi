@@ -22,7 +22,7 @@ const ADULT = { adultConfirmedAt: 1 }
 
 function world() {
   return createFakeDb({
-    unique: { reports: [['targetId', '_openid']], profiles: ['_openid', 'anonAlias'] },
+    unique: { profiles: ['_openid', 'anonAlias'] },
     data: {
       users: [
         { _id: 'uA', _openid: 'A', ...ADULT, phoneVerified: true },
@@ -187,11 +187,25 @@ test('report：同一人对同一目标只计一次（不扣额度）；3 个不
   const ur = db.store.reports.find((r) => r.targetType === 'user')
   assert.deepEqual([ur.targetUid, ur.contentType], ['A', 'reply'])
   assert.equal(db.store.replies[0].status, 'ok')
+  // 同一个人既举报话题 t1，又通过 t1 举报作者：两条都要记下（去重键含 targetType）
+  const both = await as(db, 'R2')({ action: 'report', targetType: 'user', targetId: 't1', contentType: 'topic', reason: 'abuse' })
+  assert.equal(both.data.duplicate, false)
+  assert.equal(db.store.reports.filter((r) => r._openid === 'R2' && r.targetId === 't1').length, 2)
+})
+
+test('注销：两个举报过同一目标的人先后注销都成功（举报保留、解除归属，不能有含 _openid 的唯一索引）', async () => {
+  const db = world()
+  await as(db, 'R1')({ action: 'report', targetType: 'topic', targetId: 't1', reason: 'spam' })
+  await as(db, 'R2')({ action: 'report', targetType: 'topic', targetId: 't1', reason: 'spam' })
+  const repo = S.createAccountRepo(db)
+  await S.deleteAccountData(repo, { accountId: 'R1', logger: silent })
+  await S.deleteAccountData(repo, { accountId: 'R2', logger: silent })
+  assert.deepEqual(db.store.reports.map((r) => [r._openid, r.authorDeleted]), [[null, true], [null, true]])
 })
 
 test('report：每日 30 次额度（S.DAILY_LIMITS.report）', async () => {
   const topics = Array.from({ length: S.DAILY_LIMITS.report + 1 }, (_, i) => ({ _id: `x${i}`, _openid: 'A', title: 't', body: 'b', status: 'ok' }))
-  const db = createFakeDb({ unique: { reports: [['targetId', '_openid']] }, data: { users: [{ _openid: 'R1', ...ADULT }], topics } })
+  const db = createFakeDb({ data: { users: [{ _openid: 'R1', ...ADULT }], topics } })
   const me = as(db, 'R1')
   for (let i = 0; i < S.DAILY_LIMITS.report; i++) assert.equal((await me({ action: 'report', targetType: 'topic', targetId: `x${i}`, reason: 'spam' })).code, 0)
   assert.equal((await me({ action: 'report', targetType: 'topic', targetId: `x${S.DAILY_LIMITS.report}`, reason: 'spam' })).code, 42901)
