@@ -447,13 +447,13 @@ test('匿名代号词表：自然意象，不含措辞禁用词与宗教 / 玄�
   assert.match(generateAlias(() => 0.5, 9), /^[\u4e00-\u9fa5]{2}\d{3}$/)
 })
 
-test('checkText（M2 机审钩子）：未知场景报错；空文本放行；可注入实现；实现返回未知结论报错', async () => {
+test('checkText（M1 时的机审钩子，M2 起接入词库与 msgSecCheck）：未知场景报错；空文本放行；可注入实现；实现返回未知结论报错', async () => {
   await assert.rejects(S.checkText({}, { scene: 'nope', texts: ['x'] }), /scene/)
-  assert.deepEqual(await S.checkText({}, { scene: 'profile', texts: ['', null, '  '] }), { verdict: 'pass' })
-  assert.deepEqual(await S.checkText({}, { scene: 'forum', texts: ['正常内容'] }), { verdict: 'pass' })
+  assert.deepEqual(await S.checkText({}, { scene: 'profile', texts: ['', null, '  '] }), { verdict: 'pass', hits: [], labels: [] })
+  assert.deepEqual(await S.checkText({}, { scene: 'forum', texts: ['正常内容'] }), { verdict: 'pass', hits: [], labels: [] })
   const seen = []
   const ctx = { moderation: { async checkText(i) { seen.push(i); return { verdict: 'review' } } } }
-  assert.deepEqual(await S.checkText(ctx, { scene: 'profile', texts: ['a', ''] }), { verdict: 'review' })
+  assert.deepEqual(await S.checkText(ctx, { scene: 'profile', texts: ['a', ''] }), { verdict: 'review', hits: [], labels: [] })
   assert.deepEqual(seen, [{ scene: 'profile', texts: ['a'] }])
   await assert.rejects(S.checkText({ moderation: { async checkText() { return { verdict: 'maybe' } } } }, { scene: 'profile', texts: ['a'] }), /未知结论/)
 })

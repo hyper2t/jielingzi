@@ -53,5 +53,7 @@ node scripts/ops/security-rules.mjs --apply       # 下发：全部集合 {read:
 | checkins | `_openid` + `dayKey` | 唯一 | M5 |
 | daily_prompts | `date` | 唯一 | M6 |
 | prompt_answers | `promptId` + `_openid` | 唯一 | M6 |
-| notifications | `_openid` + `read` + `createdAt`(desc) | 普通 | M6 |
+| notifications | `_openid` + `read` + `createdAt`(desc) | 普通 | M2 起写入，M6 读取 |
+| mod_logs | `expireAt` | TTL（0 秒，日志保留 6 个月） | M2 |
+| reports | `targetType` + `targetId` + `state` | 普通 | M2 |
 | rate_limits | `expireAt` | TTL（0 秒） | M0 |

@@ -13,6 +13,7 @@ import Index, { NEW_TOPIC, NEW_TOPIC_SOON } from '@/pages/index/index'
 import { mockControl, MOCK_EXPIRED_PHONE_CODE, MOCK_TAKEN_PHONE_CODE } from '@/services/mock/client'
 import { invalidate } from '@/hooks/requestCache'
 import { useUserStore } from '@/store/user'
+import { markRulesRead } from '@/features/consent/rules'
 
 const flush = () => act(async () => { await new Promise(r => setTimeout(r, 0)) })
 const mounted: ReactTestRenderer[] = []
@@ -125,6 +126,10 @@ describe('发布前实名拦截（FE-M1-02）', () => {
     expect(useUserStore.getState().account).toMatchObject({ phoneVerified: true })
     expect(texts(home)).not.toContain('验证手机号')
     expect(Taro.showToast).toHaveBeenCalledWith(expect.objectContaining({ title: '验证成功' }))
+    // 首次发布前还要读一次社区公约（FE-M2-03）
+    click(home, NEW_TOPIC)
+    expect(Taro.navigateTo).toHaveBeenLastCalledWith({ url: '/pkg-user/pages/agreement/index?type=rules&mode=gate' })
+    markRulesRead()
     click(home, NEW_TOPIC)
     expect(Taro.showToast).toHaveBeenCalledWith(expect.objectContaining({ title: NEW_TOPIC_SOON }))
   })

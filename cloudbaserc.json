@@ -40,11 +40,15 @@
       "ignore": [
         "node_modules",
         "node_modules/**/*"
-      ]
+      ],
+      "envVariables": {
+        "WX_MP_APP_ID": "{{env.WX_MP_APP_ID}}",
+        "WX_MP_APP_SECRET": "{{env.WX_MP_APP_SECRET}}"
+      }
     },
     {
       "name": "moderation",
-      "description": "ping / report / queue / decide + 机审回调（M2）",
+      "description": "ping / report / queue / decide（M2）；图片机审回调（BE-M2-02）",
       "runtime": "Nodejs20.19",
       "handler": "index.main",
       "timeout": 10,

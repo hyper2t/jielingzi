@@ -60,6 +60,24 @@ const RESERVED_NICKNAME_WORDS = Object.freeze(['结灵子', '官方', '管理员
 /** 当前协议版本（用户协议 / 隐私政策 / 社区公约一起计版本）：users.consentVersion；协议更新时改这里并重新征得同意 */
 const CONSENT_VERSION = 'v0.1'
 
+/** 举报原因（PRD S2，与前端 src/constants/moderation.ts 一致）；id 入库，label 仅展示 */
+const REPORT_REASONS = Object.freeze([
+  { id: 'religion', label: '宗教活动 / 个人崇拜' },
+  { id: 'medical', label: '疗效承诺 / 劝人停药' },
+  { id: 'money', label: '金钱往来 / 推销' },
+  { id: 'diversion', label: '站外引流（微信号 / 二维码等）' },
+  { id: 'abuse', label: '人身攻击 / 骚扰' },
+  { id: 'porn', label: '色情低俗' },
+  { id: 'illegal', label: '违法有害信息' },
+  { id: 'privacy', label: '泄露他人隐私 / 冒充他人' },
+  { id: 'spam', label: '刷屏 / 广告' },
+  { id: 'other', label: '其他' },
+])
+/** 同一目标被不同用户举报达到该数量时自动折叠（BE-M2-03，PRD S2「达阈值自动折叠」） */
+const REPORT_FOLD_THRESHOLD = 3
+/** 处罚时长上限（天）：禁言 1–30（社区公约「禁言 1–30 天」）；封禁不传天数 = 永久 */
+const PUNISH_DAYS = Object.freeze({ mute: { min: 1, max: 30 }, ban: { min: 1, max: 3650 } })
+
 /** 角色（users.role，仅 scripts/ops/set-role.mjs 可改） */
 const ROLES = Object.freeze(['user', 'mod', 'admin'])
 
@@ -68,4 +86,4 @@ function cnDate(now) {
   return new Date(now + 8 * 3600 * 1000).toISOString().slice(0, 10)
 }
 
-module.exports = { DAILY_LIMITS, TEXT_RULES, PRACTICES, PRACTICE_IDS, PROFILE_RULES, AVATAR_PRESETS, RESERVED_NICKNAME_WORDS, CONSENT_VERSION, ROLES, cnDate }
+module.exports = { DAILY_LIMITS, TEXT_RULES, PRACTICES, PRACTICE_IDS, PROFILE_RULES, AVATAR_PRESETS, RESERVED_NICKNAME_WORDS, CONSENT_VERSION, REPORT_REASONS, REPORT_FOLD_THRESHOLD, PUNISH_DAYS, ROLES, cnDate }

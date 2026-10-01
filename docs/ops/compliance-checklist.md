@@ -31,9 +31,9 @@
 | 能力 | 落地 | 里程碑 |
 |---|---|---|
 | 后台实名（手机号） | 发布前绑定手机号，`guardWrite` 拦截 40302；小程序手机号快捷验证（`user.bindPhoneWeapp`）/ App 手机号登录或绑定；只存 HMAC 哈希 | M1 ✅（代码） |
-| 内容审核（机审 + 人审） | `msgSecCheck` / `mediaCheckAsync` + 举报 + 审核队列 | M2 |
-| 日志留存 ≥ 6 个月 | `mod_logs` 集合 + 云函数日志；用户发布记录保留（注销后解除归属） | M2 |
-| 举报入口与处理 | 每条内容可举报，24h 内处理 | M2 |
+| 内容审核（机审 + 人审） | 文本：词库 + `msgSecCheck`（M2 ✅ 代码）；图片：`mediaCheckAsync`（BE-M2-02 待做）；举报 + 审核队列 + 处罚（M2 ✅ 代码） | M2 |
+| 日志留存 ≥ 6 个月 | `mod_logs`（机审 / 人工处理，`expireAt` = 6 个月，需建 TTL 索引）+ 云函数日志；用户发布记录保留（注销后解除归属） | M2 ✅（代码） |
+| 举报入口与处理 | 每条内容可举报（`ReportSheet`），达 3 人自动折叠，审核队列 24h 内处理，结果站内通知 | M2 ✅（代码；入口随 M3 内容卡片） |
 | 未成年人保护 | 首次进入 18+ 确认（`pkg-user/pages/adult`，`user.confirmAdult`），协议与社区公约写明 | M1 ✅（代码） |
 | 用户协议 / 隐私政策 / 社区公约 | `docs/prd/community-rules.md`；隐私政策列 SDK 清单（`docs/ops/app-sdk-list.md`） | M0–M2 |
 | 注销账号 | 已有（user.deleteAccount） | 已有 |

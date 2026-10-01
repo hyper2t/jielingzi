@@ -83,3 +83,22 @@ export interface AuthorView {
   practices?: string[]
   years?: number | null
 }
+
+/** 举报目标（M2，docs/api/moderation.md）：举报用户时传他发布的内容（contentType + targetId），不暴露任何 uid */
+export interface ReportTarget {
+  targetType: 'topic' | 'reply' | 'user'
+  targetId: string
+  contentType?: 'topic' | 'reply'
+}
+
+/** 审核队列条目（moderation.queue）：按目标聚合；target 为内容快照，不含任何作者标识 */
+export interface ModQueueItem extends Required<Pick<ReportTarget, 'targetType' | 'targetId'>> {
+  contentType: 'topic' | 'reply'
+  count: number
+  reasons: Record<string, number>
+  notes: string[]
+  latestAt: number
+  target: { status: 'ok' | 'pending' | 'folded' | 'removed', excerpt: string, anon: boolean, authorDeleted: boolean } | null
+}
+
+export type ModDecision = 'dismiss' | 'remove' | 'restore' | 'mute' | 'ban'

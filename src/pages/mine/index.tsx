@@ -29,6 +29,8 @@ export const MINE_PLACEHOLDER = '我的圈子、话题与消息即将开放'
 export const ADULT_HINT = '确认年满 18 周岁后可参与交流'
 export const PROFILE_SETUP = '完善练习档案'
 export const PROFILE_SETUP_HINT = '设置昵称与练习方式，让同好认识你'
+/** 审核入口（仅 mod / admin） */
+export const ADMIN_ENTRY = '审核队列'
 
 const AGREEMENTS = [
   { type: 'user', text: '用户协议' },
@@ -123,6 +125,18 @@ export default function Mine () {
       {!!PLATFORM_NOTICE && <Text {...tw('font-body text-caption text-ink-faint mx-page mt-3')}>{PLATFORM_NOTICE}</Text>}
 
       {ready && <ProfileCard profile={profile.data} loading={profile.loading} onEdit={editProfile} />}
+      {/* 审核入口（FE-M2-02）：只对 mod / admin 显示；云端再校验 */}
+      {ready && (account?.role === 'mod' || account?.role === 'admin') && (
+        <View
+          {...tw('flex flex-row items-center justify-between min-h-touch mx-page mt-3 px-4 rounded-md bg-paper-light')}
+          hoverClass={tw('bg-paper-dark').className}
+          onClick={() => { void navigate('adminQueue') }}
+          {...a11yButton(ADMIN_ENTRY)}
+        >
+          <Text {...tw('font-body text-body text-ink')}>{ADMIN_ENTRY}</Text>
+          <Icon name='chevron-right' tone='soft' size='sm' />
+        </View>
+      )}
 
       {/* 圈子 / 话题 / 邀请码 / 消息（M3、M4、M6）；ready 为 false 时只读本机数据 */}
       <Empty compact text={ready ? MINE_PLACEHOLDER : CONSENT_HINT} />

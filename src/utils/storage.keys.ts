@@ -26,5 +26,7 @@ export const STORAGE_KEYS = {
   /** App 端 18+ 确认的本机时间（毫秒）：登录前确认只记本机，登录时随 user.login 上报 */
   adultAt: 'adult_at',
   /** 云端账号状态镜像（AccountStatus：实名 / 18+ / 角色 / 处罚），启动时先用它渲染，login 后刷新 */
-  accountStatus: 'account_status'
+  accountStatus: 'account_status',
+  /** 已阅读的社区公约版本（= CONSENT_VERSION 时视为已读；首次发布前强制阅读一次，FE-M2-03） */
+  rulesRead: 'rules_read'
 } as const

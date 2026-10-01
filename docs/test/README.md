@@ -60,7 +60,7 @@
 |---|---|---|
 | M0 | [cases/M0.md](./cases/M0.md) | 已执行（自动化）；真机视觉、云端执行待人工 |
 | M1 | [cases/M1.md](./cases/M1.md) | 已执行（自动化）；三端真机待部署后执行（M1-19） |
-| M2 | cases/M2.md | 待写 |
+| M2 | [cases/M2.md](./cases/M2.md) | 已执行（自动化）；BE-M2-02 与真机待下一轮 |
 | M3 | cases/M3.md | 待写 |
 | M4 | cases/M4.md | 待写 |
 | M5 | cases/M5.md | 待写 |

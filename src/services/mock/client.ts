@@ -3,7 +3,7 @@
  * 切换真实数据：在 .env / .env.local 写 TARO_APP_DATA_SOURCE=cloud（见 services/client.ts），业务层不改。
  * 业务云函数落地时：在 FunctionMap 声明后，这里的 handlers 必须补上同名实现（类型会强制要求）。
  */
-import type { AccountStatus, Profile, User, UserSettings } from '@/types/models'
+import type { AccountStatus, ModQueueItem, Profile, User, UserSettings } from '@/types/models'
 import type { AccountIdentities } from '../cloud.types'
 import { CONSENT_VERSION } from '@/constants/community'
 import { normalizeLine, patchError } from '@/features/profile/rules'
@@ -22,6 +22,9 @@ const NO_STATUS: AccountStatus = { phoneVerified: false, adult: false, role: 'us
 let account: AccountStatus = { ...NO_STATUS }
 /** mock 云端练习档案（community.getProfile / updateProfile） */
 let profile: Profile | null = null
+/** mock 云端举报（moderation.report / queue / decide） */
+interface MockReport { targetType: ModQueueItem['targetType'], targetId: string, contentType: ModQueueItem['contentType'], reason: string, note: string, state: 'open' | 'resolved', by: string }
+let reports: MockReport[] = []
 /** getPhoneNumber 回调里以这个前缀开头的 code 视为失效（测试 / 演示「code 失效」分支） */
 export const MOCK_EXPIRED_PHONE_CODE = 'mock-expired'
 /** 视为「号码已绑定其他微信账号」的 code（演示 40901） */
@@ -45,6 +48,11 @@ export const mockControl = {
   setProfile (p: Profile | null) {
     profile = p ? { ...p } : null
   },
+  /** 预置举报（审核页演示 / 测试）；by 不同视为不同举报人 */
+  seedReports (list: Array<Omit<MockReport, 'state' | 'note' | 'contentType'> & { note?: string, contentType?: MockReport['contentType'] }>) {
+    reports = list.map(r => ({ note: '', contentType: r.targetType === 'user' ? 'topic' : r.targetType as MockReport['contentType'], ...r, state: 'open' }))
+  },
+  get reports (): MockReport[] { return reports.map(r => ({ ...r })) },
   get account (): AccountStatus { return { ...account } },
   get profile (): Profile | null { return profile ? { ...profile } : null },
   reset () {
@@ -56,6 +64,7 @@ export const mockControl = {
     identities = { mp: false, wechat: false, phone: false, apple: false }
     account = { ...NO_STATUS }
     profile = null
+    reports = []
   }
 }
 
@@ -165,6 +174,49 @@ const handlers: Handlers = {
         updatedAt: Date.now()
       } as Profile
       return { profile: { ...profile } }
+    }
+  },
+  // 与云端 moderation 一致：举报需 18+（禁言可举报）、同一人只计一次；队列 / 处理仅 mod / admin
+  moderation: {
+    report: (input) => {
+      if (account.bannedUntil && account.bannedUntil > Date.now()) throw new CloudError(ERROR_CODES.BANNED, 'mock: 账号已被封禁')
+      if (!account.adult) throw new CloudError(ERROR_CODES.ADULT_REQUIRED, 'mock: 请先确认年满 18 周岁')
+      if (input.note && Array.from(input.note).length > 200) throw new CloudError(ERROR_CODES.BAD_PARAM, 'note 长度不能超过 200')
+      const dup = reports.some(r => r.targetType === input.targetType && r.targetId === input.targetId && r.by === MOCK_OPENID)
+      if (!dup) {
+        const contentType = input.contentType || (input.targetType === 'user' ? 'topic' : input.targetType)
+        reports.push({ targetType: input.targetType, targetId: input.targetId, contentType, reason: input.reason, note: input.note || '', state: 'open', by: MOCK_OPENID })
+      }
+      return { ok: true, duplicate: dup, folded: false }
+    },
+    queue: (input) => {
+      if (account.role !== 'mod' && account.role !== 'admin') throw new CloudError(ERROR_CODES.FORBIDDEN, '无权限')
+      const state = (input && input.state) || 'open'
+      const groups = new Map<string, ModQueueItem>()
+      for (const r of reports.filter(x => x.state === state)) {
+        const key = `${r.targetType}:${r.targetId}`
+        const g: ModQueueItem = groups.get(key) || {
+          targetType: r.targetType, targetId: r.targetId, contentType: r.contentType, count: 0, reasons: {}, notes: [], latestAt: Date.now(),
+          target: { status: 'ok', excerpt: `mock 内容 ${r.targetId}`, anon: false, authorDeleted: false }
+        }
+        g.count++
+        g.reasons[r.reason] = (g.reasons[r.reason] || 0) + 1
+        if (r.note) g.notes.push(r.note)
+        groups.set(key, g)
+      }
+      const list = [...groups.values()].sort((a, b) => b.count - a.count)
+      return { list, total: list.length, page: 1, size: 20, hasMore: false }
+    },
+    decide: (input) => {
+      if (account.role !== 'mod' && account.role !== 'admin') throw new CloudError(ERROR_CODES.FORBIDDEN, '无权限')
+      if (input.decision === 'mute' && (!input.days || input.days > 30)) throw new CloudError(ERROR_CODES.BAD_PARAM, '禁言天数需为 1–30')
+      let n = 0
+      for (const r of reports) {
+        if (r.targetType === input.targetType && r.targetId === input.targetId && r.state === 'open') { r.state = 'resolved'; n++ }
+      }
+      if (!n) throw new CloudError(ERROR_CODES.NOT_FOUND, '举报目标不存在')
+      const status = input.decision === 'remove' ? 'removed' : input.decision === 'mute' || input.decision === 'ban' ? null : 'ok'
+      return { ok: true, resolved: n, status }
     }
   }
 }

@@ -35,6 +35,11 @@ export default defineAppConfig({
         'pages/profile-edit/index',
         ...RN_ONLY_PAGES
       ]
+    },
+    {
+      // 审核（FE-M2-02）：入口只对 mod / admin 显示，云端再校验
+      root: 'pkg-admin',
+      pages: ['pages/queue/index']
     }
   ],
   preloadRule: {

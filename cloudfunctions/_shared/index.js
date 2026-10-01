@@ -20,4 +20,6 @@ module.exports = {
   ...require('./phone'),
   ...require('./wxmp'),
   ...require('./moderation'),
+  ...require('./wordlist'),
+  ...require('./notify'),
 }

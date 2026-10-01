@@ -1,6 +1,6 @@
 'use strict'
 /**
- * 微信**小程序**服务端接口客户端（user：手机号快速验证 BE-M1-01；moderation：msgSecCheck / mediaCheckAsync，M2）。
+ * 微信**小程序**服务端接口客户端（user：手机号快速验证 BE-M1-01；community / moderation：msgSecCheck 文本内容安全 BE-M2-01；mediaCheckAsync 见 BE-M2-02）。
  *
  * - 凭证：小程序 AppID / AppSecret（环境变量 WX_MP_APP_ID / WX_MP_APP_SECRET，经 cloudbaserc.json envVariables 注入）。
  *   注意与 WX_APP_ID / WX_APP_SECRET（微信开放平台「移动应用」，App 微信登录用）不是同一套。
@@ -109,7 +109,18 @@ function createMpClient(env, opts = {}) {
     return phone
   }
 
-  return { appId, getAccessToken, getPhoneNumber, postJson }
+  /**
+   * 文本内容安全 v2（BE-M2-01）：POST /wxa/msg_sec_check { content, version: 2, scene, openid }。
+   * 返回 { suggest: 'pass' | 'review' | 'risky', label, traceId }；openid 须是近 2 小时访问过小程序的用户。
+   */
+  async function msgSecCheck(content, { scene, openid }) {
+    const data = await postJson('/wxa/msg_sec_check', { content, version: 2, scene, openid })
+    if (data.errcode) throw upstream(`内容安全接口失败（${data.errcode}）`)
+    const r = data.result || {}
+    return { suggest: ['pass', 'review', 'risky'].includes(r.suggest) ? r.suggest : 'review', label: r.label != null ? r.label : null, traceId: data.trace_id || null }
+  }
+
+  return { appId, getAccessToken, getPhoneNumber, msgSecCheck, postJson }
 }
 
 module.exports = { createMpClient, MP_TOKEN_ERRCODES: TOKEN_ERRCODES, MP_PHONE_CODE_ERRCODES: PHONE_CODE_ERRCODES }

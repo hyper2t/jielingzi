@@ -3,6 +3,7 @@ import Taro from '@tarojs/taro'
 import type { AccountStatus } from '@/types/models'
 import { useUserStore } from '@/store/user'
 import { ensureAdult, profileGate, publishGate, requirePhone } from '@/features/auth/gates'
+import { isRulesRead, markRulesRead } from '@/features/consent/rules'
 
 const STATUS: AccountStatus = { phoneVerified: false, adult: false, role: 'user', bannedUntil: null, mutedUntil: null }
 const reset = (p: Record<string, unknown> = {}) =>
@@ -31,9 +32,18 @@ describe('小程序（默认 TARO_ENV=weapp）', () => {
     expect(requirePhone({ reason: '发起话题' })).toBe(false)
     expect(useUserStore.getState()).toMatchObject({ phoneSheetOpen: true, phoneSheetReason: '发起话题' })
 
+    // 已实名但没读过社区公约（FE-M2-03）：先去读公约
     reset({ adult: 'confirmed', account: { ...STATUS, adult: true, phoneVerified: true } })
+    expect(publishGate()).toBe('rules')
+    expect(requirePhone({ reason: '发起话题' })).toBe(false)
+    expect(Taro.navigateTo).toHaveBeenLastCalledWith({ url: '/pkg-user/pages/agreement/index?type=rules&mode=gate' })
+    markRulesRead()
+    expect(isRulesRead()).toBe(true)
     expect(publishGate()).toBeNull()
     expect(requirePhone()).toBe(true)
+    // 公约版本变了要重读
+    ;(Taro as any).__storage.set('rules_read', 'v0.0')
+    expect(publishGate()).toBe('rules')
   })
 
   it('云端已确认 18+（换设备 / 重装）也算确认；编辑档案只要求到 18+，不要求实名', () => {

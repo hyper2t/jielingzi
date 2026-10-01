@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { AVATAR_PRESETS, BANNED_UI_WORDS, CONSENT_VERSION, DAILY_LIMITS, PRACTICES, PROFILE_RULES, RESERVED_NICKNAME_WORDS, TEXT_RULES } from '@/constants/community'
 import { AVATARS } from '@/assets/avatars'
+import { PUNISH_DAYS, REPORT_REASONS } from '@/constants/moderation'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const backend = require('../../../cloudfunctions/_shared/config.js')
@@ -20,6 +21,11 @@ describe('社区常量与云函数 _shared/config.js 一致', () => {
     expect(CONSENT_VERSION).toBe(backend.CONSENT_VERSION)
     // 每个预置头像都有生成好的图片（tools/gen-icons.js）
     expect(Object.keys(AVATARS).sort()).toEqual([...AVATAR_PRESETS].sort())
+  })
+
+  it('举报原因 / 处罚时长（M2）', () => {
+    expect(REPORT_REASONS).toEqual(backend.REPORT_REASONS)
+    expect(PUNISH_DAYS).toEqual(backend.PUNISH_DAYS)
   })
 })
 

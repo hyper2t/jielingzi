@@ -13,7 +13,7 @@
 const {
   badParam, validate, requireOpenid, guardWrite, checkText, AppError, CODES,
   TEXT_RULES, PRACTICE_IDS, PROFILE_RULES, AVATAR_PRESETS, RESERVED_NICKNAME_WORDS,
-  isDuplicateKeyError, isCollectionMissingError, withCollection,
+  isDuplicateKeyError, isCollectionMissingError, withCollection, logModeration,
 } = require('./_shared')
 const { generateAlias } = require('./alias')
 
@@ -165,9 +165,12 @@ async function updateProfile(params, ctx) {
   const input = parseUpdate(params)
   const g = await guardWrite(ctx, 'updateProfile', { requirePhone: false })
   const verdict = await checkText(ctx, { scene: 'profile', texts: [input.nickname, input.goal, input.bio] })
-  if (verdict.verdict === 'reject') throw badParam('内容不符合社区公约，请修改后再保存')
-  // TODO(M2 BE-M2-01)：verdict === 'review' 时字段先不对他人展示（pendingFields），审核通过后生效
   const now = ctx.now()
+  if (verdict.verdict !== 'pass') {
+    await logModeration(ctx.db, { kind: 'machine', scene: 'profile', verdict: verdict.verdict, categories: [...new Set(verdict.hits.map((h) => h.category))], labels: verdict.labels, actor: 'system', subject: g.accountId }, now)
+  }
+  if (verdict.verdict === 'reject') throw badParam('内容不符合社区公约，请修改后再保存')
+  // review：档案只对本人可见（M3 起作者信息对他人展示前再按 pending 处理），这里只留痕待人工复核
   const { doc, created } = await ensureProfile(ctx, g.accountId, now, input)
   if (!created) await ctx.db.collection(COLLECTION).doc(doc._id).update({ ...input, updatedAt: now })
   await g.commit()

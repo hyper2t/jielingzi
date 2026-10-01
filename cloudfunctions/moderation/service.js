@@ -1,19 +1,252 @@
 'use strict'
 /**
- * moderation 云函数业务逻辑：机审 / 举报 / 审核队列 / 处罚（M2 填充）。契约见 docs/api/moderation.md。
- * 写类动作一律先调用 guardWrite(ctx, '<action>')，成功落库后 commit()（见 _shared/guard.js）。
- * ctx：{ identity, db, now, logger }
+ * moderation 云函数（BE-M2-03 / BE-M2-04，PRD S2–S4）：举报 → 达阈值自动折叠 → 审核队列 → 处理（删除 / 恢复 / 驳回 / 禁言 / 封禁）→ 站内通知。
+ * 契约见 docs/api/moderation.md。ctx：{ identity, db, now, logger }
+ * - 举报不要求实名、禁言中也可举报（guardWrite: requirePhone=false, allowMuted=true），需 18+，每日 30 次
+ * - 同一人对同一目标只计一次（reports 唯一索引 targetId + _openid）；不能举报自己的内容
+ * - 举报「用户」时不暴露任何 uid：传他发布的内容（contentType + targetId），服务端解析作者，记在 report.targetUid（不下发）
+ * - queue / decide 仅 mod / admin（guardRole）；decide 的处理方式参数叫 decision（action 是路由字段）；mod 不能处罚 mod / admin（只有 admin 可以）
+ * - 处罚写 users.mutedUntil / bannedUntil，guardWrite 立即生效；通知作者与举报人（不含原文）；全部写 mod_logs
  */
+const {
+  validate, badParam, notFound, forbidden, guardWrite, guardRole, isDuplicateKeyError, isCollectionMissingError,
+  withCollection, logModeration, notify, REPORT_REASONS, REPORT_FOLD_THRESHOLD, PUNISH_DAYS, pageSchema,
+} = require('./_shared')
+
+const REPORTS = 'reports'
+const DAY = 24 * 3600 * 1000
+const PERMANENT_MS = 100 * 365 * DAY
+const TARGET_TYPES = ['topic', 'reply', 'user']
+const CONTENT_TYPES = ['topic', 'reply']
+const CONTENT_COLLECTION = { topic: 'topics', reply: 'replies' }
+const REASON_IDS = REPORT_REASONS.map((r) => r.id)
+const ACTIONS = ['dismiss', 'remove', 'restore', 'mute', 'ban']
+const QUEUE_SCAN_LIMIT = 300
 
 /** 不要求身份的动作（入口据此不因副作用建号） */
 const IDENTITY_FREE_ACTIONS = ['ping']
+
+const idRule = { type: 'id' }
+
+/** 内容文档（集合还没建 / 不存在 → null） */
+async function findContent(db, contentType, id) {
+  try {
+    const res = await db.collection(CONTENT_COLLECTION[contentType]).doc(id).get()
+    return (res && res.data && res.data[0]) || null
+  } catch (e) {
+    if (isCollectionMissingError(e)) return null
+    throw e
+  }
+}
+
+async function findUser(db, uid) {
+  const res = await db.collection('users').where({ _openid: uid }).limit(1).get()
+  return (res && res.data && res.data[0]) || null
+}
+
+async function listReports(db, where, limit = QUEUE_SCAN_LIMIT) {
+  try {
+    const res = await db.collection(REPORTS).where(where).orderBy('createdAt', 'desc').limit(limit).get()
+    return (res && res.data) || []
+  } catch (e) {
+    if (isCollectionMissingError(e)) return []
+    throw e
+  }
+}
+
+/** report 的目标解析：内容本身，或「用户」= 他发布的这条内容的作者 */
+function contentTypeOf(input) {
+  if (input.targetType === 'user') {
+    if (!input.contentType) throw badParam('举报用户时需提供 contentType（他发布的话题 / 回复）')
+    return input.contentType
+  }
+  if (input.contentType && input.contentType !== input.targetType) throw badParam('contentType 与 targetType 不一致')
+  return input.targetType
+}
+
+const excerpt = (doc) => {
+  const s = String((doc && (doc.title || doc.body)) || '')
+  const chars = Array.from(s)
+  return chars.length > 60 ? `${chars.slice(0, 60).join('')}…` : s
+}
+
+// ---------- 举报 ----------
+
+async function report(params, ctx) {
+  const input = validate(params, {
+    targetType: { type: 'enum', values: TARGET_TYPES },
+    targetId: idRule,
+    contentType: { type: 'enum', values: CONTENT_TYPES, optional: true },
+    reason: { type: 'enum', values: REASON_IDS },
+    note: { type: 'string', maxLen: 200, optional: true },
+  })
+  const contentType = contentTypeOf(input)
+  const g = await guardWrite(ctx, 'report', { requirePhone: false, allowMuted: true })
+  const content = await findContent(ctx.db, contentType, input.targetId)
+  if (!content) throw notFound('内容不存在或已删除')
+  if (content._openid && content._openid === g.accountId) throw badParam('不能举报自己发布的内容')
+  const now = ctx.now()
+
+  const mine = await listReports(ctx.db, { targetType: input.targetType, targetId: input.targetId, _openid: g.accountId }, 1)
+  if (mine.length) return { ok: true, duplicate: true, folded: content.status === 'folded' }
+  const doc = {
+    _openid: g.accountId,
+    targetType: input.targetType,
+    targetId: input.targetId,
+    contentType,
+    reason: input.reason,
+    note: (input.note || '').trim(),
+    state: 'open',
+    createdAt: now,
+  }
+  if (input.targetType === 'user') doc.targetUid = content._openid || null
+  try {
+    await withCollection(ctx.db, REPORTS, () => ctx.db.collection(REPORTS).add(doc))
+  } catch (e) {
+    if (isDuplicateKeyError(e)) return { ok: true, duplicate: true, folded: content.status === 'folded' }
+    throw e
+  }
+  await g.commit()
+
+  // 达阈值自动折叠（只折叠内容；举报用户只进队列）
+  let folded = content.status === 'folded'
+  if (input.targetType !== 'user' && (content.status || 'ok') === 'ok') {
+    const open = await listReports(ctx.db, { targetType: input.targetType, targetId: input.targetId, state: 'open' })
+    const reporters = new Set(open.map((r) => r._openid))
+    if (reporters.size >= REPORT_FOLD_THRESHOLD) {
+      await ctx.db.collection(CONTENT_COLLECTION[contentType]).doc(input.targetId).update({ status: 'folded', foldedAt: now })
+      await logModeration(ctx.db, { kind: 'machine', action: 'fold', targetType: input.targetType, targetId: input.targetId, contentType, actor: 'system', subject: content._openid || null, note: `举报达到 ${REPORT_FOLD_THRESHOLD} 人` }, now)
+      folded = true
+    }
+  }
+  return { ok: true, duplicate: false, folded }
+}
+
+// ---------- 审核队列 ----------
+
+async function queue(params, ctx) {
+  const input = validate(params, { state: { type: 'enum', values: ['open', 'resolved'], default: 'open' }, ...pageSchema(50) })
+  await guardRole(ctx)
+  const rows = await listReports(ctx.db, { state: input.state })
+  const groups = new Map()
+  for (const r of rows) {
+    const key = `${r.targetType}:${r.targetId}`
+    const g = groups.get(key) || { targetType: r.targetType, targetId: r.targetId, contentType: r.contentType, count: 0, reporters: new Set(), reasons: {}, latestAt: 0, notes: [] }
+    if (!g.reporters.has(r._openid)) {
+      g.reporters.add(r._openid)
+      g.count++
+      g.reasons[r.reason] = (g.reasons[r.reason] || 0) + 1
+      if (r.note && g.notes.length < 3) g.notes.push(r.note)
+    }
+    g.latestAt = Math.max(g.latestAt, r.createdAt || 0)
+    groups.set(key, g)
+  }
+  const all = [...groups.values()].sort((a, b) => b.count - a.count || b.latestAt - a.latestAt)
+  const start = (input.page - 1) * input.size
+  const list = []
+  for (const g of all.slice(start, start + input.size)) {
+    const content = await findContent(ctx.db, g.contentType, g.targetId)
+    list.push({
+      targetType: g.targetType,
+      targetId: g.targetId,
+      contentType: g.contentType,
+      count: g.count,
+      reasons: g.reasons,
+      notes: g.notes,
+      latestAt: g.latestAt,
+      // 内容快照：状态与摘要；不含任何作者标识
+      target: content ? { status: content.status || 'ok', excerpt: excerpt(content), anon: content.anon === true, authorDeleted: content.authorDeleted === true } : null,
+    })
+  }
+  return { list, total: all.length, page: input.page, size: input.size, hasMore: start + input.size < all.length }
+}
+
+// ---------- 处理 ----------
+
+const MESSAGES = {
+  remove: (t) => `你发布的${t}因违反社区公约已被删除。`,
+  mute: (days, until) => `你的账号因违反社区公约被禁言 ${days} 天（至 ${until}），期间不能发布内容。`,
+  ban: (days, until) => (days ? `你的账号因违反社区公约被封禁 ${days} 天（至 ${until}）。` : '你的账号因严重违反社区公约已被永久封禁。'),
+  reporter: '你举报的内容已处理，感谢你守护社区。',
+}
+const cnDay = (ms) => new Date(ms + 8 * 3600 * 1000).toISOString().slice(0, 10)
+const TYPE_TEXT = { topic: '话题', reply: '回复' }
+
+async function decide(params, ctx) {
+  const input = validate(params, {
+    targetType: { type: 'enum', values: TARGET_TYPES },
+    targetId: idRule,
+    contentType: { type: 'enum', values: CONTENT_TYPES, optional: true },
+    // 不能叫 action：入参与路由字段 event.action 同名会被覆盖
+    decision: { type: 'enum', values: ACTIONS },
+    days: { type: 'int', min: 1, max: PUNISH_DAYS.ban.max, optional: true },
+    note: { type: 'string', maxLen: 200, optional: true },
+  })
+  const { user: mod, accountId: actor } = await guardRole(ctx)
+  const contentType = contentTypeOf(input)
+  const now = ctx.now()
+  const content = await findContent(ctx.db, contentType, input.targetId)
+  const open = await listReports(ctx.db, { targetType: input.targetType, targetId: input.targetId, state: 'open' })
+  if (!content && !open.length) throw notFound('举报目标不存在')
+
+  let status = content ? content.status || 'ok' : null
+  let subject = null
+  const col = CONTENT_COLLECTION[contentType]
+  if (input.decision === 'remove' || input.decision === 'restore' || input.decision === 'dismiss') {
+    if (input.targetType === 'user' && input.decision !== 'dismiss') throw badParam('举报用户只能驳回、禁言或封禁')
+    if (!content && input.decision !== 'dismiss') throw notFound('内容不存在或已删除')
+    if (input.decision === 'remove') status = 'removed'
+    else if (content && (input.decision === 'restore' || status === 'folded')) status = 'ok'
+    if (content && input.targetType !== 'user' && status !== (content.status || 'ok')) {
+      const patch = { status, handledAt: now }
+      if (status === 'removed') patch.removedAt = now
+      await ctx.db.collection(col).doc(input.targetId).update(patch)
+    }
+    if (input.decision === 'remove') subject = content._openid || null
+  } else {
+    // 禁言 / 封禁：对象是内容作者（举报用户时为解析出的 targetUid）
+    const days = input.days
+    if (input.decision === 'mute' && (!days || days > PUNISH_DAYS.mute.max)) throw badParam(`禁言天数需为 ${PUNISH_DAYS.mute.min}–${PUNISH_DAYS.mute.max}`)
+    subject = (input.targetType === 'user' && (open.find((r) => r.targetUid) || {}).targetUid) || (content && content._openid) || null
+    if (!subject) throw badParam('作者已注销，无法处罚')
+    const target = await findUser(ctx.db, subject)
+    if (!target) throw notFound('用户不存在')
+    if (['mod', 'admin'].includes(target.role) && mod.role !== 'admin') throw forbidden('只有管理员可以处罚审核员 / 管理员')
+    const field = input.decision === 'mute' ? 'mutedUntil' : 'bannedUntil'
+    const until = days ? now + days * DAY : now + PERMANENT_MS
+    const current = typeof target[field] === 'number' ? target[field] : 0
+    if (until > current) await ctx.db.collection('users').doc(target._id).update({ [field]: until })
+  }
+
+  // 关闭该目标的全部待处理举报
+  const result = input.decision
+  if (open.length) {
+    await ctx.db.collection(REPORTS).where({ targetType: input.targetType, targetId: input.targetId, state: 'open' })
+      .update({ state: 'resolved', result, handledBy: actor, handledAt: now })
+  }
+  await logModeration(ctx.db, { kind: 'manual', action: result, targetType: input.targetType, targetId: input.targetId, contentType, actor, subject, days: input.days || null, note: input.note || null }, now)
+
+  // 站内通知（BE-M2-04）：被处理的作者 + 举报人；不含原文
+  if (subject && result !== 'dismiss' && result !== 'restore') {
+    const until = input.days ? now + input.days * DAY : null
+    const text = result === 'remove' ? MESSAGES.remove(TYPE_TEXT[contentType]) : result === 'mute' ? MESSAGES.mute(input.days, cnDay(until)) : MESSAGES.ban(input.days, until ? cnDay(until) : '')
+    await notify(ctx.db, { uid: subject, type: 'moderation', refType: contentType, refId: input.targetId, text, now })
+    for (const uid of new Set(open.map((r) => r._openid))) {
+      await notify(ctx.db, { uid, type: 'moderation', refType: 'report', refId: input.targetId, text: MESSAGES.reporter, now })
+    }
+  }
+  return { ok: true, resolved: open.length, status }
+}
 
 const actions = {
   /** 健康检查：部署 / 安全规则验证用，不读写数据库 */
   async ping(_params, ctx) {
     return { fn: 'moderation', at: ctx.now() }
   },
-  // TODO(M*)：按 docs/prd/mvp-plan.md 的任务编号逐个添加
+  report,
+  queue,
+  decide,
+  // TODO(BE-M2-02)：图片异步机审回调（mediaCheckAsync 结果 → 更新内容状态）
 }
 
 module.exports = { actions, IDENTITY_FREE_ACTIONS }

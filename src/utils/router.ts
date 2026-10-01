@@ -20,6 +20,8 @@ export const ROUTES = {
   /** 18+ 确认（首次进入第 2 步；发布 / 编辑档案前按需进入） */
   adult: '/pkg-user/pages/adult/index',
   profileEdit: '/pkg-user/pages/profile-edit/index',
+  // pkg-admin（仅 mod / admin，FE-M2-02）
+  adminQueue: '/pkg-admin/pages/queue/index',
   /** App 专用登录页（app.config.ts 只在 RN 注册） */
   login: '/pkg-user/pages/login/index'
 } as const
@@ -34,10 +36,12 @@ export interface RouteParams {
   topic: { id: string }
   timer: { minutes?: number }
   settings: undefined
-  agreement: { type: 'user' | 'privacy' | 'rules' }
+  /** mode=gate：首次发布前的社区公约阅读（底部「我已阅读并遵守」，FE-M2-03） */
+  agreement: { type: 'user' | 'privacy' | 'rules', mode?: 'gate' }
   /** returnTo：确认后回到的页面（不传则返回上一页）；reason：顶部提示（如「发起话题」） */
   adult: { returnTo?: RouteName, reason?: string }
   profileEdit: undefined
+  adminQueue: undefined
   /** reason：页面顶部提示（如「同步数据」）；returnTo：登录成功后 redirect 到的路由名（不传则返回上一页）；mode=bind：给已登录账号绑定手机号 */
   login: { reason?: string, returnTo?: RouteName, mode?: 'login' | 'bind' }
 }

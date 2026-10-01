@@ -6,7 +6,7 @@
  * - RN：cloud.rn.ts（CloudBase HTTP API：公开读用 Publishable Key；身份类调用用登录后的会话，见 `CloudAuth`）
  * 云函数入参 / 出参以 docs/api/*.md 为准（starter：docs/api/user.md）。
  */
-import type { AccountStatus, Profile, ProfilePatch, User, UserSettings } from '@/types/models'
+import type { AccountStatus, ModDecision, ModQueueItem, Profile, ProfilePatch, ReportTarget, User, UserSettings } from '@/types/models'
 
 /** 客户端可直读的集合（安全规则见 docs/api/README.md「安全规则」）；业务集合落地时在这里补充 */
 export interface CollectionMap {
@@ -111,6 +111,15 @@ export interface FunctionMap {
     getProfile: [void, { profile: Profile | null }]
     /** 部分更新（只传要改的字段）；首次保存时建档并分配匿名代号。需已确认 18+（40303），不要求实名 */
     updateProfile: [ProfilePatch, { profile: Profile }]
+  }
+  /** 内容安全（docs/api/moderation.md，M2） */
+  moderation: {
+    /** 举报：需 18+，不要求实名，禁言中也可；同一人对同一目标只计一次（duplicate）；达阈值自动折叠（folded） */
+    report: [ReportTarget & { reason: string, note?: string }, { ok: true, duplicate: boolean, folded: boolean }]
+    /** 审核队列（仅 mod / admin，否则 40301） */
+    queue: [{ state?: 'open' | 'resolved', page?: number, size?: number }, { list: ModQueueItem[], total: number, page: number, size: number, hasMore: boolean }]
+    /** 处理（仅 mod / admin）：decision 不叫 action（action 是路由字段）；mute 需 days 1–30，ban 不传 days = 永久 */
+    decide: [ReportTarget & { decision: ModDecision, days?: number, note?: string }, { ok: true, resolved: number, status: string | null }]
   }
   // 业务云函数在这里按同样格式声明：<函数名>: { <action>: [入参, 出参] }，并在 cloud.rn.ts 标注公开 / 免身份动作
 }
