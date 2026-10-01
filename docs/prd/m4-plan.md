@@ -1,7 +1,7 @@
 # M4 实施计划：官方圈子 + 邀请码
 
 > 范围：PRD §5 G1 / G2 / G3（`docs/prd/README.md`）、§7.1 / §7.5 线框；任务编号沿用 `mvp-plan.md` M4，并补充拆分项。
-> 状态：**计划（2026-10-01 完善，未开工）**。接口契约草案见 `docs/api/community.md`「圈子与邀请码（M4，草案）」。
+> 状态：**BE-M4-00 已完成（2026-10-01）**，其余任务未开工。BE-M4-00 产出：`config.js` 的 `INVITE_RULES` / `CIRCLE_RULES` / `DAILY_LIMITS.redeemInvite`（前端 `constants/community.ts` 同名并由测试比对）；`collections.js` 的 3 个新索引；`fakeDb` 支持 `gt / gte / lt / lte / neq / nin / exists`（并与云端一致：等值 `null` 匹配缺失字段、比较不匹配缺失字段、不认识的条件直接抛错）；夹具 `tests/cloudfunctions/circleFixtures.js`；`tests/cloudfunctions/m4-base.test.js`（10 例，含「抢最后一个名额 / 同一个码」的原子性模式）。接口契约草案见 `docs/api/community.md`「圈子与邀请码（M4，草案）」。
 > 约定：「默认」= 我按 PRD 与已有代码取的值，没有被推翻前照此实现；标 ❓ 的是需要产品确认的开放项（§2）。
 
 ## 1. 已有基础（盘点，M4 不重复做）

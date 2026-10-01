@@ -36,9 +36,28 @@ const COLLECTIONS = Object.freeze([
   },
 
   // 圈子与话题
-  { name: 'circles', desc: '官方圈子' },
-  { name: 'memberships', desc: '圈子成员关系', owned: { key: 'circleId', keep: 'primary' }, indexes: [{ name: 'uniq_circle_member', keys: [['circleId', 1], ['_openid', 1]], unique: true }] },
-  { name: 'invites', desc: '邀请码', owned: {}, indexes: [{ name: 'uniq_code', keys: [['code', 1]], unique: true }] },
+  // slug：稳定标识，种子脚本按它 upsert（改名不改 slug）
+  { name: 'circles', desc: '官方圈子', indexes: [{ name: 'uniq_slug', keys: [['slug', 1]], unique: true }] },
+  {
+    name: 'memberships',
+    desc: '圈子成员关系',
+    owned: { key: 'circleId', keep: 'primary' },
+    indexes: [
+      { name: 'uniq_circle_member', keys: [['circleId', 1], ['_openid', 1]], unique: true },
+      // 「我的圈子」：按成员查（唯一索引以 circleId 打头，不能用于按成员查）
+      { name: 'idx_member', keys: [['_openid', 1], ['joinedAt', 1]] },
+    ],
+  },
+  {
+    name: 'invites',
+    desc: '邀请码',
+    owned: {},
+    indexes: [
+      { name: 'uniq_code', keys: [['code', 1]], unique: true },
+      // 「我的邀请码」与过期退名额扫描
+      { name: 'idx_owner_time', keys: [['_openid', 1], ['createdAt', -1]] },
+    ],
+  },
   {
     name: 'topics',
     desc: '话题',

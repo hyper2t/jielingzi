@@ -10,6 +10,8 @@ const DAILY_LIMITS = Object.freeze({
   answerPrompt: 1,
   report: 30,
   createInvite: 5,
+  /** 兑换邀请码：每次尝试都计数（含失败），防猜码（M4） */
+  redeemInvite: 10,
   updateProfile: 20,
   /** 上传图片（头像等，BE-M2-02） */
   uploadImage: 10,
@@ -32,6 +34,29 @@ const TOPIC_RULES = Object.freeze({
   tagsMax: 3,
   tag: { min: 1, max: 12 },
   excerptLen: 80,
+})
+
+/**
+ * 邀请码与圈子（PRD G1–G3，docs/prd/m4-plan.md §4；前端同名常量见 src/constants/community.ts）。
+ * alphabet 是 Crockford base32（去掉 I L O U，避免口头 / 手输混淆）；输入规范化时 O→0、I/L→1。
+ */
+const INVITE_RULES = Object.freeze({
+  /** 新用户初始名额（users.inviteQuota 首次使用时懒初始化） */
+  initialQuota: 3,
+  /** 邀请码有效期（天） */
+  ttlDays: 7,
+  codeLength: 8,
+  alphabet: '0123456789ABCDEFGHJKMNPQRSTVWXYZ',
+  /** 「我的邀请码」最多返回条数 */
+  listMax: 50,
+})
+
+/** 官方圈子的字段长度（种子脚本与 getCircle 共用） */
+const CIRCLE_RULES = Object.freeze({
+  nameMax: 12,
+  descMax: 60,
+  rulesMax: 5,
+  ruleMax: 60,
 })
 
 /** 练习方式预置列表（PRD P1；措辞规范见 docs/prd/wording.md）。id 入库，label 仅展示 */
@@ -95,4 +120,4 @@ function cnDate(now) {
   return new Date(now + 8 * 3600 * 1000).toISOString().slice(0, 10)
 }
 
-module.exports = { DAILY_LIMITS, TEXT_RULES, TOPIC_RULES, PRACTICES, PRACTICE_IDS, PROFILE_RULES, AVATAR_PRESETS, RESERVED_NICKNAME_WORDS, CONSENT_VERSION, REPORT_REASONS, REPORT_FOLD_THRESHOLD, PUNISH_DAYS, ROLES, cnDate }
+module.exports = { DAILY_LIMITS, TEXT_RULES, TOPIC_RULES, INVITE_RULES, CIRCLE_RULES, PRACTICES, PRACTICE_IDS, PROFILE_RULES, AVATAR_PRESETS, RESERVED_NICKNAME_WORDS, CONSENT_VERSION, REPORT_REASONS, REPORT_FOLD_THRESHOLD, PUNISH_DAYS, ROLES, cnDate }

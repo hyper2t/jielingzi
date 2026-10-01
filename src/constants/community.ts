@@ -8,6 +8,8 @@ export const DAILY_LIMITS = {
   answerPrompt: 1,
   report: 30,
   createInvite: 5,
+  /** 兑换邀请码：每次尝试都计数（含失败） */
+  redeemInvite: 10,
   updateProfile: 20,
   /** 上传图片（头像等） */
   uploadImage: 10
@@ -29,6 +31,28 @@ export const TOPIC_RULES = {
   tagsMax: 3,
   tag: { min: 1, max: 12 },
   excerptLen: 80
+} as const
+
+/**
+ * 邀请码与圈子（PRD G1–G3，docs/prd/m4-plan.md §4）。alphabet 是 Crockford base32（无 I L O U）；
+ * 输入规范化时 O→0、I/L→1（features/circle/rules.ts，后续任务）。
+ */
+export const INVITE_RULES = {
+  /** 新用户初始名额 */
+  initialQuota: 3,
+  /** 邀请码有效期（天） */
+  ttlDays: 7,
+  codeLength: 8,
+  alphabet: '0123456789ABCDEFGHJKMNPQRSTVWXYZ',
+  /** 「我的邀请码」最多返回条数 */
+  listMax: 50
+} as const
+
+export const CIRCLE_RULES = {
+  nameMax: 12,
+  descMax: 60,
+  rulesMax: 5,
+  ruleMax: 60
 } as const
 
 export const PRACTICES = [

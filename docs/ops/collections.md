@@ -46,8 +46,11 @@ node scripts/ops/security-rules.mjs --apply       # 下发：全部集合 {read:
 | account_links | `idx_accountId` | `accountId` | 普通 |
 | profiles | `uniq_openid` | `_openid` | 唯一 |
 | profiles | `uniq_anonAlias` | `anonAlias` | 唯一 |
+| circles | `uniq_slug`（M4） | `slug` | 唯一 |
 | memberships | `uniq_circle_member` | `circleId` + `_openid` | 唯一 |
+| memberships | `idx_member`（M4） | `_openid` + `joinedAt` | 普通 |
 | invites | `uniq_code` | `code` | 唯一 |
+| invites | `idx_owner_time`（M4） | `_openid` + `createdAt`(desc) | 普通 |
 | topics | `idx_circle_status_time` | `circleId` + `status` + `createdAt`(desc) | 普通 |
 | topics | `idx_status_time` | `status` + `createdAt`(desc) | 普通 |
 | topics | `idx_author_time` | `_openid` + `createdAt`(desc) | 普通 |
@@ -67,6 +70,7 @@ node scripts/ops/security-rules.mjs --apply       # 下发：全部集合 {read:
 | rate_limits | `idx_expireAt` | `expireAt` | 普通 |
 
 说明：
+- **M4 新增的 3 个索引**（`circles.uniq_slug`、`memberships.idx_member`、`invites.idx_owner_time`）已登记在 `collections.js`，**云端要在 M4 部署前执行一次 `ensure-indexes.mjs --apply`**（只新增，不删除）。
 - **注销会解除归属的集合（topics / replies / reports / prompt_answers，`onDelete: 'detach'`）不能建包含 `_openid` 的唯一索引**：注销把 `_openid` 置 null，第二个注销的人会撞索引而失败。这些集合的去重在应用层（举报：同人同目标只计一次、计数按不同举报人去重；每日一题：作答前查询）。`scripts/ops/ensure-indexes.test.mjs` 会拦这类配置。
 - **过期清理（TTL）**：平台 OpenAPI 只支持普通 / 唯一 / 稀疏索引，不支持 TTL。`rate_limits` / `mod_logs` 的 `expireAt` 上建的是普通索引；需要自动过期请在控制台确认是否提供 TTL 选项，否则后续加定时清理（数据量很小：频控每人每动作每天一条，日志保留 6 个月）。
 - 唯一索引只能在集合里没有重复数据时创建；新环境先跑 `ensure-collections.mjs` 再跑本脚本。

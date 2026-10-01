@@ -1,7 +1,7 @@
 'use strict'
 /**
  * 内存版 @cloudbase/node-sdk database() 子集，用于本地单测：
- * where(等值 / command.in) / orderBy / skip / limit / field / get / count / add / update / remove /
+ * where(等值 / command.in / nin / gt / gte / lt / lte / neq / exists) / orderBy / skip / limit / field / get / count / add / update / remove /
  * doc(id).get|update|remove，支持点号路径更新与唯一索引模拟。calls 记录每次操作，便于断言查询条件。
  * remove 返回 { deleted }、update 返回 { updated }，与 SDK 一致。
  */
@@ -10,11 +10,29 @@ let seq = 0
 function getPath(o, p) {
   return p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o)
 }
-/** 等值或 { $in: [...] }（db.command.in 的替身） */
+/**
+ * 条件替身：db.command 的 in / nin / gt / gte / lt / lte / neq / exists 分别对应 $in / $nin / $gt / $gte / $lt / $lte / $ne / $exists。
+ * 与云端（MongoDB 语义）一致的两点：① 大小比较遇到缺失字段一律不匹配；② 等值 null 同时匹配 null 与字段缺失。
+ */
+const isOps = (v) => v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length > 0 && Object.keys(v).every((x) => x.startsWith('$'))
+function testOp(actual, op, arg) {
+  switch (op) {
+    case '$in': return arg.includes(actual)
+    case '$nin': return !arg.includes(actual)
+    case '$gt': return actual != null && actual > arg
+    case '$gte': return actual != null && actual >= arg
+    case '$lt': return actual != null && actual < arg
+    case '$lte': return actual != null && actual <= arg
+    case '$ne': return arg === null ? actual != null : actual !== arg
+    case '$exists': return arg ? actual !== undefined : actual === undefined
+    default: throw new Error(`fakeDb 不支持的条件：${op}`)
+  }
+}
 function matches(d, where) {
   return Object.entries(where).every(([k, v]) => {
     const actual = getPath(d, k)
-    if (v && typeof v === 'object' && Array.isArray(v.$in)) return v.$in.includes(actual)
+    if (isOps(v)) return Object.entries(v).every(([op, arg]) => testOp(actual, op, arg))
+    if (v === null) return actual == null
     return actual === v
   })
 }
@@ -127,7 +145,17 @@ function createFakeDb({ data = {}, unique = {}, strictCollections = false } = {}
     }
   }
 
-  const command = { in: (values) => ({ $in: [...values] }), inc: (n) => ({ $inc: n }) }
+  const command = {
+    in: (values) => ({ $in: [...values] }),
+    nin: (values) => ({ $nin: [...values] }),
+    gt: (v) => ({ $gt: v }),
+    gte: (v) => ({ $gte: v }),
+    lt: (v) => ({ $lt: v }),
+    lte: (v) => ({ $lte: v }),
+    neq: (v) => ({ $ne: v }),
+    exists: (b = true) => ({ $exists: !!b }),
+    inc: (n) => ({ $inc: n }),
+  }
   async function createCollection(name) {
     calls.push({ op: 'createCollection', collection: name })
     if (store[name]) throw Object.assign(new Error('[ResourceUnavailable.ResourceExist] Table exist.'), { code: 'DATABASE_COLLECTION_ALREADY_EXIST' })
