@@ -1,0 +1,41 @@
+{
+  "_comment": "官方圈子种子（docs/prd/wording.md §5）。slug 固定不可改；名称 / 简介 / 公约可改，改完执行 `node scripts/ops/circles.mjs seed --apply`（只更新有差异的字段，不动成员数 / 话题数 / 状态）。限制见 cloudfunctions/_shared/config.js 的 CIRCLE_RULES。",
+  "circles": [
+    {
+      "slug": "mindful",
+      "name": "静观练习",
+      "desc": "冥想、正念、内观的日常练习与困惑",
+      "cover": "circle:mindful",
+      "sort": 1,
+      "rules": [
+        "说具体：做法、时长、当时的感受，少下结论。",
+        "讲方法时先说明这是个人经验，不替别人定「应该」。",
+        "不评判他人的练习方式。"
+      ]
+    },
+    {
+      "slug": "tradition",
+      "name": "传统养生",
+      "desc": "太极、站桩、传统养生功法的身体经验",
+      "cover": "circle:tradition",
+      "sort": 2,
+      "rules": [
+        "只谈自己的身体体验，不做诊断，不承诺疗效。",
+        "不劝任何人放弃就医或自行改变用药。",
+        "不推销课程、器具与药品。"
+      ]
+    },
+    {
+      "slug": "lifestyle",
+      "name": "正念生活",
+      "desc": "把练习带进工作、家庭与日常",
+      "cover": "circle:lifestyle",
+      "sort": 3,
+      "rules": [
+        "说真实的日常场景，而不是道理。",
+        "提到他人时不透露能识别身份的信息。",
+        "遇到心理或健康方面的困难，请同时寻求专业帮助。"
+      ]
+    }
+  ]
+}

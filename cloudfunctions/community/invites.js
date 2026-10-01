@@ -10,9 +10,8 @@
  * - 兑换：规范化 → 码无效 / 已用 / 过期 / 圈子已关闭统一 40401 → 已是成员 40901（不消耗码）→ 条件标记已用 → 写成员关系。
  *   每次兑换尝试（含失败）计 1 次日额度，防猜码；输入格式错误（40001）不计。
  */
-const { randomInt } = require('node:crypto')
 const {
-  validate, badParam, notFound, conflict, tooMany, forbidden, guardWrite, isDuplicateKeyError, withCollection, INVITE_RULES,
+  validate, notFound, conflict, tooMany, forbidden, guardWrite, isDuplicateKeyError, withCollection, INVITE_RULES, normalizeInviteCode, generateInviteCode,
 } = require('./_shared')
 const { findById, findRows, requireReader } = require('./common')
 const { isMember, presentCircle } = require('./circles')
@@ -27,27 +26,6 @@ const CODE_ATTEMPTS = 5
 /** 一次最多回收的过期码（再多的下次再退） */
 const REFUND_BATCH = 50
 const INVALID_MSG = '邀请码无效、已被使用或已过期'
-
-/**
- * 邀请码规范化（前端同一算法，共享 fixture：tests/fixtures/invite-code.json）：
- * 去空白 / 连字符 → 大写 → O→0、I/L→1；必须恰好 8 位且都在字母表内，否则 40001。
- */
-function normalizeInviteCode(raw) {
-  if (typeof raw !== 'string') throw badParam('code 必须是字符串')
-  const code = raw.replace(/[\s\-\u2010-\u2015\u2212]/g, '').toUpperCase().replace(/O/g, '0').replace(/[IL]/g, '1')
-  if (code.length !== INVITE_RULES.codeLength) throw badParam(`邀请码为 ${INVITE_RULES.codeLength} 位`)
-  for (const ch of code) if (!INVITE_RULES.alphabet.includes(ch)) throw badParam('邀请码含有不支持的字符')
-  return code
-}
-
-/** 随机码：默认用 crypto；单测可通过 ctx.random（[0,1)）注入确定性序列 */
-function generateCode(ctx) {
-  const { alphabet, codeLength } = INVITE_RULES
-  const pick = typeof ctx.random === 'function' ? () => Math.min(alphabet.length - 1, Math.floor(ctx.random() * alphabet.length)) : () => randomInt(alphabet.length)
-  let code = ''
-  for (let i = 0; i < codeLength; i++) code += alphabet[pick()]
-  return code
-}
 
 const quotaOf = (v) => (typeof v === 'number' && v > 0 ? Math.floor(v) : 0)
 
@@ -130,7 +108,7 @@ async function createInvite(params, ctx) {
   try {
     for (let i = 0; i < CODE_ATTEMPTS && !doc; i++) {
       const candidate = {
-        code: generateCode(ctx), circleId, _openid: g.accountId, official: false, createdAt: now, expiresAt: now + INVITE_RULES.ttlDays * DAY_MS,
+        code: generateInviteCode(ctx), circleId, _openid: g.accountId, official: false, createdAt: now, expiresAt: now + INVITE_RULES.ttlDays * DAY_MS,
         usedBy: null, usedAt: null, refunded: false,
       }
       try {

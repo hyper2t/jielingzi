@@ -16,6 +16,7 @@ module.exports = {
   ...require('./account'),
   ...require('./collections'),
   ...require('./config'),
+  ...require('./invite-code'),
   ...require('./guard'),
   ...require('./phone'),
   ...require('./wxmp'),

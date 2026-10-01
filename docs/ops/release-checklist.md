@@ -21,3 +21,21 @@
 ## 排障：开发者工具全部页面白屏，Console 报 `MiniProgramError … n[e] is not a function`
 
 - 2026-09-29 出现过一次（重建 dist 后）。先跑 `node scripts/ops/weapp-smoke.cjs dist`：它在 Node 里模拟 wx 环境加载全部产物并渲染每个页面；如果这里正常（每页都有 setData、无 THROW），就是开发者工具缓存了旧分包 / 模板，「工具 → 清除缓存 → 全部清除」→ 编译即可。如果这里抛错，堆栈会直接指向产物文件，按文件找源码。
+
+## M4 上线（官方圈子 + 邀请码）
+
+> 顺序很重要：**先让第一批成员入圈，再发客户端**——部署新的 `community` 后，没有圈子成员的人读不到任何话题（旧话题不可见，见 `docs/prd/m4-plan.md` D11）。以下命令都在仓库根目录执行；云端写入类命令默认只预览，确认输出后再加 `--apply`。
+
+1. 本地验证：`npm run test:functions`、`npm run test:ops`、`npx jest --silent`、`npx tsc --noEmit` 全绿。
+2. 建索引：`node scripts/ops/ensure-indexes.mjs --apply`（M4 新增 3 个：`circles.uniq_slug`、`memberships.idx_member`、`invites.idx_owner_time`）。
+3. 只读审计：`node scripts/ops/circles.mjs audit`。旧话题 / 旧回复大于 0 时，先决定归到哪个圈子，`seed` 之后再 `migrate-topics --to <slug> --apply`；为 0（目前云端即是）则无需迁移。
+4. 圈子种子：`node scripts/ops/circles.mjs seed` 预览 → `--apply`。名称 / 简介 / 公约改 `scripts/ops/circles.seed.json`，可重复执行。
+5. 部署 `community` 与 `moderation`（`sync-shared` → 隔离登录 → `function-env.mjs` 核对环境变量 → `tcb fn deploy`，做法见上文「部署」）；`user` 不用动。部署后 `invoke-fn.mjs community '{"action":"ping"}'` 冒烟。
+6. 第一批成员：`node scripts/ops/circles.mjs grant --circle mindful --phone <号> --apply`（自己和种子用户；`--latest` 取最近活跃账号）；再签发官方邀请码：`node scripts/ops/circles.mjs issue --circle mindful --count 5 --apply`，**清单只在终端显示一次**，立刻转交。
+7. 复核：`circles.mjs audit`（计数无偏差）；用刚入圈的账号在小程序 / App 走一遍：看圈子 → 发话题 → 签发邀请码 → 另一账号兑换。
+8. 发客户端（小程序提审、App 打包）。
+
+名额增发（手动）：`node scripts/ops/invite-quota.mjs --report` 看本月有效回复榜，再 `--account <id> --add N --apply`。
+
+**回滚**：重新部署上一个提交的 `community` / `moderation`。`memberships` / `invites` 数据无副作用可保留；但旧代码不看 `circleId`，圈内话题会对所有人可见——回滚窗口内应暂停对外发版 / 先导出清单。计数偏差用 `circles.mjs recount --apply` 校正。
+
