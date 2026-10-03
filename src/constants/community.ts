@@ -26,6 +26,21 @@ export const TEXT_RULES = {
   goal: { max: 40 }
 } as const
 
+/**
+ * 每日一题（PRD W3，docs/prd/m6-plan.md D6–D10）：题目录入长度、答案字数、答案列表单页上限与匿名默认值。
+ * 权威定义在 cloudfunctions/_shared/config.js，两边必须一致（src/constants/__tests__/community.test.ts 比对）。
+ */
+export const PROMPT_RULES = {
+  /** 题目正文字数上限（运营录入用，前端只展示） */
+  textMax: 120,
+  /** 答案字数：太短的回答在列表里没有阅读价值 */
+  answer: { min: 5, max: 500 },
+  /** 答案列表单页上限 */
+  listMax: 50,
+  /** 默认匿名：作答未显式选择时按匿名处理（D9，可切实名） */
+  defaultAnon: true
+} as const
+
 /** 话题的其余规则（PRD T1）：标签最多几个、每个标签的字数；列表摘要长度 */
 export const TOPIC_RULES = {
   tagsMax: 3,

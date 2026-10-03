@@ -23,7 +23,7 @@ export default defineAppConfig({
     {
       root: 'pkg-practice',
       // M5：冥想计时；个人打卡热力图随主包练习 Tab 渲染。M6：每日一题
-      pages: ['pages/timer/index']
+      pages: ['pages/timer/index', 'pages/prompt/index']
     },
     {
       root: 'pkg-user',

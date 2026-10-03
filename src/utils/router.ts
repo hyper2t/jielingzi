@@ -20,6 +20,8 @@ export const ROUTES = {
   invites: '/pkg-community/pages/invites/index',
   // pkg-practice（M5/M6 补齐：timerDone、calendar、prompt…）
   timer: '/pkg-practice/pages/timer/index',
+  /** 每日一题作答与答案列表（FE-M6-01） */
+  prompt: '/pkg-practice/pages/prompt/index',
   // pkg-user
   settings: '/pkg-user/pages/settings/index',
   agreement: '/pkg-user/pages/agreement/index',
@@ -46,6 +48,8 @@ export interface RouteParams {
   joinCircle: { code?: string }
   invites: { circleId?: string }
   timer: { minutes?: number }
+  /** promptId / date 由练习 Tab 的卡片带入；缺 promptId 时页面回落到今日题目 */
+  prompt: { promptId?: string, date?: string }
   settings: undefined
   /** mode=gate：首次发布前的社区公约阅读（底部「我已阅读并遵守」，FE-M2-03） */
   agreement: { type: 'user' | 'privacy' | 'rules', mode?: 'gate' }

@@ -130,7 +130,7 @@
 
 ## M6 · 每日一题 / 慢话题 / 精华 / 通知（1.5 周）
 
-> **进度（2026-10-03）**：实施计划与接口契约见 [`docs/prd/m6-plan.md`](./m6-plan.md)。同日用户拍板两项：D9 答案**可选匿名、默认匿名**（覆盖计划原稿的「一律不署名」）、N1 通知**先只做站内**（订阅消息与模板 ID 后补）。已完成 BE-M6-00 + BE-M6-01（每日一题的 `todayPrompt` / `answerPrompt` / `listAnswers`，`PROMPT_RULES`、`prompt_answers` 分页索引、22 例单测 + 变异验证 5 处）：云函数 244/244、运维 32/32、Jest 38 suites / 526 tests、`tsc --noEmit` 0 错，**仅本地，未部署**（M4 签核与 M5 真机仍未闭环）。慢话题 / 精华 / 通知与全部 FE-M6-* 未开工。
+> **进度（2026-10-03）**：实施计划与接口契约见 [`docs/prd/m6-plan.md`](./m6-plan.md)。同日用户拍板两项：D9 答案**可选匿名、默认匿名**（覆盖计划原稿的「一律不署名」）、N1 通知**先只做站内**（订阅消息与模板 ID 后补）。已完成 BE-M6-00 + BE-M6-01（每日一题的 `todayPrompt` / `answerPrompt` / `listAnswers`，`PROMPT_RULES`、`prompt_answers` 分页索引、22 例单测 + 变异验证 5 处）：云函数 244/244、运维 32/32、Jest 38 suites / 526 tests、`tsc --noEmit` 0 错，**仅本地，未部署**（M4 签核与 M5 真机仍未闭环）。同日继续完成 FE-M6-00（类型 / `PROMPT_RULES` / `services/practice.ts` / `guard.ts` / `cloud.types.ts` / mock handler）与 FE-M6-01（练习 Tab「每日一题」卡片 + 作答页）：新增 `src/pkg-practice/__tests__/m6.test.tsx` 12 例与 1 个快照，`src/constants/__tests__/community.test.ts` 增加前后端规则逐字段比对用例；全量 Jest 40 suites / 551 tests / 32 snapshots、`tsc --noEmit` 0 错、云函数 244/244、运维 32/32（**仍仅本地，未部署**）。慢话题 / 精华 / 通知（BE-M6-02 / 03、OPS-M6-01）与 FE-M6-02 / 03 未开工。
 > 已预登记的部分：`daily_prompts`（`uniq_date`）、`prompt_answers`（`idx_prompt_owner`）、`notifications`（`idx_owner_read_time`）集合与索引已在云端齐全；
 > `DAILY_LIMITS.answerPrompt = 1` 已配置但暂无调用方，`_shared/notify.js` 有 `notify()` 而无人调用，`cloudbaserc.json` 尚无 `triggers`。
 > 门槛：M4 签核与 M5 真机验收先闭合；三项标 ★ 的产品决定（作答是否署名、订阅消息模板 ID、题目与提醒文案审阅）见 m6-plan §8。
@@ -140,7 +140,7 @@
 | BE-M6-01 | BE | 每日一题：`daily_prompts` 运营脚本录入；`answerPrompt`（每日一次）/ `listAnswers`（作答后才可读） | 单测 |
 | BE-M6-02 | BE | 慢话题：`slowUntil` 前拒绝回复；精华 `featured` 标记（mod）+ `listFeatured` | 单测 |
 | BE-M6-03 | BE | 通知：回复我 / 处理结果 / 每日一题提醒；小程序订阅消息（定时触发器），App 站内消息列表 + 未读数 | 单测；触发器配置入 `cloudbaserc.json` |
-| FE-M6-01 | FE | 练习 Tab 内"每日一题"卡片与作答页；作答后展示他人回答 | 快照测试 |
+| ✅ FE-M6-01 | FE | 已完成（本地）：练习 Tab 内"每日一题"卡片与作答页；作答后展示他人回答（默认匿名、可切实名、待复核只标自己那条） | `m6.test.tsx` 12 例 + 1 个快照，全量 Jest 40/551 通过 |
 | FE-M6-02 | FE | 发起话题增加"慢话题"选项与倒计时展示；精华列表入口 | 组件测试 |
 | FE-M6-03 | FE | 消息页 + 未读角标；小程序订阅授权在用户主动操作时请求（发帖/作答后） | 三端走通 |
 | QA-M6-01 | QA | 用例：作答可见性、慢话题时间边界、订阅消息实际送达、通知不含营销内容 | 通过 |

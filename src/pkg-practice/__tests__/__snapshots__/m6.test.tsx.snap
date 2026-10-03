@@ -1,0 +1,51 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`练习 Tab 的每日一题卡片 卡片快照（未作答态） 1`] = `
+<View
+  className="mx-4 mt-5 rounded-2xl border border-solid border-paper-dark bg-paper-light p-5"
+>
+  <View
+    className="flex flex-row items-center justify-between"
+  >
+    <Text
+      className="font-body text-caption font-bold text-brand-dark"
+    >
+      每日一题
+    </Text>
+    <Text
+      className="font-body text-caption text-ink-faint"
+    >
+      2026-10-03
+    </Text>
+  </View>
+  <Text
+    className="mt-3 font-body text-body text-ink"
+  >
+    今天你想放下的一件小事是什么
+  </Text>
+  <View
+    className="flex flex-row items-center mt-2"
+  >
+    <Text
+      className="ml-2 font-body text-caption text-ink-faint"
+    >
+      作答后可见其他人的回答
+    </Text>
+  </View>
+  <View
+    accessibilityLabel="写下今天的回答"
+    accessibilityRole="button"
+    ariaLabel="写下今天的回答"
+    ariaRole="button"
+    className="flex flex-row items-center justify-center rounded-full bg-brand min-h-btn px-6 min-h-touch-kid w-full mt-4"
+    hoverClass="bg-brand-dark"
+    onClick={[Function]}
+  >
+    <Text
+      className="font-body font-bold text-kid-button text-paper-light"
+    >
+      写下今天的回答
+    </Text>
+  </View>
+</View>
+`;

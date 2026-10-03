@@ -12,7 +12,7 @@ export const WRITE_ACTIONS: { [N in FnName]?: Array<FnAction<N>> } = {
   user: ['login', 'confirmAdult', 'updateSettings', 'bindWechat', 'bindApple', 'linkPhoneSession', 'bindPhoneWeapp', 'deleteAccount'],
   community: ['updateProfile', 'setAvatar', 'createInvite', 'redeemInvite', 'createTopic', 'createReply', 'deleteMine'],
   moderation: ['report', 'decide', 'decideMedia'],
-  practice: ['checkin']
+  practice: ['checkin', 'answerPrompt']
   // 业务云函数的写 action 加在这里
 }
 

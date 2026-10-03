@@ -28,9 +28,9 @@
 - 权限：只按当前调用方 `_openid` 查询；无其他用户查询参数。
 - 错误：参数不合法 `40001`；未登录 `40101`；未确认 18+ `40303`；账号封禁 `40304`。
 
-## 每日一题（M6 契约 · 云函数已实现（本地，未部署）；前端未接）
+## 每日一题（M6 契约 · 云函数与前端均已实现（本地，未部署））
 
-> 决策与理由见 [`docs/prd/m6-plan.md`](../prd/m6-plan.md)。本节三个动作已按定稿契约实现于 `cloudfunctions/practice/service.js`（2026-10-03：本地 22 例单测通过，**未部署**，前端与 `mock` 未接）；「同里程碑的其他接口」一节仍是草案。
+> 决策与理由见 [`docs/prd/m6-plan.md`](../prd/m6-plan.md)。本节三个动作已按定稿契约实现于 `cloudfunctions/practice/service.js`（2026-10-03：本地 22 例单测通过；同日前端接线完成——`src/services/practice.ts` 三个方法 + `src/services/mock/client.ts` 同名 handler + 练习 Tab 的 `PromptCard` 与 `pkg-practice/pages/prompt` 作答页，页面测试 12 例 + 快照 1 个，前后端规则同源由 `community.test.ts` 比对。**均只在本地，未部署**）；「同里程碑的其他接口」一节仍是草案。
 
 ### todayPrompt
 

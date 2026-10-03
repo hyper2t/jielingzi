@@ -41,6 +41,67 @@ export interface CheckinMonth {
   totalMinutes: number
 }
 
+/**
+ * 每日一题（PRD W3，docs/api/practice.md「每日一题」）。题目由运营写入 `daily_prompts`、云函数只读；
+ * 答案落 `prompt_answers`：一人一题一次，默认匿名（m6-plan D6 / D9）。
+ */
+export type PromptAnswerStatus = 'ok' | 'pending' | 'removed'
+
+export interface DailyPrompt {
+  id: string
+  /** 北京时间日期 YYYY-MM-DD */
+  date: string
+  text: string
+}
+
+/** practice.todayPrompt 的返回体：当日没有已发布题目时 prompt 为 null（不是错误）。 */
+export interface PromptToday {
+  prompt: (DailyPrompt & {
+    /** 本人是否已作答（任意状态都算，是「能否看他人回答」的开关） */
+    answered: boolean
+    /** 本人那条的状态；未作答为 null */
+    myStatus: PromptAnswerStatus | null
+    /** 该题的回答数（近似值，含本人那条） */
+    answerCount: number
+  }) | null
+}
+
+export interface PromptAnswerInput {
+  promptId: string
+  text: string
+  /** 缺省即匿名（PROMPT_RULES.defaultAnon），显式 false 才实名 */
+  anon?: boolean
+}
+
+/** 服务端返回的答案（不回传 _openid） */
+export interface PromptAnswer {
+  id: string
+  date: string
+  text: string
+  anon: boolean
+  status: PromptAnswerStatus
+  createdAt: number
+}
+
+/** 列表条目：作者只给展示名与形态（匿名 → 花名、实名 → 昵称、注销 → 「已注销用户」） */
+export interface PromptAnswerItem extends PromptAnswer {
+  authorName: string
+  isSelf: boolean
+  deleted: boolean
+}
+
+export interface PromptAnswerPage {
+  promptId: string
+  date: string
+  page: number
+  size: number
+  hasMore: boolean
+  /** 他人的可见答案（status ok，不含本人） */
+  list: PromptAnswerItem[]
+  /** 本人那条（可能是 pending）；仅在已作答时有值 */
+  mine: PromptAnswerItem | null
+}
+
 /** users 集合文档（_openid 承载 accountId，见 cloudfunctions/_shared/account.js） */
 export interface User {
   _id: string

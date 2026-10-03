@@ -3,9 +3,9 @@
  * 切换真实数据：在 .env / .env.local 写 TARO_APP_DATA_SOURCE=cloud（见 services/client.ts），业务层不改。
  * 业务云函数落地时：在 FunctionMap 声明后，这里的 handlers 必须补上同名实现（类型会强制要求）。
  */
-import type { AccountStatus, AuthorView, CheckinMonth, Circle, DailyCheckin, Invite, MediaQueueItem, ModQueueItem, PracticeCheckinInput, PracticeCheckinResult, Profile, Reply, ReplyQuote, TopicDetail, TopicStatus, TopicSummary, User, UserSettings } from '@/types/models'
+import type { AccountStatus, AuthorView, CheckinMonth, Circle, DailyCheckin, Invite, MediaQueueItem, ModQueueItem, PracticeCheckinInput, PracticeCheckinResult, Profile, PromptAnswerInput, PromptAnswerItem, Reply, ReplyQuote, TopicDetail, TopicStatus, TopicSummary, User, UserSettings } from '@/types/models'
 import type { AccountIdentities } from '../cloud.types'
-import { CONSENT_VERSION, DAILY_LIMITS, INVITE_RULES, PRACTICES, TOPIC_RULES } from '@/constants/community'
+import { CONSENT_VERSION, DAILY_LIMITS, INVITE_RULES, PROMPT_RULES, PRACTICES, TOPIC_RULES } from '@/constants/community'
 import { normalizeInviteCode } from '@/features/circle/rules'
 import { normalizeLine, patchError } from '@/features/profile/rules'
 import { clip, isShortReply, normalizeBody, replyError, topicInputError } from '@/features/topic/rules'
@@ -92,7 +92,17 @@ let replies: MockReply[] = []
 let postSeq = 0
 interface MockCheckin { date: string, practice: PracticeCheckinInput['practice'], minutes: number, sessionIds: string[] }
 let checkins: MockCheckin[] = []
-let postedToday = { topic: 0, reply: 0, createInvite: 0, redeemInvite: 0 }
+interface MockPrompt { id: string, date: string, text: string, status: 'ok' | 'closed' }
+interface MockPromptAnswer { id: string, promptId: string, date: string, text: string, anon: boolean, mine: boolean, authorName: string, status: 'ok' | 'pending' | 'removed', createdAt: number, deleted?: boolean }
+let prompts: MockPrompt[] = []
+let promptAnswers: MockPromptAnswer[] = []
+let promptSeq = 0
+let answerSeq = 0
+/** 与云函数 _shared/config.js 的 cnDate 一致：每日一题按北京时间归日 */
+const mockCnDate = () => new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10)
+/** 答案列表默认分页：与云函数 service.js 的 ANSWER_PAGE_SIZE 同值（同 mock 里 180 分钟上限的处理方式） */
+const MOCK_ANSWER_PAGE_SIZE = 20
+let postedToday = { topic: 0, reply: 0, answer: 0, createInvite: 0, redeemInvite: 0 }
 export const MOCK_REJECT_MARK = '[reject]'
 export const MOCK_REVIEW_MARK = '[review]'
 /** getPhoneNumber 回调里以这个前缀开头的 code 视为失效（测试 / 演示「code 失效」分支） */
@@ -189,6 +199,34 @@ export const mockControl = {
   },
   get topics (): MockTopic[] { return topics.map(t => ({ ...t })) },
   get replies (): MockReply[] { return replies.map(r => ({ ...r })) },
+  /** 预置每日一题题目（date 缺省为北京时间当日，status 缺省 ok） */
+  seedPrompts (list: Array<Partial<MockPrompt> & { text: string }>) {
+    list.forEach(p => {
+      prompts.push({ id: p.id || `p${++promptSeq}`, date: p.date || mockCnDate(), text: p.text, status: p.status || 'ok' })
+    })
+  },
+  /** 预置别人的回答（mine: true 视为我自己发的） */
+  seedPromptAnswers (list: Array<Partial<MockPromptAnswer> & { text: string }>) {
+    const base = Date.now() - list.length * 1000
+    list.forEach((a, i) => {
+      const wanted = a.promptId || (prompts[0] ? prompts[0].id : 'p1')
+      const prompt = prompts.find(p => p.id === wanted)
+      promptAnswers.push({
+        id: `pa${++answerSeq}`,
+        promptId: wanted,
+        date: a.date || (prompt ? prompt.date : mockCnDate()),
+        text: a.text,
+        anon: a.anon ?? true,
+        mine: a.mine ?? false,
+        authorName: a.authorName || MOCK_ALIASES[0],
+        status: a.status || 'ok',
+        createdAt: a.createdAt ?? base + i * 1000,
+        deleted: a.deleted ?? false
+      })
+    })
+  },
+  get prompts (): MockPrompt[] { return prompts.map(p => ({ ...p })) },
+  get promptAnswers (): MockPromptAnswer[] { return promptAnswers.map(a => ({ ...a })) },
   get checkins (): MockCheckin[] { return checkins.map(c => ({ ...c, sessionIds: [...c.sessionIds] })) },
   get account (): AccountStatus { return { ...account } },
   get profile (): Profile | null { return profile ? { ...profile } : null },
@@ -207,13 +245,17 @@ export const mockControl = {
     topics = []
     replies = []
     checkins = []
+    prompts = []
+    promptAnswers = []
+    promptSeq = 0
+    answerSeq = 0
     postSeq = 0
     circles = [defaultMockCircle()]
     memberships = [{ circleId: DEFAULT_CIRCLE_ID, accountId: MOCK_OPENID }]
     invites = []
     inviteQuota = undefined
     inviteSeq = 0
-    postedToday = { topic: 0, reply: 0, createInvite: 0, redeemInvite: 0 }
+    postedToday = { topic: 0, reply: 0, answer: 0, createInvite: 0, redeemInvite: 0 }
   }
 }
 
@@ -330,6 +372,17 @@ function mockAuthor (d: { anon: boolean, mine: boolean, authorName: string }): A
   if (d.mine) return { name: (p && p.nickname) || alias, avatar: p ? p.avatar : null, badges: (p && p.badges) || [], practices: (p && p.practices) || [], years: p ? p.years : null, isSelf: true, anon: false, deleted: false }
   return { name: d.authorName, avatar: null, badges: [], practices: [], years: null, isSelf: false, anon: false, deleted: false }
 }
+/** 答案条目的展示形态（与云函数 presentAnswer 一致：匿名给代号、实名给昵称、注销给「已注销用户」） */
+function presentMockAnswer (a: MockPromptAnswer): PromptAnswerItem {
+  const alias = (profile && profile.anonAlias) || MOCK_ALIASES[0]
+  const nickname = (profile && profile.nickname) || alias
+  const authorName = a.deleted ? '已注销用户' : (a.mine ? (a.anon ? alias : nickname) : a.authorName)
+  return {
+    id: a.id, date: a.date, text: a.text, status: a.status, createdAt: a.createdAt,
+    authorName, anon: a.anon, isSelf: a.mine, deleted: a.deleted === true
+  }
+}
+
 /** ok / folded 所有人可见；pending 只有作者；removed 不可见 */
 const canSee = (d: { status: TopicStatus, mine: boolean }) => d.status === 'ok' || d.status === 'folded' || (d.status === 'pending' && d.mine)
 function topicBase (d: MockTopic) {
@@ -705,9 +758,89 @@ const handlers: Handlers = {
         days.set(c.date, day)
       })
       const list = [...days.values()].sort((a, b) => a.date.localeCompare(b.date))
+
       const result: CheckinMonth = { month: input.month, list, totalMinutes: list.reduce((sum, day) => sum + day.minutes, 0) }
       return result
+    },
+    todayPrompt: (input: Record<string, never>) => {
+      noUnknown(input, [])
+      guard({ requirePhone: false, allowMuted: true })
+      const date = mockCnDate()
+      const prompt = prompts.find(p => p.date === date && p.status === 'ok')
+      if (!prompt) return { prompt: null }
+      const mine = promptAnswers.find(a => a.promptId === prompt.id && a.mine)
+      return {
+        prompt: {
+          id: prompt.id,
+          date: prompt.date,
+          text: prompt.text,
+          answered: !!mine,
+          myStatus: mine ? mine.status : null,
+          answerCount: promptAnswers.filter(a => a.promptId === prompt.id && a.status === 'ok').length
+        }
+      }
+    },
+    /** 与云函数同序：先判「题目失效 / 我已作答」（40401 / 40901），再走每日额度（42901） */
+    answerPrompt: (input: PromptAnswerInput) => {
+      noUnknown(input, ['promptId', 'text', 'anon'])
+      if (typeof input.promptId !== 'string' || !input.promptId) throw badParam('promptId 不能为空')
+      const text = typeof input.text === 'string' ? input.text.trim() : ''
+      const { min, max } = PROMPT_RULES.answer
+      if (text.length < min || text.length > max) throw badParam(`答案需 ${min}–${max} 字`)
+      if ('anon' in input && typeof input.anon !== 'boolean') throw badParam('anon 需为布尔值')
+      const prompt = prompts.find(p => p.id === input.promptId)
+      if (!prompt || prompt.status !== 'ok') throw new CloudError(ERROR_CODES.NOT_FOUND, 'mock: 题目不存在或已结束')
+      if (promptAnswers.some(a => a.promptId === prompt.id && a.mine)) throw new CloudError(ERROR_CODES.CONFLICT, 'mock: 今天已经作答过了')
+      guard({ requirePhone: true, allowMuted: false })
+      if (postedToday.answer >= DAILY_LIMITS.answerPrompt) {
+        throw new CloudError(ERROR_CODES.TOO_MANY, `mock: 今日额度已用完（每天 ${DAILY_LIMITS.answerPrompt} 次），明天再来`)
+      }
+      const status = mockModerate(text)
+      const row: MockPromptAnswer = {
+        id: `pa${++answerSeq}`,
+        promptId: prompt.id,
+        date: prompt.date,
+        text,
+        anon: input.anon !== false,
+        mine: true,
+        authorName: '',
+        status,
+        createdAt: Date.now(),
+        deleted: false
+      }
+      promptAnswers.push(row)
+      postedToday.answer += 1
+      const { id, date: d, text: t, anon, status: st, createdAt } = row
+      return { answer: { id, date: d, text: t, anon, status: st, createdAt } }
+    },
+    /** 未作答 → 40301，且不返回任何他人答案；他人只看得到 ok */
+    listAnswers: (input: { promptId: string, page?: number, size?: number }) => {
+      noUnknown(input, ['promptId', 'page', 'size'])
+      if (typeof input.promptId !== 'string' || !input.promptId) throw badParam('promptId 不能为空')
+      const page = input.page === undefined ? 1 : input.page
+      if (!Number.isInteger(page) || page < 1) throw badParam('page 需为正整数')
+      const size = input.size === undefined ? MOCK_ANSWER_PAGE_SIZE : input.size
+      if (!Number.isInteger(size) || size < 1 || size > PROMPT_RULES.listMax) throw badParam(`size 需为 1–${PROMPT_RULES.listMax} 的整数`)
+      guard({ requirePhone: false, allowMuted: true })
+      const prompt = prompts.find(p => p.id === input.promptId)
+      if (!prompt) throw new CloudError(ERROR_CODES.NOT_FOUND, 'mock: 题目不存在')
+      const mine = promptAnswers.find(a => a.promptId === prompt.id && a.mine)
+      if (!mine) throw new CloudError(ERROR_CODES.FORBIDDEN, '作答后即可查看他人的回答')
+      const others = promptAnswers.filter(a => a.promptId === prompt.id && !a.mine && a.status === 'ok')
+        .sort((x, y) => x.createdAt - y.createdAt)
+      const skip = (page - 1) * size
+      const rows = others.slice(skip, skip + size)
+      return {
+        promptId: prompt.id,
+        date: prompt.date,
+        page,
+        size,
+        hasMore: others.length > skip + rows.length,
+        list: rows.map(presentMockAnswer),
+        mine: presentMockAnswer(mine)
+      }
     }
+
   }
 }
 

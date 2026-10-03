@@ -26,6 +26,8 @@ export interface TrackEvents {
   // ---- 深度话题（M3） ----
   topic_create: { anon: boolean, status: string }
   reply_create: { anon: boolean, quote: boolean, status: string }
+  // ---- 每日一题（M6）：只记状态与署名方式，不记答案内容 ----
+  prompt_answer: { status: string, anon: boolean }
 }
 
 export type TrackEventName = keyof TrackEvents
