@@ -28,31 +28,31 @@
 - 权限：只按当前调用方 `_openid` 查询；无其他用户查询参数。
 - 错误：参数不合法 `40001`；未登录 `40101`；未确认 18+ `40303`；账号封禁 `40304`。
 
-## 每日一题（M6 契约 · 草案，未实现）
+## 每日一题（M6 契约 · 云函数已实现（本地，未部署）；前端未接）
 
-> 决策与理由见 [`docs/prd/m6-plan.md`](../prd/m6-plan.md)；本节是实现前的契约草案，**未定稿**。三个动作都挂在 `practice` 云函数（`service.js` 头注释已预留）。
+> 决策与理由见 [`docs/prd/m6-plan.md`](../prd/m6-plan.md)。本节三个动作已按定稿契约实现于 `cloudfunctions/practice/service.js`（2026-10-03：本地 22 例单测通过，**未部署**，前端与 `mock` 未接）；「同里程碑的其他接口」一节仍是草案。
 
 ### todayPrompt
 
 - 入参：无
-- 返回：`{ prompt: { id, date, text, answered, answerCount } | null }`；`date` 是北京时间当日（`cnDate`），只取 `status: 'ok'` 的题目；当天没有题目返回 `null`，不是错误。
+- 返回：`{ prompt: { id, date, text, answered, myStatus, answerCount } | null }`；`date` 是北京时间当日（`cnDate`），只取 `status: 'ok'` 的题目；当天没有题目返回 `null`，不是错误。`myStatus` 是本人那条的状态（未作答为 `null`），`answerCount` 为他人可见答案数（近似值，与圈子成员数同口径）。
 - 权限：登录 + 已确认 18+ 即可；不要求入圈，也不要求手机号。
 - 错误：`40101` 未登录；`40303` 未确认 18+；`40304` 封禁。
 
 ### answerPrompt
 
-- 入参：`{ promptId, text }`；`text` 去首尾空白后 5–500 字（`PROMPT_RULES.answer`），未知字段 `40001`。
+- 入参：`{ promptId, text, anon? }`；`text` 去首尾空白后 5–500 字（`PROMPT_RULES.answer`）；`anon` 缺省即匿名（`PROMPT_RULES.defaultAnon = true`，显式 `false` 才实名，见 m6-plan D9）；未知字段 `40001`。
 - 门禁：登录 → 未封禁 → 18+ → 已实名 → 未禁言 → 当日额度 `DAILY_LIMITS.answerPrompt = 1`；机审 `reject` → `40001`，不落库也不扣额度。
 - 行为：同一题每人一条，应用层先查后写（`collections.js:95` 已注明不能建含 `_openid` 的唯一索引）；机审 `review` → 落库 `status: 'pending'`；`pass` → `ok`。
-- 返回：`{ answer: { id, date, text, status, createdAt } }`。
+- 返回：`{ answer: { id, date, text, anon, status, createdAt } }`（不回传 `_openid`）。**顺序**：题目失效（`40401`）与重复作答（`40901`）的判断在 `guardWrite` 之前——每日额度只有 1 次，先扣额度会让重复提交的真实原因被 `42901` 盖掉。
 - 错误：`40001`；`40101`；`40302` 未实名；`40303`；`40304`；`40401` 题目不存在或已 `closed`；`40901`「今天已经作答过了」；`42901` 当日额度已用完。
 
 ### listAnswers
 
 - 入参：`{ promptId, page?, size? }`；`size` 默认 20、上限 `PROMPT_RULES.listMax = 50`。
 - 前置：调用方必须已作答该题，否则 `40301`「作答后即可查看他人的回答」，且**不返回任何答案内容**。
-- 返回：`{ promptId, list, page, size, hasMore }`；`list` 按 `createdAt` 升序，每项 `{ id, date, text, status, createdAt, mine }`；他人答案只含 `status: 'ok'`，本人自己的 `pending` 也返回。
-- 隐私：不下发 `_openid`、昵称、头像、徽章等任何作者标识（m6-plan D9，答案不署名）。
+- 返回：`{ promptId, date, page, size, hasMore, list, mine }`；`list` 按 `createdAt` 升序、只含他人 `status: 'ok'`，每项 `{ id, date, text, status, createdAt, authorName, anon, isSelf, deleted }`；本人那条在 `mine` 单独返回（可能是 `pending`）。
+- 隐私（D9）：默认匿名。`authorName` 匿名时取 `profiles.anonAlias`、实名时取 `nickname`，注销或已解除归属（`_openid` 为 `null` 或 `authorDeleted`）固定「已注销用户」；不下发 `_openid` / 头像 / 徽章 / 练习方式 / 年限 / 手机号。
 
 ### 同里程碑的其他接口
 

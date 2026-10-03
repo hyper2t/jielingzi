@@ -130,7 +130,7 @@
 
 ## M6 · 每日一题 / 慢话题 / 精华 / 通知（1.5 周）
 
-> **进度（2026-10-03）**：实施计划与接口契约草案见 [`docs/prd/m6-plan.md`](./m6-plan.md)（状态：未评审、未排期、未实现）。
+> **进度（2026-10-03）**：实施计划与接口契约见 [`docs/prd/m6-plan.md`](./m6-plan.md)。同日用户拍板两项：D9 答案**可选匿名、默认匿名**（覆盖计划原稿的「一律不署名」）、N1 通知**先只做站内**（订阅消息与模板 ID 后补）。已完成 BE-M6-00 + BE-M6-01（每日一题的 `todayPrompt` / `answerPrompt` / `listAnswers`，`PROMPT_RULES`、`prompt_answers` 分页索引、22 例单测 + 变异验证 5 处）：云函数 244/244、运维 32/32、Jest 38 suites / 526 tests、`tsc --noEmit` 0 错，**仅本地，未部署**（M4 签核与 M5 真机仍未闭环）。慢话题 / 精华 / 通知与全部 FE-M6-* 未开工。
 > 已预登记的部分：`daily_prompts`（`uniq_date`）、`prompt_answers`（`idx_prompt_owner`）、`notifications`（`idx_owner_read_time`）集合与索引已在云端齐全；
 > `DAILY_LIMITS.answerPrompt = 1` 已配置但暂无调用方，`_shared/notify.js` 有 `notify()` 而无人调用，`cloudbaserc.json` 尚无 `triggers`。
 > 门槛：M4 签核与 M5 真机验收先闭合；三项标 ★ 的产品决定（作答是否署名、订阅消息模板 ID、题目与提醒文案审阅）见 m6-plan §8。

@@ -59,6 +59,21 @@ const CIRCLE_RULES = Object.freeze({
   ruleMax: 60,
 })
 
+/**
+ * 每日一题（PRD W3，docs/prd/m6-plan.md D6–D10）：题目录入长度、答案字数、答案分页与匿名默认值。
+ * 前端同名常量见 src/constants/community.ts（一致性由 src/constants/__tests__/community.test.ts 校验，FE-M6-00 补齐）。
+ */
+const PROMPT_RULES = Object.freeze({
+  /** 题目正文字数上限（运营录入时校验，云函数只读不校验） */
+  textMax: 120,
+  /** 答案字数：太短的答案在列表里没有阅读价值 */
+  answer: { min: 5, max: 500 },
+  /** 答案列表单页上限 */
+  listMax: 50,
+  /** 默认匿名：作答未显式选择时按匿名处理（D9，用户可切实名） */
+  defaultAnon: true,
+})
+
 /** 练习方式预置列表（PRD P1；措辞规范见 docs/prd/wording.md）。id 入库，label 仅展示 */
 const PRACTICES = Object.freeze([
   { id: 'meditation', label: '冥想' },
@@ -120,4 +135,4 @@ function cnDate(now) {
   return new Date(now + 8 * 3600 * 1000).toISOString().slice(0, 10)
 }
 
-module.exports = { DAILY_LIMITS, TEXT_RULES, TOPIC_RULES, INVITE_RULES, CIRCLE_RULES, PRACTICES, PRACTICE_IDS, PROFILE_RULES, AVATAR_PRESETS, RESERVED_NICKNAME_WORDS, CONSENT_VERSION, REPORT_REASONS, REPORT_FOLD_THRESHOLD, PUNISH_DAYS, ROLES, cnDate }
+module.exports = { DAILY_LIMITS, TEXT_RULES, TOPIC_RULES, INVITE_RULES, CIRCLE_RULES, PROMPT_RULES, PRACTICES, PRACTICE_IDS, PROFILE_RULES, AVATAR_PRESETS, RESERVED_NICKNAME_WORDS, CONSENT_VERSION, REPORT_REASONS, REPORT_FOLD_THRESHOLD, PUNISH_DAYS, ROLES, cnDate }

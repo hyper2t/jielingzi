@@ -93,7 +93,9 @@ const COLLECTIONS = Object.freeze([
   { name: 'checkins', desc: '练习打卡（dayKey = 日期:练习方式；sessionIds 用于请求幂等）', owned: { key: 'dayKey', keep: 'sum', sumFields: ['minutes'] }, indexes: [{ name: 'uniq_owner_day', keys: [['_openid', 1], ['dayKey', 1]], unique: true }, { name: 'idx_owner_month_date', keys: [['_openid', 1], ['monthKey', 1], ['date', 1]] }] },
   { name: 'daily_prompts', desc: '每日一题', indexes: [{ name: 'uniq_date', keys: [['date', 1]], unique: true }] },
   // 每日一次在应用层判断（注销会解除归属，不能建含 _openid 的唯一索引）
-  { name: 'prompt_answers', desc: '每日一题作答', owned: { key: 'promptId', keep: 'primary', onDelete: 'detach' }, indexes: [{ name: 'idx_prompt_owner', keys: [['promptId', 1], ['_openid', 1]] }] },
+  { name: 'prompt_answers', desc: '每日一题作答', owned: { key: 'promptId', keep: 'primary', onDelete: 'detach' }, indexes: [{ name: 'idx_prompt_owner', keys: [['promptId', 1], ['_openid', 1]] },
+    // 列表按「题目 + 可见性 + 时间」分页（idx_prompt_list）；本人查自己的作答走 idx_prompt_owner
+    { name: 'idx_prompt_list', keys: [['promptId', 1], ['status', 1], ['createdAt', 1]] }] },
 
   // 用户上传图片的机审记录（BE-M2-02）；注销时记录删除，文件由 user.deleteAccount 一并删除
   {

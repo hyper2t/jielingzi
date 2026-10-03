@@ -1,7 +1,7 @@
 # M6 实施计划：每日一题 / 慢话题 / 精华 / 通知
 
 > 范围：PRD §5 T3 / T5 / W3 / N1（`docs/prd/README.md`）、§7.1 与 §7.4 线框中的「每日一题」卡片与「精华」入口。
-> 状态（2026-10-03）：**计划与接口契约草案，未评审、未排期、未实现**。接口草案写在 [`docs/api/practice.md`](../api/practice.md)「每日一题（M6 契约 · 草案）」。
+> 状态（2026-10-03）：**已评审并部分实现**——D9（署名形态）与 N1（通知范围）由用户当日拍板（见 D9、D17）；BE-M6-00 与 BE-M6-01（每日一题：今日题目 / 作答 / 答案列表）已在本地实现并全绿，**未部署**。慢话题、精华、通知与全部前端任务未开工。接口见 [`docs/api/practice.md`](../api/practice.md)「每日一题」。
 > 前置：M4 签核（[`docs/ops/release-checklist.md`](../ops/release-checklist.md) 第 7~8 步）与 M5 真机验收（[`docs/test/cases/M5.md`](../test/cases/M5.md)）先闭合；M6 不得先于它们部署到共享环境。
 > 下游：`docs/prd/join-plan.md` 的申请结果通知（V2-1）依赖本里程碑的 N1。
 
@@ -31,7 +31,7 @@
 | D6 | 「每人每题只能一条」**在应用层判断**：写前查 `prompt_answers` 是否已有本人该题答案，有则 40901「今天已经作答过了」 | 登记处已排除含 `_openid` 的唯一索引（注销 `detach` 会留记录）；配合 D5 的当日额度，正常路径唯一 |
 | D7 | 并发双写的后果可接受：同账号同日两条答案时，`listAnswers` 以 `createdAt` 最早的一条作为「我的作答」，多余一条由运维 `daily-prompt.mjs audit` 报出（不自动删） | 不引入事务（CloudBase `runTransaction` 在现有代码里没用过）；把偏差变成可观测数据比假装没有更稳 |
 | D8 | 答案走机审：`reject` → 40001 不落库不扣额度；`review` → 落库 `status = 'pending'`，本人可见「审核中」但不进他人列表；`pass` → `ok` | 与 `community/topics.js` 的 `screen()` 完全一致，前端与审核台无需新增状态机 |
-| ★ D9 | **答案不署名**：`listAnswers` 只返回内容 + 时间，不下发 `nickname` / `avatar` / 徽章，也不提供匿名开关 | 练习分享常涉及身心状态，与 M4 D10「最小必要」和 `wording.md` §1 的去身份化取向一致；若要署名，需产品明确并补隐私说明后再开 |
+| ★ D9 | **可选匿名，默认匿名**：`answerPrompt` 入参 `anon`（缺省即 `true`，显式传 `false` 才实名）；`listAnswers` 每项只给 `authorName` + `anon` / `deleted` / `isSelf`，匿名取 `profiles.anonAlias`、实名取 `nickname`、注销或已解除归属取「已注销用户」 | 用户 2026-10-03 决定（覆盖本计划原稿的「一律不署名」）：练习分享常涉及身心状态，默认匿名最稳，同时保留「我用真名交流」的可能。展示形态沿用社区 `presentAuthor` 的口径，但按最小必要不带头像 / 徽章 / 练习方式 / 年限（与 M4 D10 一致） |
 | D10 | 未作答调 `listAnswers` → 40301「作答后即可查看他人的回答」；题目不存在 / 已 `closed` → 40401 | PRD W3 的「作答后可见」要有可区分的失败语义，但不能泄露他人答案的任何内容 |
 | D11 | 慢话题 `slowUntil`（T3）：`createTopic` 增加 `slow` 布尔（前端映射为 24h 冷静期），`slowUntil = createdAt + 24h`；`slowUntil` 之前 `createReply` → 40901「这条话题还没开放回复」；已发布的回复不受影响 | PRD 只说「发起人设定开放回复前的冷静期（如 24h）」，取值 24h 固定，先不做自定义时长 |
 | D12 | 精华（T5）：`moderation.markFeatured` 仅 `mod` / `admin`，写 `mod_logs`（`kind: 'featured'`）+ 话题 `featured` 布尔；`listTopics` 增 `featured: true` 筛选；**精华不解除圈子成员校验**（圈内精华仍只给成员看） | D6（M4）的可见性规则优先于列表筛选，否则精华列表会变成越权读圈内内容的通道 |
@@ -39,6 +39,7 @@
 | D14 | 小程序订阅消息：只在用户**主动操作成功后**（作答成功、发帖成功）请求一次订阅授权，且 `subscribeMessage.send` 需配置了模板 ID 才调用；模板 ID 走 `envVariables`（`WX_MP_PROMPT_TEMPLATE_ID` 等），缺键时**跳过外发只留站内**，不抛错 | 避免「未配置即报错」把主流程带崩；部署时 `scripts/ops/function-env.mjs` 会核对环境变量，缺键即清空是已知坑 |
 | D15 | 每日一题提醒由定时触发器发：`cloudbaserc.json` 给 `practice` 加 `triggers: [{ type: 'timer', config: '0 0 8 * * * *' }]`（北京时间 08:00），当天没有 `ok` 题目就整批跳过；发送前按 `(uid, type='prompt', refId=promptId)` 去重，保证一题最多提醒一次 | 提醒是低频可延迟动作，用触发器省客户端轮询；去重防止重跑或部署重试造成刷屏 |
 | D16 | 未读数与列表：`listNotifications`（分页、按 `createdAt` 倒序）+ `markNotificationsRead`（把给定 id 或全部置 `read`）；`notifications` 集合 `owned: {}`，只有 `_openid` 本人可读写 | `collections.js:107` 的登记已经是这个形状，接口照它写 |
+| ★ D17 | **本轮范围**：只做每日一题（BE-M6-00 / 01）；通知 N1 **只做站内**——D13 的站内部分先落，D14 的小程序订阅消息与 `WX_MP_PROMPT_TEMPLATE_ID` 模板 ID 后补；慢话题 / 精华（BE-M6-02）与 FE-M6-* 未开工；本轮不部署任何云函数 | 用户 2026-10-03 决定。M4 签核与 M5 真机仍未闭环，云端环境不宜再加变量；站内消息是唯一保证送达的通道，先把数据面打通 |
 
 ## 3. 数据模型（增量）
 
@@ -72,7 +73,7 @@
 |---|---|---|
 | `todayPrompt` | 否 | 返回今日 `ok` 题目 + 我是否已作答 + `answerCount`；没有题目 → `{ prompt: null }`（不是错误） |
 | `answerPrompt` | 是 | 门禁见 D5；`{ promptId, text }` → `{ answer: { id, date, text, status, createdAt } }` |
-| `listAnswers` | 否 | `{ promptId, page, size }`；未作答 → 40301；只返回 `status = 'ok'` 的他人答案 + 我的（含 `pending`）；**不含任何身份字段**（D9） |
+| `listAnswers` | 否 | `{ promptId, page, size }`；本人未作答 → `40301` 且不返回任何答案内容；他人只返回 `status = 'ok'`，本人条目在 `mine` 单独返回（可为 `pending`）；每项含 `authorName` / `anon`（D9：默认匿名），不含 `_openid` / 头像 / 徽章 / 练习档案 |
 | `listNotifications` / `markNotificationsRead` | 否 / 是 | 站内消息列表 + 未读数；只按 `_openid` 过滤 |
 | `community.createTopic` | — | 增 `slow` 入参（D11），返回体带 `slowUntil` |
 | `community.createReply` | — | `slowUntil` 未到 → 40901 |
@@ -85,8 +86,8 @@
 
 | 编号 | 负责 | 任务 | 验收 | 估时 |
 |---|---|---|---|---|
-| BE-M6-00 | BE | 前置：`config.js` 加 `PROMPT_RULES`；`collections.js` 加 `prompt_answers.idx_owner_time`；`fakeDb` 若缺能力先补；`userHarness` 加 `seedPrompt` / `seedAnswer` | 现有云函数用例（222 例）不回归 | 0.5d |
-| BE-M6-01 | BE | `daily_prompts` 读取与 `todayPrompt` / `answerPrompt` / `listAnswers`；机审走 `screen()` 同约定 | 单测：无题目返回 null、未 18+ / 未实名 / 禁言 / 封禁各错误码、当日重复 40901、额度用尽 42901、reject 不落库不扣额度、review 落 pending、未作答读列表 40301、返回体无 `_openid` 且无昵称 | 1d |
+| ✅ BE-M6-00 | BE | 已完成（2026-10-03，本地）：`config.js` 加 `PROMPT_RULES`（`textMax 120`、`answer { min: 5, max: 500 }`、`listMax 50`、`defaultAnon true`）并导出；`collections.js` 的 `prompt_answers` 补分页索引 `idx_prompt_list`（`promptId + status + createdAt`）。`daily_prompts` / `prompt_answers`、`idx_prompt_owner` 与「每日一次在应用层判断（不能建含 `_openid` 的唯一索引）」原已在册，故未新增 `idx_owner_time`；`fakeDb`（已支持 `count` / `$ne` / `orderBy`）与 `userHarness` 无需改动 | 现有云函数用例不回归：244/244（含新增 22 例） | 0.5d ✔ |
+| ✅ BE-M6-01 | BE | 已完成（本地）：`practice/service.js` 新增 `todayPrompt` / `answerPrompt` / `listAnswers` 并注册进 `actions`；机审复用 `checkText`（scene `comment`）+ `logModeration`，`reject` → `40001` 不落库不扣额度、`review` → 落库 `status: 'pending'`；拦截文案与社区逐字一致。**顺序修正**：`answerPrompt` 的「题目失效 / 已作答」前置判断放在 `guardWrite` 之前（每日额度只有 1 次，先扣额度会让 `40901` 被 `42901` 盖掉），与 `community.redeemInvite` 同序 | 单测 22 例：无题目兜底、只认当日 `ok`、重复 `40901` 不扣额度、同日第二题 `42901`、`40401`、字数与参数校验、四类门禁码、reject / review、未作答 `40301` 零内容、他人 `ok` 过滤、匿名与实名展示、注销形态、分页 | 1d ✔ |
 | BE-M6-02 | BE | 慢话题 `slowUntil`（`createTopic` / `createReply`）与 `featured`（`moderation.markFeatured` + `listTopics` 筛选 + `mod_logs`） | 单测：冷静期内回复 40901、到期可回；非 mod 标记精华 40301；精华不解除成员校验；`featured` 列表只含 `ok` | 1d |
 | BE-M6-03 | BE | 通知：`reply` / `moderation` / `prompt` 落 `notifications`（`_shared/notify.js`）+ `listNotifications` / `markNotificationsRead`；`cloudbaserc.json` 加定时触发器；订阅消息按 D14（模板 ID 缺则跳过） | 单测：同 `(uid, type, refId)` 只一条、未读数与分页正确、触发器函数在无题目时不写任何记录、`envVariables` 缺键不抛错 | 1.5d |
 | OPS-M6-01 | OPS | `scripts/ops/daily-prompt.mjs`（`set` / `list` / `close` / `audit`）+ `daily-prompt.seed.json`；`ensure-indexes.mjs --apply` 建 1 个新索引 | 脚本单测：参数解析、预览不写、重复执行幂等、`audit` 报出同日多条与未作答统计 | 0.5d |
@@ -108,6 +109,8 @@
 - 前端：卡片状态机（未作答 / 已作答 / 审核中 / 无题目）、`pending` 与 `ok` 的展示差异、未作答时不请求 `listAnswers`、订阅授权只在主动操作后触发一次、失败静默。
 - 变异验证（M3 起的习惯）：去掉「已作答」前置查询、去掉 `slowUntil` 校验、去掉 `listAnswers` 的成员前置（改为不判作答）、去掉通知去重查询——每种都要让对应用例转红，探针后恢复。
 
+- **实现结果（2026-10-03，BE-M6-00 / 01）**：`tests/cloudfunctions/m6-prompt.test.js` 22 例全通过；变异验证 5 处（去掉「已作答」前置 / 默认匿名翻成默认实名 / reject 先扣额度 / 他人答案不按 `ok` 过滤 / 重复判断挪到扣额度之后）各使**恰好 1 例**转红，恢复后复绿。全量复跑：云函数 244/244、运维 32/32、Jest 38 suites / 526 tests / 31 snapshots、`npx tsc --noEmit` 0 错。
+
 ## 7. 上线与回滚
 
 1. 合并前逐项运行并记录：`yarn test:functions`、`yarn test:ops`、`yarn test --runInBand --silent`、`yarn typecheck`；新文件按仓库风格 `npx eslint`；三端结果记入 `docs/test/cases/M6.md`。
@@ -121,7 +124,7 @@
 
 | 风险 / 未决 | 处置 |
 |---|---|
-| ★「作答是否署名」未定（D9 取了不署名的保守值） | 需产品确认；若改为署名，要同步隐私政策说明与 `wording.md`，并补「他人可否反查练习者身份」的越权用例 |
+| ~~★「作答是否署名」未定~~ **已定**（2026-10-03：可选匿名、默认匿名，见 D9） | 若日后要展示更多身份信息（头像 / 徽章 / 练习年限），须同步隐私政策与 `wording.md`，并补「他人可否反查练习者身份」的越权用例 |
 | ★ 订阅消息模板 ID 未申请 | 阻塞 FE-M6-03 的真实送达验收（`QA-M6-01` 的「订阅消息实际送达」项在模板到位前记为受阻，不得标为通过） |
 | ★ 题目文案与提醒文案需法务 / 措辞审阅 | 走 `wording.md` §1 / §2 流程；未通过前不 `--apply` 写题 |
 | 并发双写导致同日多条答案（D7） | `daily-prompt.mjs audit` 观测；若内测真实出现，再评估把 `prompt_answers` 的注销语义从 `detach` 改成删除并补唯一索引 |
