@@ -124,4 +124,21 @@ describe('usePaged', () => {
     await flush()
     expect(holder.v.list.map((x: any) => x._id)).toEqual(['k2-1'])
   })
+
+  it('筛选变化时立即清空上一筛选的列表', async () => {
+    let key = 'circle-a'
+    const holder: any = {}
+    const fetch = () => Promise.resolve({ list: [{ _id: key }], hasMore: false })
+    function P () { holder.v = usePaged(key, fetch); return null }
+    let r: any
+    act(() => { r = create(<P />) })
+    await flush()
+    expect(holder.v.list.map((x: any) => x._id)).toEqual(['circle-a'])
+    key = 'circle-b'
+    act(() => r.update(<P />))
+    expect(holder.v.list).toEqual([])
+    expect(holder.v.loading).toBe(true)
+    await flush()
+    expect(holder.v.list.map((x: any) => x._id)).toEqual(['circle-b'])
+  })
 })

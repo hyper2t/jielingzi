@@ -112,6 +112,8 @@
 | 圈子 | G1 | 官方圈子 2~3 个（"静观练习""传统养生""正念生活"，待定），MVP 不开放用户建圈 | P0 |
 | | G2 | 邀请码入圈；圈内话题仅成员可见 | P0 |
 | | G3 | 邀请名额：初始 3 个，按活跃与贡献增发 | P1 |
+| | G4 | 圈子加入方式（joinMode）：邀请 / 申请 / 仅圈主邀请；官方圈默认邀请不变，v0.2 起大众圈可开申请 | P1（v0.2，见 [join-plan.md](./join-plan.md)） |
+| | G5 | 申请审核入圈：练习向结构化表单（不收集宗教 / 健康等敏感信息），审核通过后入圈；与邀请码并行 | P1（v0.2） |
 | 练习工具 | W1 | 冥想计时器（预设时长、开始/结束提示音） | P0 |
 | | W2 | 练习打卡 + 日历热力图（仅本人可见） | P0 |
 | | W3 | 每日一题：作答后可见他人回答 | P1 |
@@ -310,7 +312,7 @@
 
 **`reports`**：`targetType`(`topic`/`reply`/`user`)、`targetId`、`reporterUid`、`reason`、`note`、`state`(`open`/`resolved`)、`result`、`handledBy`、`handledAt`。唯一索引 `(targetId, reporterUid)`。
 
-**`checkins`**：`uid`、`date`(`YYYY-MM-DD`，用户本地时区)、`minutes`、`practice`、`note`。唯一索引 `(uid, date, practice)`。
+**`checkins`**：`_openid`、`dayKey`(`date:practice`)、`monthKey`(`YYYY-MM`)、`date`(`YYYY-MM-DD`，用户设备本地时区)、`practice`、累计 `minutes`、`sessionIds`（同一计时会话幂等）。唯一索引 `(_openid, dayKey)`；按月查询与日期排序索引 `(_openid, monthKey, date)`。所有返回仅含本人按日汇总。
 
 **`daily_prompts`**：`date`(唯一)、`question`。**`prompt_answers`**：`promptId`、`uid`、`anon`、`body`、`status`。唯一索引 `(promptId, uid)`。
 
@@ -355,8 +357,8 @@ users 1─n checkins ; daily_prompts 1─n prompt_answers
 | 版本 | 时间（自启动起） | 目标 | 主要内容 |
 |---|---|---|---|
 | **v0.1 MVP 内测** | 第 1–10 周 | 验证"深度交流"是否成立 | §5 全部 P0 + P1；50–100 人邀请内测；小程序体验版 + App TestFlight/安卓内测 |
-| **v0.2 公测** | 第 11–16 周 | 打磨与正式上线 | 根据内测反馈调整；小程序正式发布、App 上架；深色模式；搜索（话题标题/标签）；资深练习者标识 |
-| **v0.3 社交加深** | 第 17–24 周 | 人与人的连接 | **一对一私聊**（前提：同圈 ≥ 14 天 + 双方同意 + 留存 + 举报 + 引流拦截）；关注同好；用户自建圈子（圈主审核成员，限额） |
+| **v0.2 公测** | 第 11–16 周 | 打磨与正式上线 | 根据内测反馈调整；小程序正式发布、App 上架；深色模式；搜索（话题标题/标签）；大众圈申请入圈（joinMode）；资深练习者标识 |
+| **v0.3 社交加深** | 第 17–24 周 | 人与人的连接 | **一对一私聊**（前提：同圈 ≥ 14 天 + 双方同意 + 留存 + 举报 + 引流拦截）；关注同好；用户自建圈子（圈主审核成员，限额；joinMode 与圈主协议见 [join-plan.md](./join-plan.md)） |
 | **v0.4 共练** | 第 25–32 周 | 线上一起练习 | 语音共修房间（定时开始、引导音、实时音视频内容安全方案）；扩展工具（念诵计数、梦境记录、心情卡片） |
 | **v1.0** | 第 33 周后 | 可持续运营 | 会员（只用于高级工具与圈子扩容，不影响基础交流）；线下活动报名（与静修营等合作方，平台不收取活动费用）；同好匹配 |
 
@@ -382,3 +384,4 @@ users 1─n checkins ; daily_prompts 1─n prompt_answers
 - [ ] 官方圈子最终名称与圈子公约
 - [ ] 练习方式预置列表
 - [ ] 审核人力（谁值班复审、响应时效）
+- [ ] v0.2 申请审核的审核人 / SLA 与申请数据保留期（见 [join-plan.md](./join-plan.md)）

@@ -24,9 +24,10 @@ export default function TopicCard ({ topic, now, onClick, className, style }: To
     <View
       {...mergeTw(tw('flex flex-col p-4 mb-3 rounded-md bg-paper-light shadow-card'), { className, style })}
       onClick={onClick}
-      {...a11yButton(`话题：${topic.title}，${topic.replyCount} 条回复`)}
+      {...a11yButton(`话题：${topic.title}，${topic.replyCount} 条回复${topic.circle?.name ? `，${topic.circle.name}` : ''}`)}
     >
       <AuthorBadge author={topic.author} anon={topic.anon} size='sm' meta={formatPostTime(topic.createdAt, now)} />
+      {!!topic.circle?.name && <Text {...tw('self-start mt-3 px-2 rounded-full bg-brand-light font-body text-caption text-brand-dark')}>{topic.circle.name}</Text>}
       <Text {...tw('font-title font-bold text-subtitle text-ink mt-3')} numberOfLines={2}>{topic.title}</Text>
       {!!topic.excerpt && <Text {...tw('font-body text-body text-ink-soft mt-1')} numberOfLines={3}>{topic.excerpt}</Text>}
       {topic.tags.length > 0 && (

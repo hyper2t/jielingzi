@@ -10,10 +10,14 @@ export const ROUTES = {
   index: '/pages/index/index',
   practice: '/pages/practice/index',
   mine: '/pages/mine/index',
-  // pkg-community（M4 补齐：circle、joinCircle、invites…）
+  // pkg-community（M4：圈子与邀请码）
   topic: '/pkg-community/pages/topic/index',
   /** 发起话题（FE-M3-02） */
   topicNew: '/pkg-community/pages/topic-new/index',
+  circles: '/pkg-community/pages/circles/index',
+  circle: '/pkg-community/pages/circle/index',
+  joinCircle: '/pkg-community/pages/join-circle/index',
+  invites: '/pkg-community/pages/invites/index',
   // pkg-practice（M5/M6 补齐：timerDone、calendar、prompt…）
   timer: '/pkg-practice/pages/timer/index',
   // pkg-user
@@ -36,7 +40,11 @@ export interface RouteParams {
   practice: undefined
   mine: undefined
   topic: { id: string }
-  topicNew: undefined
+  topicNew: { circleId?: string }
+  circles: undefined
+  circle: { id: string }
+  joinCircle: { code?: string }
+  invites: { circleId?: string }
   timer: { minutes?: number }
   settings: undefined
   /** mode=gate：首次发布前的社区公约阅读（底部「我已阅读并遵守」，FE-M2-03） */
@@ -74,7 +82,11 @@ export function parseParams<K extends RouteName> (raw: Record<string, string | u
   return out as Partial<NonNullable<RouteParams[K]>>
 }
 
-type NavArgs<K extends RouteName> = RouteParams[K] extends undefined ? [] : [RouteParams[K]]
+type NavArgs<K extends RouteName> = RouteParams[K] extends undefined
+  ? []
+  : {} extends RouteParams[K]
+    ? [params?: RouteParams[K]]
+    : [params: RouteParams[K]]
 
 export function navigate<K extends RouteName> (name: K, ...args: NavArgs<K>) {
   if (TAB_ROUTES.includes(name)) return Taro.switchTab({ url: ROUTES[name] })

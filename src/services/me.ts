@@ -14,6 +14,7 @@ import { getItem, setItem, STORAGE_KEYS } from '@/utils/storage'
 import { getClient } from './client'
 import { FnInput, LoginInput, LoginResult } from './cloud.types'
 import { assertCanWrite } from './guard'
+import { syncPendingCheckins } from '@/features/practice/checkins'
 
 /** user.updateSettings：成功后把云端返回的完整设置写回本地 */
 export async function updateSettings (p: FnInput<'user', 'updateSettings'>) {
@@ -49,6 +50,14 @@ function applyStatus (res: unknown): AccountStatus | null {
   return status
 }
 
+/** 用户建立登录 / 同意 / 18+ 同步资格后，后台补传本机排队的私人练习。 */
+function syncPracticeQueue (): void {
+  void syncPendingCheckins().then(({ synced, error }) => {
+    if (error) console.warn('[me] 离线练习补传失败，稍后重试', error)
+    else if (synced) console.info(`[me] 已补传 ${synced} 条练习记录`)
+  }).catch(e => console.warn('[me] 离线练习补传失败，稍后重试', e))
+}
+
 /**
  * 登录会 upsert users 记录，属于云端写入，同意（且 App 端已登录）后才调用。
  * 服务端同时下发云端已保存的 users.settings：换手机 / 重装 / 清缓存后本地只剩默认值，这里把云端值合并回本地。
@@ -68,6 +77,8 @@ export async function login (extra: Pick<LoginInput, 'linkToken'> = {}): Promise
     if (res.merged) invalidate()
   }
   if (res.settings) useSettingsStore.getState().applyRemote(res.settings)
+  // 不阻塞登录流程；失败时队列会保留并在练习页 / 下次登录重试。
+  syncPracticeQueue()
   return res
 }
 
@@ -93,10 +104,12 @@ export async function consent () {
     const now = Date.now()
     setItem(STORAGE_KEYS.consentAt, now)
     useUserStore.getState().setConsent('agreed')
+    syncPracticeQueue()
     return { guardianConsentAt: now }
   }
   const res = await getClient().fn.call('user', 'consent')
   useUserStore.getState().setConsent('agreed')
+  syncPracticeQueue()
   return res
 }
 
@@ -110,12 +123,16 @@ export async function confirmAdult (): Promise<void> {
   if (HAS_LOGIN) {
     setItem(STORAGE_KEYS.adultAt, Date.now())
     s.setAdult('confirmed')
-    if (!canSync()) return
+    if (!canSync()) {
+      syncPracticeQueue()
+      return
+    }
   }
   assertCanWrite()
   const res = await getClient().fn.call('user', 'confirmAdult', { consentVersion: CONSENT_VERSION })
   applyStatus(res)
   s.setAdult('confirmed')
+  syncPracticeQueue()
 }
 
 /** 用户选择「退出」：只能浏览公开内容，可随时重新确认（拒绝路径可回退） */

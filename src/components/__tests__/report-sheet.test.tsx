@@ -22,6 +22,7 @@ beforeEach(() => {
 
 it('未选原因提示；选原因 + 补充说明提交 → moderation.report；成功提示并关闭；重复举报提示已举报', async () => {
   mockControl.setAccount({ adult: true })
+  mockControl.seedTopics([{ title: '举报用话题', body: '这是一条供举报测试使用的圈内话题内容。' }])
   const onClose = jest.fn()
   const onDone = jest.fn()
   const r = render(<ReportSheet open target={{ targetType: 'topic', targetId: 't1' }} onClose={onClose} onDone={onDone} />)

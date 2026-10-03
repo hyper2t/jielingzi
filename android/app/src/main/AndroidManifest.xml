@@ -51,7 +51,7 @@
       </activity>
       <!--
         微信 Open SDK 回调入口（NA-L01）：类名必须是 <applicationId>.wxapi.WXEntryActivity，
-        对应 src/main/java/cn/jielingzi/app/wxapi/WXEntryActivity.java（build.gradle 校验两者一致）。
+        对应 src/main/java/com/jielingzi/app/wxapi/WXEntryActivity.java（build.gradle 校验两者一致）。
         singleTask + 与主 Activity 相同的 taskAffinity（默认即 applicationId）保证授权后回到本 App 的任务栈；透明主题避免闪一下白屏。
       -->
       <activity

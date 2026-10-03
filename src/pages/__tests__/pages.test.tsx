@@ -6,6 +6,8 @@ import { mockControl } from '@/services/mock/client'
 import { invalidate } from '@/hooks/requestCache'
 import { useUserStore } from '@/store/user'
 
+jest.mock('@/utils/practice-cue', () => ({ playPracticeCue: jest.fn() }))
+
 const flush = () => act(async () => { await new Promise(r => setTimeout(r, 0)) })
 
 const mounted: ReactTestRenderer[] = []
@@ -67,16 +69,16 @@ describe('我的', () => {
   })
 })
 
-describe('M0 新页面（空壳）', () => {
-  it('练习 Tab：渲染占位并弹同意；话题详情未同意时引导、计时器占位，都不发请求', async () => {
-    const { default: Practice, PRACTICE_PLACEHOLDER } = await import('@/pages/practice/index')
+describe('M5 练习', () => {
+  it('练习 Tab 显示计时入口与本人热力图；计时页显示时长预设；未同意时不发请求', async () => {
+    const { default: Practice } = await import('@/pages/practice/index')
     const { default: Topic } = await import('@/pkg-community/pages/topic/index')
-    const { default: Timer, TIMER_PLACEHOLDER } = await import('@/pkg-practice/pages/timer/index')
+    const { default: Timer } = await import('@/pkg-practice/pages/timer/index')
     const r = render(<Practice />)
     await flush()
-    expect(texts(r)).toEqual(expect.arrayContaining(['练习', PRACTICE_PLACEHOLDER, '请阅读并同意']))
+    expect(texts(r)).toEqual(expect.arrayContaining(['练习', '设定练习时间', '练习日历', '仅你本人可见', '请阅读并同意']))
     expect(texts(render(<Topic />))).toEqual(expect.arrayContaining(['同意协议后可查看话题']))
-    expect(texts(render(<Timer />))).toEqual(expect.arrayContaining([TIMER_PLACEHOLDER]))
+    expect(texts(render(<Timer />))).toEqual(expect.arrayContaining(['把注意力带回此刻', '5 分钟', '10 分钟', '20 分钟', '30 分钟']))
     expect(mockControl.calls).toHaveLength(0)
   })
 

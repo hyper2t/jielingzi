@@ -11,7 +11,7 @@
  * - iOS（NA-L03）：微信 SDK 2.x 必须带 Universal Link 注册，所以 iOS 要求 TARO_APP_WX_UNIVERSAL_LINK 也已配置才算可用；
  *   回跳由 ios/taroDemo/AppDelegate.mm 处理（URL Scheme 经 RCTLinkingManager → 本库；Universal Link 手动转发给 WXApi）。
  *
- * 原生侧：Android（NA-L01）android/app/src/main/java/cn/jielingzi/app/wxapi/WXEntryActivity.java + Manifest <queries>；
+ * 原生侧：Android（NA-L01）android/app/src/main/java/com/jielingzi/app/wxapi/WXEntryActivity.java + Manifest <queries>；
  * iOS（NA-L03）Podfile 的 WechatOpenSDK-XCFramework、Info.plist URL Scheme / LSApplicationQueriesSchemes、entitlements applinks、
  * 官网 .well-known/apple-app-site-association（scripts/rn/ios-native-check.mjs 校验与 .env 一致）；
  * 依赖清单见 docs/ops/app-sdk-list.md §2。

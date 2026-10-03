@@ -56,6 +56,18 @@ const memberOf = (db, circleId, id) => db.store.memberships.find((m) => m.circle
 function failing(db, collection, method, makeError) {
   return { ...db, collection: (name) => { const q = db.collection(name); return name === collection ? { ...q, [method]: async () => { throw makeError() } } : q } }
 }
+/** 让 where(...).update 抛错，用于证明前置拒绝分支不会尝试核销邀请码 */
+function failingWhereUpdate(db, collection, makeError) {
+  return {
+    ...db,
+    collection: (name) => {
+      const q = db.collection(name)
+      return name === collection
+        ? { ...q, where: (...args) => ({ ...q.where(...args), update: async () => { throw makeError() } }) }
+        : q
+    },
+  }
+}
 function assertNoLeak(data) {
   const s = JSON.stringify(data)
   for (const f of ['_openid', '_id', 'usedBy', 'refunded', 'official', 'invitedBy']) assert.ok(!s.includes(`"${f}"`), `返回体含内部字段 ${f}`)
@@ -281,7 +293,7 @@ test('redeemInvite：不存在 / 已用 / 已过期 / 圈子已关闭统一 4040
 
 test('redeemInvite：已是成员 40901，且不消耗邀请码', async () => {
   const db = world({ invites: [inviteDoc('FB0B0001', MINDFUL._id, ID.alice, { now: NOW })] })
-  const r = await redeem(db, ID.bob, 'FB0B0001')
+  const r = await redeem(failingWhereUpdate(db, 'invites', () => new Error('已是成员时不应核销邀请码')), ID.bob, 'FB0B0001')
   assert.equal(r.code, 40901)
   assert.equal(r.msg, '你已在这个圈子里')
   assert.equal(invite(db, 'FB0B0001').usedBy, null)

@@ -22,6 +22,7 @@ module.exports = {
     '^@tarojs/taro$': '<rootDir>/test/mocks/taro.ts',
     '\\.(png|jpe?g|gif|svg)$': '<rootDir>/test/mocks/file.js',
     '\\.(css|scss)$': '<rootDir>/test/mocks/style.js',
+    '\\.(wav)$': '<rootDir>/test/mocks/file.js',
     '^@/(.*)$': '<rootDir>/src/$1'
   },
   setupFiles: ['<rootDir>/test/setup.js']

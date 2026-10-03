@@ -1,0 +1,152 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`圈子页面（FE-M4-01） 圈子目录区分已加入与其他开放圈子；卡片可进详情或输入邀请码；有单页快照 1`] = `
+<View
+  className="flex flex-col flex-1 min-h-screen bg-paper jl-safe-bottom"
+>
+  <View
+    className="bg-paper"
+    style={
+      {
+        "paddingTop": 20,
+      }
+    }
+  >
+    <View
+      className="flex flex-row items-center px-2"
+      style={
+        {
+          "height": 40,
+          "paddingRight": 94,
+        }
+      }
+    >
+      <Text
+        className="flex-1 font-title font-bold text-subtitle text-ink ml-3"
+        numberOfLines={1}
+      >
+        圈子
+      </Text>
+    </View>
+  </View>
+  <View
+    className="flex flex-col flex-1"
+  >
+    <View
+      className="flex flex-col px-page pt-4"
+    >
+      <Text
+        className="font-title font-bold text-title text-ink mb-3"
+      >
+        我的圈子
+      </Text>
+      <View
+        className="flex flex-col p-4 mb-3 rounded-md bg-paper-light"
+      >
+        <View
+          accessibilityLabel="查看圈子：静观练习"
+          accessibilityRole="button"
+          ariaLabel="查看圈子：静观练习"
+          ariaRole="button"
+          className="flex flex-col"
+          onClick={[Function]}
+        >
+          <View
+            className="flex flex-row items-center justify-between"
+          >
+            <Text
+              className="font-title font-bold text-subtitle text-ink"
+            >
+              静观练习
+            </Text>
+            <Text
+              className="font-body text-caption text-brand-dark"
+            >
+              已加入
+            </Text>
+          </View>
+          <Text
+            className="font-body text-body text-ink-soft mt-2"
+            numberOfLines={3}
+          >
+            练习分享
+          </Text>
+          <Text
+            className="font-body text-caption text-ink-faint mt-2"
+          >
+            0 位成员 · 0 个话题
+          </Text>
+        </View>
+      </View>
+      <Text
+        className="font-title font-bold text-title text-ink mt-4 mb-3"
+      >
+        其他官方圈子
+      </Text>
+      <View
+        className="flex flex-col p-4 mb-3 rounded-md bg-paper-light"
+      >
+        <View
+          accessibilityLabel="查看圈子：传统养生"
+          accessibilityRole="button"
+          ariaLabel="查看圈子：传统养生"
+          ariaRole="button"
+          className="flex flex-col"
+          onClick={[Function]}
+        >
+          <View
+            className="flex flex-row items-center justify-between"
+          >
+            <Text
+              className="font-title font-bold text-subtitle text-ink"
+            >
+              传统养生
+            </Text>
+          </View>
+          <Text
+            className="font-body text-body text-ink-soft mt-2"
+            numberOfLines={3}
+          >
+            日常养生
+          </Text>
+          <Text
+            className="font-body text-caption text-ink-faint mt-2"
+          >
+            0 位成员 · 0 个话题
+          </Text>
+        </View>
+        <View
+          accessibilityLabel="输入邀请码"
+          accessibilityRole="button"
+          ariaLabel="输入邀请码"
+          ariaRole="button"
+          className="flex flex-row items-center justify-center rounded-full bg-paper-light border-2 border-solid border-ink min-h-touch px-5 self-start self-start mt-3"
+          hoverClass="bg-paper-dark"
+          onClick={[Function]}
+        >
+          <Text
+            className="font-body font-bold text-kid-button text-ink"
+          >
+            输入邀请码
+          </Text>
+        </View>
+      </View>
+      <View
+        accessibilityLabel="输入邀请码"
+        accessibilityRole="button"
+        ariaLabel="输入邀请码"
+        ariaRole="button"
+        className="flex flex-row items-center justify-center rounded-full bg-paper-light border-2 border-solid border-ink min-h-touch px-5 self-start self-start mt-2 mb-6"
+        hoverClass="bg-paper-dark"
+        onClick={[Function]}
+      >
+        <Text
+          className="font-body font-bold text-kid-button text-ink"
+        >
+          输入邀请码
+        </Text>
+      </View>
+    </View>
+  </View>
+</View>
+`;

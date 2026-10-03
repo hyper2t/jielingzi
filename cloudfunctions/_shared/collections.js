@@ -90,7 +90,7 @@ const COLLECTIONS = Object.freeze([
   },
 
   // 练习工具
-  { name: 'checkins', desc: '练习打卡（dayKey = 日期:练习方式）', owned: { key: 'dayKey', keep: 'sum', sumFields: ['minutes'] }, indexes: [{ name: 'uniq_owner_day', keys: [['_openid', 1], ['dayKey', 1]], unique: true }] },
+  { name: 'checkins', desc: '练习打卡（dayKey = 日期:练习方式；sessionIds 用于请求幂等）', owned: { key: 'dayKey', keep: 'sum', sumFields: ['minutes'] }, indexes: [{ name: 'uniq_owner_day', keys: [['_openid', 1], ['dayKey', 1]], unique: true }, { name: 'idx_owner_month_date', keys: [['_openid', 1], ['monthKey', 1], ['date', 1]] }] },
   { name: 'daily_prompts', desc: '每日一题', indexes: [{ name: 'uniq_date', keys: [['date', 1]], unique: true }] },
   // 每日一次在应用层判断（注销会解除归属，不能建含 _openid 的唯一索引）
   { name: 'prompt_answers', desc: '每日一题作答', owned: { key: 'promptId', keep: 'primary', onDelete: 'detach' }, indexes: [{ name: 'idx_prompt_owner', keys: [['promptId', 1], ['_openid', 1]] }] },

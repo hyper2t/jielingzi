@@ -25,15 +25,17 @@
 ## M4 上线（官方圈子 + 邀请码）
 
 > 顺序很重要：**先让第一批成员入圈，再发客户端**——部署新的 `community` 后，没有圈子成员的人读不到任何话题（旧话题不可见，见 `docs/prd/m4-plan.md` D11）。以下命令都在仓库根目录执行；云端写入类命令默认只预览，确认输出后再加 `--apply`。
+>
+> **当前状态（2026-10-02）**：当前共享 CloudBase 已创建 3 个 M4 索引、写入 `mindful` / `tradition` / `lifestyle` 三个开放圈子，`community` / `moderation` 已部署且 `ping` 通过；全量 26 个索引存在、无冲突，圈子成员 / 话题计数均为 0。用户确认 `docs/prd/wording.md` §5 法务审阅已通过。首批成员与邀请码尚未配置，三端手工验收及客户端发布尚未完成；本状态不构成 M4 上线签核。按 [`docs/test/cases/M4.md`](../test/cases/M4.md) 记录手工结果。
 
-1. 本地验证：`npm run test:functions`、`npm run test:ops`、`npx jest --silent`、`npx tsc --noEmit` 全绿。
-2. 建索引：`node scripts/ops/ensure-indexes.mjs --apply`（M4 新增 3 个：`circles.uniq_slug`、`memberships.idx_member`、`invites.idx_owner_time`）。
-3. 只读审计：`node scripts/ops/circles.mjs audit`。旧话题 / 旧回复大于 0 时，先决定归到哪个圈子，`seed` 之后再 `migrate-topics --to <slug> --apply`；为 0（目前云端即是）则无需迁移。
-4. 圈子种子：`node scripts/ops/circles.mjs seed` 预览 → `--apply`。名称 / 简介 / 公约改 `scripts/ops/circles.seed.json`，可重复执行。
-5. 部署 `community` 与 `moderation`（`sync-shared` → 隔离登录 → `function-env.mjs` 核对环境变量 → `tcb fn deploy`，做法见上文「部署」）；`user` 不用动。部署后 `invoke-fn.mjs community '{"action":"ping"}'` 冒烟。
-6. 第一批成员：`node scripts/ops/circles.mjs grant --circle mindful --phone <号> --apply`（自己和种子用户；`--latest` 取最近活跃账号）；再签发官方邀请码：`node scripts/ops/circles.mjs issue --circle mindful --count 5 --apply`，**清单只在终端显示一次**，立刻转交。
-7. 复核：`circles.mjs audit`（计数无偏差）；用刚入圈的账号在小程序 / App 走一遍：看圈子 → 发话题 → 签发邀请码 → 另一账号兑换。
-8. 发客户端（小程序提审、App 打包）。
+1. ✅ 2026-10-02 本地验证：`yarn test:functions`、`yarn test:ops`、`yarn test --runInBand --silent`、`yarn typecheck` 全绿（217 个云函数测试、32 个运维测试、35 个 Jest suites / 510 tests / 31 snapshots）；代码变更后、上线前仍须重跑。
+2. ✅ 2026-10-02 建索引：`node scripts/ops/ensure-indexes.mjs --apply` 已创建 3 个 M4 索引（`circles.uniq_slug`、`memberships.idx_member`、`invites.idx_owner_time`）；复核 26 个索引齐全、0 冲突。
+3. ✅ 2026-10-02 只读审计：部署前后旧话题 / 旧回复均为 0；种子写入后 3 圈成员 / 话题计数均为 0 且一致，无名额异常、无邀请码。首批成员加入及客户端发布前仍须重跑 `audit`；若旧话题 / 回复大于 0，先决定迁移目标。
+4. ✅ 2026-10-02 圈子种子：用户确认 `wording.md` §5 法务审阅通过并确认其与 `scripts/ops/circles.seed.json` 一致后，执行 `seed --apply`，创建 3 个开放圈子。以后若改名称 / 简介 / 公约，须更新两处并重跑措辞测试；不可用真实用户数据造测试种子。
+5. ✅ 2026-10-02 部署 `community` 与 `moderation`：执行 `sync-shared`、隔离登录并核对函数环境变量后部署；两函数均 Active，`invoke-fn.mjs` 的 `ping` 均通过；`user` 未变更。
+6. ☐ 首批成员与官方邀请码待办：须先收到明确的圈子、QA / 首批账号名单及邀请码数量，再执行 `grant` / `issue`；不以 `--latest` 代替明确名单。官方码清单只在终端显示一次，须按确认对象安全转交。当前 CloudBase 尚无成员和邀请码。
+7. ☐ 手工复核待办：M4-D01 的非成员浏览开放圈子列表 / 简介 / 公约可由获批的 18+ QA 非成员独立执行，不依赖 grant / issue；其余依赖成员、邀请码或圈内测试内容的用例按 `docs/test/cases/M4.md` 逐项准备 QA 账号与数据。小程序、iOS、Android 结果均须留证；不得把未执行的独立用例一并标为受阻，也不得据此签 M4 上线。
+8. ☐ 发客户端（小程序提审、App 打包）；须待三端 QA 通过并签核后执行。
 
 名额增发（手动）：`node scripts/ops/invite-quota.mjs --report` 看本月有效回复榜，再 `--account <id> --add N --apply`。
 

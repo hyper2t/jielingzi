@@ -71,8 +71,11 @@ export default function Topic () {
   const ready = !!id && !gate && !needAdult
 
   const topicReq = useRequest(ready ? topicKey(id) : null, () => getTopic(id))
-  const replies = usePaged<ReplyItem>(`replies:${id}:${ready ? 1 : 0}`, page => listReplies(id, page))
   const topic = topicReq.data
+  const repliesReady = ready && !!topic
+  const replies = usePaged<ReplyItem>(`replies:${id}:${repliesReady ? 1 : 0}`, page =>
+    repliesReady ? listReplies(id, page) : Promise.resolve({ list: [], total: 0, hasMore: false })
+  )
 
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null)
@@ -145,6 +148,7 @@ export default function Topic () {
 
   const rows = foldShortReplies(replies.list, expanded)
   const canReply = !!topic && !topic.pending && !topic.folded
+  const topicCircle = topic?.circle
 
   const composer = status === 'ready' && canReply
     ? (
@@ -203,6 +207,15 @@ export default function Topic () {
           {topic.pending && <Text {...tw('font-body text-caption text-ink-soft px-3 py-2 mb-3 rounded-sm bg-highlight')}>{PENDING_NOTE}</Text>}
           <Text {...tw('font-title font-bold text-title text-ink')}>{topic.title}</Text>
           <AuthorBadge author={topic.author} anon={topic.anon} meta={formatPostTime(topic.createdAt)} {...tw('mt-3')} />
+          {!!topicCircle?.name && (
+            <View
+              onClick={() => { void navigate('circle', { id: topicCircle.id }) }}
+              {...a11yButton(`圈子：${topicCircle.name}`)}
+              {...tw('self-start mt-3 px-3 min-h-touch rounded-full bg-brand-light')}
+            >
+              <Text {...tw('font-body text-caption text-brand-dark')}>{topicCircle.name}</Text>
+            </View>
+          )}
           {topic.folded
             ? <Text {...tw('font-body text-body text-ink-faint mt-4')}>{FOLDED_NOTE}</Text>
             : <Text {...tw('font-body text-body text-ink mt-4')} selectable>{topic.body || ''}</Text>}

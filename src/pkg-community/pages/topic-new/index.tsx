@@ -5,24 +5,26 @@
  * - 匿名：别人只看到「匿名·代号」，不显示头像与档案（预览见顶部「别人看到的你」）
  * - 机审：拒绝 → 提示修改（不占当日额度）；待复核 → 进入详情，顶部标明「审核中」
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { View, Text, Input, Textarea } from '@tarojs/components'
-import { AuthorBadge, Button, ConsentSheet, PhoneSheet, Screen, showToast, Toggle } from '@/components'
+import { AuthorBadge, Button, ConsentSheet, PhoneSheet, Screen, Sheet, showToast, Toggle } from '@/components'
 import { TEXT_RULES, TOPIC_RULES } from '@/constants/community'
-import { requirePhone } from '@/features/auth/gates'
+import { ensureAdult, requirePhone } from '@/features/auth/gates'
+import CircleJoinGuide from '@/features/circle/CircleJoinGuide'
 import { loginGate, goLogin } from '@/features/auth/require-login'
 import { normalizeLine, textLength } from '@/features/profile/rules'
 import {
   bodyCounter, clearDraft, EMPTY_TOPIC_FORM, isEmptyForm, loadDraft, parseTags, publishError, saveDraft, toTopicInput, TopicErrors, TopicField, TopicForm, validateTopicForm
 } from '@/features/topic/rules'
-import { createTopic, getProfile, PROFILE_KEY } from '@/services/community'
-import { needsAdultConfirm } from '@/services/errors'
+import { CIRCLES_KEY, createTopic, getProfile, listCircles, PROFILE_KEY } from '@/services/community'
+import { errorMessage, needsAdultConfirm } from '@/services/errors'
 import { useRequest } from '@/hooks/useRequest'
 import { useTrackPage } from '@/hooks/useTrackPage'
 import { HAS_LOGIN, useUserStore } from '@/store/user'
 import { track } from '@/utils/track'
-import { navigate, redirect } from '@/utils/router'
+import { navigate, parseParams, redirect } from '@/utils/router'
 import { tw } from '@/utils/tw'
 import { a11yButton } from '@/utils/a11y'
 
@@ -34,6 +36,8 @@ export const DRAFT_RESTORED = '已恢复上次未发布的草稿'
 export const DRAFT_CLEAR = '清除草稿'
 export const ANON_LABEL = '匿名发布'
 export const ANON_HINT = '别人只看到匿名代号，不显示头像和档案；你仍可删除自己的话题'
+export const NEED_ADULT_TOPIC_TEXT = '确认年满 18 周岁后可发起话题'
+export const CIRCLE_REQUIRED_TEXT = '请选择发布到的圈子'
 
 function Field ({ label, hint, error, children }: { label: string, hint?: string, error?: string, children: ReactNode }) {
   return (
@@ -52,49 +56,81 @@ const inputLabel = (label: string) => ({ ariaLabel: label, accessibilityLabel: l
 
 export default function TopicNew () {
   useTrackPage('topic_new')
+  const initialCircleId = parseParams<'topicNew'>(Taro.getCurrentInstance().router?.params).circleId
   const consent = useUserStore(s => s.consent)
   const auth = useUserStore(s => s.auth)
+  const adult = useUserStore(s => s.adult)
+  const account = useUserStore(s => s.account)
   const gate = loginGate(consent, !HAS_LOGIN || auth.signedIn)
-  const ready = !gate
-  const profile = useRequest(ready ? PROFILE_KEY : null, getProfile)
+  const adultOk = adult === 'confirmed' || account?.adult === true
+  const ready = !gate && adultOk
+  const circlesReq = useRequest(ready ? CIRCLES_KEY : null, listCircles)
+  const circles = circlesReq.data || []
+  const joinedCircles = circles.filter(circle => circle.joined)
+  const profile = useRequest(ready && !!circlesReq.data && joinedCircles.length > 0 ? PROFILE_KEY : null, getProfile)
 
-  const [form, setForm] = useState<TopicForm>(EMPTY_TOPIC_FORM)
+  const [form, setForm] = useState<TopicForm>(() => ({ ...EMPTY_TOPIC_FORM, circleId: initialCircleId }))
   const [restored, setRestored] = useState(false)
   const [errors, setErrors] = useState<TopicErrors>({})
   const [formError, setFormError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [circleSheetOpen, setCircleSheetOpen] = useState(false)
+  const shown = useRef(false)
+
+  useDidShow(() => {
+    if (shown.current && ready) void circlesReq.refresh()
+    shown.current = true
+  })
 
   // 进入时恢复草稿（只恢复一次，用户开始输入前）
   useEffect(() => {
     const d = loadDraft()
-    if (d) { setForm({ title: d.title, body: d.body, tags: d.tags, anon: d.anon }); setRestored(true) }
+    if (d) { setForm({ circleId: d.circleId || initialCircleId, title: d.title, body: d.body, tags: d.tags, anon: d.anon }); setRestored(true) }
   }, [])
+
+  useEffect(() => {
+    if (!circlesReq.data) return
+    setForm(prev => {
+      const preferred = prev.circleId || initialCircleId
+      const chosen = joinedCircles.length === 1
+        ? joinedCircles[0].id
+        : joinedCircles.find(circle => circle.id === preferred)?.id || joinedCircles[0]?.id
+      if (chosen === prev.circleId) return prev
+      const next = { ...prev, circleId: chosen }
+      saveDraft(next)
+      return next
+    })
+  }, [circlesReq.data])
 
   const set = <K extends keyof TopicForm>(key: K, value: TopicForm[K]) => {
     const next = { ...form, [key]: value }
     setForm(next)
     saveDraft(next)
-    if (key !== 'anon') setErrors(e => ({ ...e, [key as TopicField]: undefined }))
+    if (key !== 'anon' && key !== 'circleId') setErrors(e => ({ ...e, [key as TopicField]: undefined }))
     setFormError('')
   }
 
   const discardDraft = () => {
     clearDraft()
-    setForm(EMPTY_TOPIC_FORM)
+    const preferred = joinedCircles.find(circle => circle.id === initialCircleId)?.id || joinedCircles[0]?.id
+    setForm({ ...EMPTY_TOPIC_FORM, circleId: preferred })
     setErrors({})
     setRestored(false)
   }
 
   const onSubmit = async () => {
     if (busy) return
-    const errs = validateTopicForm(form)
+    const selectedCircle = joinedCircles.find(circle => circle.id === form.circleId) || joinedCircles[0]
+    if (!selectedCircle) { setFormError(CIRCLE_REQUIRED_TEXT); return }
+    const submitForm = { ...form, circleId: selectedCircle.id }
+    const errs = validateTopicForm(submitForm)
     setErrors(errs)
     if (Object.keys(errs).length) return
     if (!requirePhone({ reason: NEW_TOPIC_TITLE })) return
     setBusy(true)
     setFormError('')
     try {
-      const r = await createTopic(toTopicInput(form))
+      const r = await createTopic(toTopicInput(submitForm))
       clearDraft()
       track('topic_create', { anon: form.anon, status: r.status })
       showToast(r.status === 'pending' ? PENDING_TEXT : PUBLISHED_TEXT)
@@ -111,15 +147,36 @@ export default function TopicNew () {
   const nickname = (profile.data?.nickname || '').trim() || alias
   const body = bodyCounter(form.body)
   const tags = parseTags(form.tags)
+  const currentCircle = joinedCircles.find(circle => circle.id === form.circleId) || joinedCircles[0]
 
   return (
     <Screen
       nav={{ title: NEW_TOPIC_TITLE, showBack: true }}
-      status={ready ? 'ready' : 'empty'}
-      emptyText={gate === 'login' ? '登录后可发起话题' : '同意协议后可发起话题'}
-      emptyActionText={gate === 'login' ? '去登录' : '去同意'}
-      onEmptyAction={() => (gate === 'login' ? goLogin({ reason: NEW_TOPIC_TITLE }) : useUserStore.getState().openConsentSheet())}
-      overlay={<><ConsentSheet /><PhoneSheet /></>}
+      status={!ready || (ready && needsAdultConfirm(circlesReq.error)) ? 'empty' : circlesReq.loading && !circlesReq.data ? 'loading' : circlesReq.error && !circlesReq.data ? 'error' : 'ready'}
+      emptyText={gate === 'login' ? '登录后可发起话题' : gate ? '同意协议后可发起话题' : NEED_ADULT_TOPIC_TEXT}
+      emptyActionText={gate ? (gate === 'login' ? '去登录' : '去同意') : '去确认'}
+      onEmptyAction={() => {
+        if (gate === 'login') goLogin({ reason: NEW_TOPIC_TITLE })
+        else if (gate) useUserStore.getState().openConsentSheet()
+        else if (needsAdultConfirm(circlesReq.error)) void navigate('adult', { reason: NEW_TOPIC_TITLE })
+        else ensureAdult({ reason: NEW_TOPIC_TITLE })
+      }}
+      errorText={errorMessage(circlesReq.error)}
+      onRetry={() => { void circlesReq.refresh() }}
+      overlay={
+        <>
+          <ConsentSheet />
+          <PhoneSheet />
+          <Sheet
+            open={circleSheetOpen}
+            title='选择话题所属圈子'
+            options={joinedCircles.map(circle => ({ value: circle.id, label: circle.name }))}
+            value={currentCircle?.id}
+            onSelect={circleId => set('circleId', circleId)}
+            onClose={() => setCircleSheetOpen(false)}
+          />
+        </>
+      }
     >
       <View {...tw('flex flex-col px-page pt-4 pb-section')}>
         {restored && !isEmptyForm(form) && (
@@ -130,6 +187,22 @@ export default function TopicNew () {
             </View>
           </View>
         )}
+
+        {joinedCircles.length === 0
+          ? <CircleJoinGuide circles={circles} />
+          : <>
+            {joinedCircles.length === 1
+              ? <Field label='发布到'><Text {...tw('font-body text-body text-ink px-4 py-3 rounded-md bg-paper-light')}>{joinedCircles[0].name}</Text></Field>
+              : <Field label='发布到' hint='选择话题所属圈子'>
+                <View
+                  onClick={() => setCircleSheetOpen(true)}
+                  {...a11yButton(`发布到：${currentCircle?.name || '请选择'}`)}
+                  {...tw('flex flex-row items-center justify-between min-h-touch-kid px-4 rounded-md bg-paper-light')}
+                >
+                  <Text {...tw('font-body text-body text-ink')}>{currentCircle?.name || '请选择'}</Text>
+                  <Text {...tw('font-body text-caption text-brand-dark')}>更改</Text>
+                </View>
+              </Field>}
 
         <Field label='标题' hint={`${textLength(normalizeLine(form.title))}/${TEXT_RULES.topicTitle.max}`} error={errors.title}>
           <View {...tw('flex flex-row items-center min-h-touch-kid px-4 rounded-md bg-paper-light')}>
@@ -189,6 +262,7 @@ export default function TopicNew () {
         {!!formError && <Text {...tw('font-body text-caption text-danger text-center mt-4')}>{formError}</Text>}
         <Button block size='kid' loading={busy} onClick={() => { void onSubmit() }} {...tw('mt-section')}>{PUBLISH_TEXT}</Button>
         <Text {...tw('font-body text-caption text-ink-faint text-center mt-2')}>话题需遵守社区公约；发布后可在详情页删除</Text>
+          </>}
       </View>
     </Screen>
   )

@@ -27,7 +27,7 @@ node scripts/ops/security-rules.mjs --apply       # 下发：全部集合 {read:
 | replies | 回复 | 改归属 | **保留，解除归属** | 私有 |
 | reports | 举报（_openid = 举报人） | 改归属 | **保留，解除归属** | 私有 |
 | mod_logs | 机审 / 人工处理日志（≥ 6 个月） | — | 保留 | 私有 |
-| checkins | 打卡 | 按 dayKey 累加 minutes | 删除 | 私有 |
+| checkins | 打卡（sessionId 幂等；dayKey 聚合 minutes） | 按 dayKey 累加 minutes | 删除 | 私有 |
 | daily_prompts | 每日一题 | — | — | 私有 |
 | prompt_answers | 每日一题作答 | 按 promptId 去重 | **保留，解除归属** | 私有 |
 | notifications | 站内消息 | 改归属 | 删除 | 私有 |
@@ -61,6 +61,7 @@ node scripts/ops/security-rules.mjs --apply       # 下发：全部集合 {read:
 | mod_logs | `idx_expireAt` | `expireAt` | 普通 |
 | mod_logs | `idx_subject_time` | `subject` + `createdAt`(desc) | 普通 |
 | checkins | `uniq_owner_day` | `_openid` + `dayKey` | 唯一 |
+| checkins | `idx_owner_month_date`（M5） | `_openid` + `monthKey` + `date` | 普通 |
 | daily_prompts | `uniq_date` | `date` | 唯一 |
 | prompt_answers | `idx_prompt_owner` | `promptId` + `_openid` | 普通 |
 | media | `idx_traceId` | `traceId` | 普通 |
@@ -70,7 +71,7 @@ node scripts/ops/security-rules.mjs --apply       # 下发：全部集合 {read:
 | rate_limits | `idx_expireAt` | `expireAt` | 普通 |
 
 说明：
-- **M4 新增的 3 个索引**（`circles.uniq_slug`、`memberships.idx_member`、`invites.idx_owner_time`）已登记在 `collections.js`，**云端要在 M4 部署前执行一次 `ensure-indexes.mjs --apply`**（只新增，不删除）。
+- **M4 新增的 3 个索引**（`circles.uniq_slug`、`memberships.idx_member`、`invites.idx_owner_time`）已登记在 `collections.js`；M5 新增 `checkins.idx_owner_month_date`（支持按 `_openid + monthKey` 查询并按 `date` 排序）。2026-10-02 共享 Dev/Prod CloudBase 复核：`checkins` 集合存在，`uniq_owner_day` 原已存在；经用户明确授权，`ensure-indexes.mjs --apply` 仅新建 `idx_owner_month_date`（created=1、present=26、conflicts=0），复查 27 个索引齐全、无冲突。`practice` 已部署且 `ping` 成功。QA-A 用户本人完成 ConsentSheet 后，应用显示 `已同步`、5 分钟 / 1 天（应用级证据，未独立直查集合记录）。冷启动 QA-B UI 与用户确认的测试前基线相符：10 月 5 分钟 / 1 天，10/02 为 5 分钟；D05 本场景应用层无可见增量。源码查询限定 accountId、返回日汇总而非身份字段；未直查云记录 / 运行时响应，未测反向 QA-B→QA-A，因此完整 D05 仍部分验收。未手动打卡；页面加载可能尝试同步本机待同步队列，是否触发未独立核验。
 - **注销会解除归属的集合（topics / replies / reports / prompt_answers，`onDelete: 'detach'`）不能建包含 `_openid` 的唯一索引**：注销把 `_openid` 置 null，第二个注销的人会撞索引而失败。这些集合的去重在应用层（举报：同人同目标只计一次、计数按不同举报人去重；每日一题：作答前查询）。`scripts/ops/ensure-indexes.test.mjs` 会拦这类配置。
 - **过期清理（TTL）**：平台 OpenAPI 只支持普通 / 唯一 / 稀疏索引，不支持 TTL。`rate_limits` / `mod_logs` 的 `expireAt` 上建的是普通索引；需要自动过期请在控制台确认是否提供 TTL 选项，否则后续加定时清理（数据量很小：频控每人每动作每天一条，日志保留 6 个月）。
 - 唯一索引只能在集合里没有重复数据时创建；新环境先跑 `ensure-collections.mjs` 再跑本脚本。

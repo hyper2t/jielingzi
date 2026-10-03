@@ -17,12 +17,12 @@ export default defineAppConfig({
   subPackages: [
     {
       root: 'pkg-community',
-      // M3：话题详情（topic）、发起话题（topic-new）；TODO(M4)：circle-detail、join-circle、invites、featured
-      pages: ['pages/topic/index', 'pages/topic-new/index']
+      // M3：话题详情（topic）、发起话题（topic-new）；M4：圈子列表 / 详情、加入圈子、邀请码
+      pages: ['pages/topic/index', 'pages/topic-new/index', 'pages/circles/index', 'pages/circle/index', 'pages/join-circle/index', 'pages/invites/index']
     },
     {
       root: 'pkg-practice',
-      // TODO(M5/M6)：timer、timer-done、calendar、prompt
+      // M5：冥想计时；个人打卡热力图随主包练习 Tab 渲染。M6：每日一题
       pages: ['pages/timer/index']
     },
     {

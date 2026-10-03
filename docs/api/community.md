@@ -132,9 +132,9 @@
 
 > 部署后需要执行一次 `scripts/ops/ensure-indexes.mjs`（见 `docs/ops/collections.md`）。
 
-## 圈子与邀请码（M4，草案）
+## 圈子与邀请码（M4 契约）
 
-> **状态：契约草案**（2026-10-01）。**已实现：`listCircles`、`getCircle`、`listInvites`、`createInvite`、`redeemInvite`**（`cloudfunctions/community/{circles,invites}.js`，用例 `tests/cloudfunctions/m4*.test.js`，未部署）；话题 / 回复 / 举报的成员校验（BE-M4-03）已实现（`topics.js`、`moderation/service.js`，用例 `m4-topics.test.js`）。`circles.topicCount` 为近似值：发布 +1、作者删除 −1（不会减到 0 以下），运维脚本 `recount` 校正。实施计划与决策见 [`docs/prd/m4-plan.md`](../prd/m4-plan.md)；落地时以本节为准并同步更新。所有动作沿用本文件前面的通则：扁平入参、**拒绝未声明参数（40001）**、读要求 18+（40303）、写走 `guardWrite`。
+> **状态：契约定稿**（2026-10-01），已按 `cloudfunctions/community/{circles,invites,topics}.js` 与 `moderation/service.js` 对齐。M4 相关云函数 / 运维脚本与前端已实现且自动化通过；2026-10-02 当前共享 CloudBase 已创建 3 个 M4 索引、写入 3 个开放圈子，`community` / `moderation` 已部署且 `ping` 通过。圈子尚无成员 / 邀请码，小程序 / iOS / Android 真机验收和客户端发布仍待完成；M4 尚未签上线。详情见 [`docs/ops/release-checklist.md`](../ops/release-checklist.md) 与 [`docs/test/cases/M4.md`](../test/cases/M4.md)。如实现变更，以本节作为接口契约并同步更新用例。所有动作沿用本文件前面的通则：扁平入参、**拒绝未声明参数（40001）**、读要求 18+（40303）、写走 `guardWrite`。`circles.topicCount` 为展示用近似值：成功发布（非 pending）+1、作者删除自己的已发布（`status = ok`）话题 −1（不会减到 0 以下）；`recount` 按当前 `status = ok` 明细校正。
 
 ### 数据
 
@@ -147,7 +147,7 @@
 |---|---|
 | 初始名额 | 3 |
 | 邀请码 | 8 位，字母表 `0123456789ABCDEFGHJKMNPQRSTVWXYZ`（Crockford base32，无 I L O U）；一次性；绑定签发它的圈子；**7 天**有效 |
-| 过期退额度 | 过期未使用的码退回 1 个名额，每个码只退一次；官方码（运维签发）不占名额也不退 |
+| 过期退额度 | 过期未使用的个人码退回 1 个名额，每个码只退一次；每次 `listInvites` / `createInvite` 最多扫描 50 个，后续调用继续；官方码（运维签发）不占名额也不退 |
 | 额度（北京时间切日） | `createInvite` 5 次 / 天；`redeemInvite` 10 次 / 天（**含失败尝试**） |
 
 **邀请码规范化**（服务端与前端同一算法，共享 fixture `tests/fixtures/invite-code.json`）：去首尾空白与中间空格 / `-` → 大写 → `O→0`、`I/L→1`；必须恰好 8 位且都在字母表内，否则 40001（「邀请码为 8 位」「邀请码含有不支持的字符」）。
@@ -197,8 +197,8 @@
 ### redeemInvite
 
 - 入参：`{ code }`（规范化见上）。出参：`{ circle, joined: true }`。
-- 校验顺序：规范化（40001）→ 码不存在 / 已用 / 已过期（**同一条 40401「邀请码无效、已被使用或已过期」**，不泄露码是否存在）→ 我已是该圈子成员（40901「你已在这个圈子里」，**不消耗码**）→ 条件更新标记已用（被抢先 → 40401）→ 写 `memberships`（撞唯一索引 → 还原码并 40901）→ `circles.memberCount` +1。
-- 要求：已登录、已确认 18+、已实名、未封禁（禁言不影响加入）；每次调用（含失败）计 1 次日额度，超出 42901。
+- 校验顺序：规范化（40001）→ 通过 `guardWrite`（登录 / 18+ / 实名 / 未封禁；禁言不影响加入）并提交兑换频控 → 码不存在 / 已用 / 已过期 / 圈子已关闭（**同一条 40401「邀请码无效、已被使用或已过期」**，不泄露码或圈子状态）→ 我已是该圈子成员（40901「你已在这个圈子里」，**不消耗码，也不执行核销写入**）→ 条件更新标记已用（被抢先 → 40401）→ 写 `memberships`（撞唯一索引 → 还原码并 40901）→ `circles.memberCount` +1。
+- 兑换日限：通过格式规范化与 `guardWrite` 后，每次实际兑换尝试（含码无效、已用、已过期、已是成员等失败）计 1 次；格式无效（40001）或登录 / 实名 / 年龄 / 封禁门禁失败不会提交此额度。达到每日 10 次返回 42901。
 - 错误：40001、40101、40302、40303、40304、40401、40901、42901。
 
 ### 对话题与回复接口的改动（BE-M4-03）
@@ -220,3 +220,67 @@
 | invites | `idx_owner_time`：`_openid` + `createdAt`（倒序） | 普通 |
 
 > 落地后需执行 `scripts/ops/ensure-indexes.mjs`；运维脚本（`circles.mjs`、`invite-quota.mjs`）见 `m4-plan.md` §8。
+
+## 加入方式与申请审核（草案 · 未实现 · 未排期，2026-10-03）
+
+> **状态：契约草案**，供 v0.2（公测期）排期时评审；当前代码未实现（全仓库无 `joinMode` / `applications`）。规划与决策见 [`docs/prd/join-plan.md`](../prd/join-plan.md)；实现变更后本节转为正式契约并同步用例。
+
+### 数据
+
+- **`circles.joinMode`**：`'invite' | 'apply' | 'owner_only'`，默认 `'invite'`（字段缺失按 `invite` 处理，存量数据不迁移）。
+  - `invite`：现状不变——任意成员凭名额签发邀请码；无申请入口。
+  - `apply`：**邀请码仍然有效**；同时开放申请审核入口。
+  - `owner_only`：仅圈主 / 管理员可签发邀请码（随 v0.3 用户自建圈子启用；v0.2 官方圈只使用前两个值）。
+- **`applications`**（新集合）：`circleId`、`_openid`（申请人，**不下发**）、`answers`（见下）、`status`（`pending` / `approved` / `rejected`）、`createdAt` / `updatedAt`、`decidedBy`（**不下发**）、`decidedAt`、`reason`（拒绝原因，通过时 `null`）、`note`（审核备注 ≤ 60 字，**不下发**）。
+  - `answers`：`{ practices: string[]（1–3，取 PRACTICES 预置值）, years: number|null（0–60）, topic: string（1–80 字）, willingness: 'read' | 'discuss' | 'write' }`
+  - 唯一索引 `uniq_application`：`circleId` + `_openid`（一人一圈一条，重投复用同一条）；`idx_apply_queue`：`status` + `createdAt`（审核队列）。
+- **`invites` 新增** `revokedAt`（number|null）与 `revokedBy`（`'ops'` 或圈主 accountId，**不下发**）；被撤销的码对兑换方与「已用 / 过期」**同一条 40401 文案**。
+- **配置**（`_shared/config.js`，前端 `src/constants/community.ts` 同名常量由测试比对）：`APPLY_RULES = { topicMax: 80, practicesMax: 3, yearsMax: 60, cooldownDays: 7, pendingMaxPerUser: 2, listMax: 50 }`；`DAILY_LIMITS += { applyCircle: 5 }`。错误码不新增。
+
+### 撤销（运维先行）
+
+v0.2 先以运维脚本实现（`circles.mjs revoke --code <码>`：仅未使用的码可撤，撤销即退额），**不进客户端契约**；云函数 `revokeInvite` 的契约在 v0.3 圈主体系落地时另行定义。数据层要求（`revokedAt` 生效于兑换与退额）在 BE 任务中先实现。
+
+### applyCircle（需登录）
+
+- 入参：`{ circleId, practices, years?, topic, willingness }`（除 `years` 外必填）。
+- 写入链路：`guardWrite(ctx, 'applyCircle', { allowMuted: true })`（登录 / 未封禁 / 18+ / 实名；**禁言不影响申请**，与兑换一致）→ `topic` 过词库 + `msgSecCheck`（reject → 40001 不落库）→ 频控 → 落库。
+- 校验与冲突：
+  - 圈子不存在 / 非 `open` → 40401；圈子 `joinMode ≠ 'apply'` → 40301「该圈子暂未开放申请」。
+  - 已是成员 → 40901「你已在这个圈子里」。
+  - 已有 `pending` → 幂等：`{ application, duplicate: true }`（不扣额度，同 `moderation.report` 的 duplicate 语义）。
+  - `rejected` 且在冷却期内 → 42901（msg 含可再申请日期）；冷却期外 → 同一条记录条件更新回 `pending`（覆盖 `answers`、清空裁定字段）。
+  - `pending` 数量达到 `pendingMaxPerUser` → 42901。
+- 出参：`{ application: { id, circleId, status, createdAt, reason } }`（`reason` 仅被拒时下发文案化枚举；不含 `_openid` / `decidedBy` / `note`）。
+
+### listApplications（仅 mod / admin）
+
+- 入参：`{ status?: 'pending' | 'approved' | 'rejected'（默认 pending）, page?, size?（≤ 50） }`。
+- 出参：`{ list, total, page, size, hasMore }`；list 项：`{ id, circleId, circleName, answers, applicant: { name, avatar, practices, years }（档案可见性同 profile.md）, createdAt }`；**不含 `_openid`**。
+- 错误：40101、40301。
+
+### decideApplication（仅 mod / admin）
+
+- 入参：`{ id, decision: 'approve' | 'reject', reason?, note? }`；`reject` 必填 `reason ∈ { off_topic, too_brief, violation, other }`；`note` ≤ 60 字（可选，写 `mod_logs`，不下发）。
+- 行为：条件更新 `pending → approved / rejected`（并发双审只有一次成功，另一次 40901「申请已被处理」）；
+  - `approve`：写 `memberships`（`invitedBy = null`、`inviteCode = null`、`role = 'member'`；唯一索引幂等）→ 新增时 `memberCount + 1`（失败仅记日志，`recount` 校正）→ 通知申请人（N1）。
+  - `reject`：写 `reason` → 通知申请人（文案见 `wording.md` §6）。
+  - 写 `mod_logs`（kind = manual，记审核人与结论，不记 `answers` 原文）。
+- 权限与错误沿用 `moderation.queue / decide` 约定：40101、40301、40001、40401、40901。
+
+### 对现有接口的改动
+
+| 接口 | 改动 |
+|---|---|
+| `listCircles` / `getCircle` | 圈子对象新增 `joinMode`（前端据此显示「输入邀请码」或「申请加入」；`owner_only` 显示「仅邀请」） |
+| `redeemInvite` | 核销条件增加「未撤销」；被撤销 / 已用 / 过期同一条 40401 |
+| `listInvites` | 状态新增 `revoked`（`active / used / expired / revoked`）；撤销退额与过期退额共用 `refunded` 一次性标记 |
+
+### 新增索引（v0.2）
+
+| 集合 | 索引 | 类型 |
+|---|---|---|
+| applications | `uniq_application`：`circleId` + `_openid` | 唯一 |
+| applications | `idx_apply_queue`：`status` + `createdAt` | 普通 |
+
+> 落地后由 `scripts/ops/ensure-indexes.mjs` 创建（只增不改）。

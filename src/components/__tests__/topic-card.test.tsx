@@ -11,6 +11,7 @@ const texts = (r: ReactTestRenderer) => hosts(r, n => n.type === 'Text').map(n =
 const NOW = new Date('2026-10-01T12:00:00+08:00').getTime()
 const TOPIC: TopicSummary = {
   id: 't1',
+  circle: null,
   title: '静坐走神怎么办',
   excerpt: '静坐时总是走神，试了数呼吸也很难坚持…',
   tags: ['冥想', '呼吸'],
@@ -42,6 +43,12 @@ describe('TopicCard', () => {
     const t = texts(r)
     expect(t).toContain('匿名·竹影')
     expect(t).not.toContain('松声')
+  })
+
+  it('显示所属圈子名，并纳入读屏文案', () => {
+    const r = render(<TopicCard topic={{ ...TOPIC, circle: { id: 'circle-mindful', name: '静观练习' } }} now={NOW} />)
+    expect(texts(r)).toContain('静观练习')
+    expect(hosts(r, n => n.props.ariaLabel === '话题：静坐走神怎么办，3 条回复，静观练习')).toHaveLength(1)
   })
 
   it('精选 / 审核中状态标；摘要为空（折叠）时不渲染摘要；无标签不渲染标签行', () => {

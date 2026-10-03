@@ -87,6 +87,7 @@
     "@tarojs/taro": "3.6.40",
     "@tarojs/taro-rn": "3.6.40",
     "expo": "~47.0.14",
+    "expo-av": "~13.0.0",
     "react": "^18.1.0",
     "react-dom": "^18.1.0",
     "react-native": "^0.70.1",

@@ -30,5 +30,9 @@ export const STORAGE_KEYS = {
   /** 已阅读的社区公约版本（= CONSENT_VERSION 时视为已读；首次发布前强制阅读一次，FE-M2-03） */
   rulesRead: 'rules_read',
   /** 发起话题的本地草稿（TopicForm + savedAt）；发布成功 / 手动清除后删除，「清除本机数据」一并清空 */
-  topicDraft: 'topic_draft'
+  topicDraft: 'topic_draft',
+  /** 本机冥想计时状态（开始 / 结束均由时间戳推算） */
+  practiceTimer: 'practice_timer',
+  /** 尚未同步的个人打卡；登录后由 services/me 的登录收尾钩子补传 */
+  practiceCheckinQueue: 'practice_checkin_queue'
 } as const

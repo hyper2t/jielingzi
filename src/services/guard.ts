@@ -10,8 +10,9 @@ import { CloudError, ERROR_CODES, FnAction, FnName } from './cloud.types'
 /** 会写云端的函数 action（按 docs/api） */
 export const WRITE_ACTIONS: { [N in FnName]?: Array<FnAction<N>> } = {
   user: ['login', 'confirmAdult', 'updateSettings', 'bindWechat', 'bindApple', 'linkPhoneSession', 'bindPhoneWeapp', 'deleteAccount'],
-  community: ['updateProfile', 'setAvatar', 'createTopic', 'createReply', 'deleteMine'],
-  moderation: ['report', 'decide', 'decideMedia']
+  community: ['updateProfile', 'setAvatar', 'createInvite', 'redeemInvite', 'createTopic', 'createReply', 'deleteMine'],
+  moderation: ['report', 'decide', 'decideMedia'],
+  practice: ['checkin']
   // 业务云函数的写 action 加在这里
 }
 

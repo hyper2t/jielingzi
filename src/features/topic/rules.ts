@@ -49,6 +49,8 @@ export function tagsError (tags: string[]): string | undefined {
 export const isShortReply = (body: string): boolean => effectiveLength(normalizeBody(body)) < TEXT_RULES.shortReply
 
 export interface TopicForm {
+  /** 发布归属；草稿一并保存在本机 */
+  circleId?: string
   title: string
   body: string
   /** 标签输入框原文 */
@@ -82,7 +84,7 @@ export function topicInputError (input: TopicInput): string | undefined {
 }
 
 export function toTopicInput (f: TopicForm): TopicInput {
-  return { title: normalizeLine(f.title), body: normalizeBody(f.body), anon: f.anon, tags: parseTags(f.tags) }
+  return { ...(f.circleId ? { circleId: f.circleId } : {}), title: normalizeLine(f.title), body: normalizeBody(f.body), anon: f.anon, tags: parseTags(f.tags) }
 }
 
 /** 正文字数提示：还差多少 / 已达标（有效字数，不含空白） */
@@ -155,6 +157,7 @@ export function loadDraft (): TopicDraft | null {
   const d = getItem<Partial<TopicDraft> | undefined>(STORAGE_KEYS.topicDraft)
   if (!d || typeof d !== 'object') return null
   const form: TopicForm = {
+    circleId: typeof d.circleId === 'string' && d.circleId ? d.circleId : undefined,
     title: typeof d.title === 'string' ? d.title : '',
     body: typeof d.body === 'string' ? d.body : '',
     tags: typeof d.tags === 'string' ? d.tags : '',
@@ -166,7 +169,7 @@ export function loadDraft (): TopicDraft | null {
 /** 内容为空时直接删除草稿（不留空壳） */
 export function saveDraft (f: TopicForm, now: number = Date.now()): void {
   if (isEmptyForm(f)) { removeItem(STORAGE_KEYS.topicDraft); return }
-  setItem(STORAGE_KEYS.topicDraft, { title: f.title, body: f.body, tags: f.tags, anon: f.anon, savedAt: now })
+  setItem(STORAGE_KEYS.topicDraft, { ...(f.circleId ? { circleId: f.circleId } : {}), title: f.title, body: f.body, tags: f.tags, anon: f.anon, savedAt: now })
 }
 
 export function clearDraft (): void {

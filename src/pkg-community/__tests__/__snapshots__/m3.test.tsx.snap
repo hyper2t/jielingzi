@@ -1,0 +1,287 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`首页话题流（FE-M3-01） 多圈首页筛选只传所选 circleId，并切换后不保留旧列表: home feed with circle filter and circle labels 1`] = `
+<View
+  className="flex flex-col flex-1 min-h-screen bg-paper"
+>
+  <View
+    className="bg-paper"
+    style={
+      {
+        "paddingTop": 20,
+      }
+    }
+  >
+    <View
+      className="flex flex-row items-center px-2"
+      style={
+        {
+          "height": 40,
+          "paddingRight": 94,
+        }
+      }
+    >
+      <Text
+        className="flex-1 font-title font-bold text-subtitle text-ink ml-3"
+        numberOfLines={1}
+      >
+        结灵子
+      </Text>
+      <View
+        accessibilityLabel="发起话题"
+        accessibilityRole="button"
+        ariaLabel="发起话题"
+        ariaRole="button"
+        className="flex flex-row items-center justify-center w-touch h-touch rounded-full"
+        hoverClass="bg-paper-dark"
+        onClick={[Function]}
+      >
+        <Image
+          accessibilityElementsHidden={true}
+          ariaHidden={true}
+          className="w-6 h-6"
+          importantForAccessibility="no-hide-descendants"
+          mode="aspectFit"
+          src="file-stub"
+        />
+      </View>
+    </View>
+  </View>
+  <View
+    className="flex flex-col flex-1"
+  >
+    <View
+      className="flex flex-col px-page pt-4 pb-section"
+    >
+      <ScrollView
+        className="block w-full whitespace-nowrap mb-2"
+        enhanced={true}
+        scrollX={true}
+        showScrollbar={false}
+      >
+        <View
+          className="block whitespace-nowrap"
+        >
+          <View
+            accessibilityLabel="圈子：全部，已选中"
+            accessibilityRole="button"
+            ariaLabel="圈子：全部，已选中"
+            ariaRole="button"
+            className="inline-flex align-middle whitespace-nowrap flex-row items-center justify-center min-h-touch mr-2"
+            onClick={[Function]}
+          >
+            <View
+              className="flex flex-row items-center justify-center rounded-full border-2 border-solid h-8 px-3 bg-brand border-brand"
+              hoverClass="none"
+            >
+              <Image
+                accessibilityElementsHidden={true}
+                ariaHidden={true}
+                className="w-4 h-4 mr-1"
+                importantForAccessibility="no-hide-descendants"
+                mode="aspectFit"
+                src="file-stub"
+              />
+              <Text
+                className="font-body whitespace-nowrap text-caption font-bold text-paper-light"
+              >
+                全部
+              </Text>
+            </View>
+          </View>
+          <View
+            accessibilityLabel="圈子：静观练习"
+            accessibilityRole="button"
+            ariaLabel="圈子：静观练习"
+            ariaRole="button"
+            className="inline-flex align-middle whitespace-nowrap flex-row items-center justify-center min-h-touch mr-2"
+            onClick={[Function]}
+          >
+            <View
+              className="flex flex-row items-center justify-center rounded-full border-2 border-solid h-8 px-3 bg-paper-light border-paper-dark"
+              hoverClass="bg-paper-dark"
+            >
+              <Text
+                className="font-body whitespace-nowrap text-caption text-ink"
+              >
+                静观练习
+              </Text>
+            </View>
+          </View>
+          <View
+            accessibilityLabel="圈子：传统养生"
+            accessibilityRole="button"
+            ariaLabel="圈子：传统养生"
+            ariaRole="button"
+            className="inline-flex align-middle whitespace-nowrap flex-row items-center justify-center min-h-touch mr-2"
+            onClick={[Function]}
+          >
+            <View
+              className="flex flex-row items-center justify-center rounded-full border-2 border-solid h-8 px-3 bg-paper-light border-paper-dark"
+              hoverClass="bg-paper-dark"
+            >
+              <Text
+                className="font-body whitespace-nowrap text-caption text-ink"
+              >
+                传统养生
+              </Text>
+            </View>
+          </View>
+          <View
+            className="inline-block align-middle w-2"
+          />
+        </View>
+      </ScrollView>
+      <View
+        accessibilityLabel="话题：传统圈话题，0 条回复，传统养生"
+        accessibilityRole="button"
+        ariaLabel="话题：传统圈话题，0 条回复，传统养生"
+        ariaRole="button"
+        className="flex flex-col p-4 mb-3 rounded-md bg-paper-light shadow-card"
+        onClick={[Function]}
+      >
+        <View
+          accessibilityLabel="林然，1 分钟前"
+          ariaLabel="林然，1 分钟前"
+          className="flex flex-row items-center"
+        >
+          <Image
+            accessibilityElementsHidden={true}
+            ariaHidden={true}
+            className="rounded-full w-8 h-8"
+            importantForAccessibility="no-hide-descendants"
+            mode="aspectFill"
+            src="file-stub"
+          />
+          <View
+            className="flex flex-col flex-1 ml-2"
+          >
+            <View
+              className="flex flex-row items-center"
+            >
+              <Text
+                className="font-body font-bold text-ink text-caption"
+                numberOfLines={1}
+              >
+                林然
+              </Text>
+            </View>
+            <Text
+              className="font-body text-caption text-ink-faint"
+              numberOfLines={1}
+            >
+              1 分钟前
+            </Text>
+          </View>
+        </View>
+        <Text
+          className="self-start mt-3 px-2 rounded-full bg-brand-light font-body text-caption text-brand-dark"
+        >
+          传统养生
+        </Text>
+        <Text
+          className="font-title font-bold text-subtitle text-ink mt-3"
+          numberOfLines={2}
+        >
+          传统圈话题
+        </Text>
+        <Text
+          className="font-body text-body text-ink-soft mt-1"
+          numberOfLines={3}
+        >
+          静坐时总是走神，试了数呼吸也很难坚持，想听听大家的经验。静坐时总是走神，试了数呼吸也很难坚持，想听听大家的经验。静坐时总是走神，试了数呼吸也很难坚持，想听听大家…
+        </Text>
+        <View
+          className="flex flex-row items-center mt-3"
+        >
+          <View
+            className="flex-1"
+          />
+          <Text
+            className="font-body text-caption text-ink-faint"
+          >
+            0 条回复
+          </Text>
+        </View>
+      </View>
+      <View
+        accessibilityLabel="话题：静观圈话题，0 条回复，静观练习"
+        accessibilityRole="button"
+        ariaLabel="话题：静观圈话题，0 条回复，静观练习"
+        ariaRole="button"
+        className="flex flex-col p-4 mb-3 rounded-md bg-paper-light shadow-card"
+        onClick={[Function]}
+      >
+        <View
+          accessibilityLabel="林然，2 分钟前"
+          ariaLabel="林然，2 分钟前"
+          className="flex flex-row items-center"
+        >
+          <Image
+            accessibilityElementsHidden={true}
+            ariaHidden={true}
+            className="rounded-full w-8 h-8"
+            importantForAccessibility="no-hide-descendants"
+            mode="aspectFill"
+            src="file-stub"
+          />
+          <View
+            className="flex flex-col flex-1 ml-2"
+          >
+            <View
+              className="flex flex-row items-center"
+            >
+              <Text
+                className="font-body font-bold text-ink text-caption"
+                numberOfLines={1}
+              >
+                林然
+              </Text>
+            </View>
+            <Text
+              className="font-body text-caption text-ink-faint"
+              numberOfLines={1}
+            >
+              2 分钟前
+            </Text>
+          </View>
+        </View>
+        <Text
+          className="self-start mt-3 px-2 rounded-full bg-brand-light font-body text-caption text-brand-dark"
+        >
+          静观练习
+        </Text>
+        <Text
+          className="font-title font-bold text-subtitle text-ink mt-3"
+          numberOfLines={2}
+        >
+          静观圈话题
+        </Text>
+        <Text
+          className="font-body text-body text-ink-soft mt-1"
+          numberOfLines={3}
+        >
+          静坐时总是走神，试了数呼吸也很难坚持，想听听大家的经验。静坐时总是走神，试了数呼吸也很难坚持，想听听大家的经验。静坐时总是走神，试了数呼吸也很难坚持，想听听大家…
+        </Text>
+        <View
+          className="flex flex-row items-center mt-3"
+        >
+          <View
+            className="flex-1"
+          />
+          <Text
+            className="font-body text-caption text-ink-faint"
+          >
+            0 条回复
+          </Text>
+        </View>
+      </View>
+      <Text
+        className="font-body text-caption text-ink-faint text-center py-3"
+      >
+        没有更多了
+      </Text>
+    </View>
+  </View>
+</View>
+`;

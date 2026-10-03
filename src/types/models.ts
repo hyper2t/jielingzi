@@ -3,11 +3,43 @@
  * starter 只包含账号相关模型；业务模型（如条目、记录）落地时在这里补充，并同步 services/cloud.types.ts 的 CollectionMap / FunctionMap。
  */
 
+import type { PracticeId } from '@/constants/community'
+
 /**
  * 用户设置（users.settings）。starter 为空；新增设置项时与云函数 cloudfunctions/_shared/settings.js 的 SETTINGS_SCHEMA 保持一致，
  * 例如 `{ fontScale?: 'normal' | 'large' }`。
  */
 export type UserSettings = Record<string, unknown>
+
+/** 一次完成的私人练习；sessionId 是重试时复用的幂等键。 */
+export interface PracticeCheckinInput {
+  sessionId: string
+  /** 设备本地日期 YYYY-MM-DD；跨零点按计时结束日期 */
+  date: string
+  practice: PracticeId
+  minutes: number
+}
+
+export interface PracticeCheckinResult {
+  date: string
+  practice: PracticeId
+  /** 当日该练习方式累计分钟数 */
+  minutes: number
+  duplicate: boolean
+}
+
+/** practice.listCheckins 按日汇总，仅包含当前账号自己的记录。 */
+export interface DailyCheckin {
+  date: string
+  minutes: number
+  practices: Partial<Record<PracticeId, number>>
+}
+
+export interface CheckinMonth {
+  month: string
+  list: DailyCheckin[]
+  totalMinutes: number
+}
 
 /** users 集合文档（_openid 承载 accountId，见 cloudfunctions/_shared/account.js） */
 export interface User {
@@ -120,9 +152,48 @@ export interface MediaQueueItem {
 /** 话题状态（docs/api/community.md M3）：pending = 机审待复核（只有作者看得到）；folded = 被举报自动折叠 */
 export type TopicStatus = 'pending' | 'ok' | 'folded' | 'removed'
 
+/** 官方圈子列表对象（community.listCircles）；计数仅用于展示 */
+export interface Circle {
+  id: string
+  slug: string
+  name: string
+  desc: string
+  cover: string | null
+  memberCount: number
+  topicCount: number
+  joined: boolean
+}
+
+/** 官方圈子详情（community.getCircle）：列表字段 + 圈子公约 */
+export interface CircleDetail extends Circle {
+  rules: string[]
+}
+
+export type CircleRef = Pick<Circle, 'id' | 'name'>
+
+export type InviteStatus = 'active' | 'used' | 'expired'
+
+/** 只返回给签发人的邀请码；不含兑换人或任何账号标识 */
+export interface Invite {
+  code: string
+  circle: CircleRef
+  status: InviteStatus
+  createdAt: number
+  expiresAt: number
+  usedAt: number | null
+}
+
+export interface InviteList {
+  quota: number
+  ttlDays: number
+  list: Invite[]
+}
+
 /** 话题流条目（community.listTopics）：只有摘要，不含正文；author 已按匿名脱敏 */
 export interface TopicSummary {
   id: string
+  /** 所属圈子；旧话题 / 不可见圈子为空 */
+  circle: CircleRef | null
   title: string
   excerpt: string
   tags: string[]
@@ -167,6 +238,8 @@ export interface Reply {
 }
 
 export interface TopicInput {
+  /** 所属圈子；缺省时云端仅在恰好加入 1 个圈子时自动归属 */
+  circleId?: string
   title: string
   body: string
   anon?: boolean

@@ -79,7 +79,7 @@ describe('首页话题流（FE-M3-01）', () => {
     expect(all).toEqual(expect.arrayContaining(['松声', '#冥想', '#呼吸', '3 条回复']))
     // 摘要不是全文（80 字 + …）
     expect(all.some(t => t.endsWith('…') && t.length <= 81)).toBe(true)
-    click(r, '话题：最新的话题，3 条回复')
+    click(r, '话题：最新的话题，3 条回复，静观练习')
     expect(Taro.navigateTo).toHaveBeenCalledWith({ url: `/pkg-community/pages/topic/index?id=${id}` })
   })
 
@@ -102,6 +102,50 @@ describe('首页话题流（FE-M3-01）', () => {
     expect(has(r, HOME_EMPTY)).toBe(true)
     click(r, '发起话题')
     expect(Taro.navigateTo).toHaveBeenCalledWith({ url: '/pkg-community/pages/topic-new/index' })
+  })
+
+  it('未入圈：首页介绍开放圈子与加入入口，不请求圈内话题', async () => {
+    signIn()
+    mockControl.seedCircles([
+      { id: 'circle-mindful', slug: 'mindful', name: '静观练习', desc: '练习分享' },
+      { id: 'circle-tradition', slug: 'tradition', name: '传统养生', desc: '日常养生' }
+    ])
+    mockControl.setMemberships([])
+    mockControl.seedTopics([{ title: '不应出现的话题', body: BODY, circleId: 'circle-mindful' }])
+    const r = render(<Index />)
+    await flush()
+    expect(has(r, '先加入一个圈子')).toBe(true)
+    expect(texts(r)).toEqual(expect.arrayContaining(['静观练习', '传统养生']))
+    expect(calls('listTopics')).toHaveLength(0)
+    click(r, '输入邀请码')
+    expect(Taro.navigateTo).toHaveBeenCalledWith({ url: '/pkg-community/pages/join-circle/index' })
+    click(r, '浏览圈子')
+    expect(Taro.navigateTo).toHaveBeenCalledWith({ url: '/pkg-community/pages/circles/index' })
+  })
+
+  it('多圈首页筛选只传所选 circleId，并切换后不保留旧列表', async () => {
+    signIn()
+    mockControl.seedCircles([
+      { id: 'circle-mindful', slug: 'mindful', name: '静观练习' },
+      { id: 'circle-tradition', slug: 'tradition', name: '传统养生' }
+    ])
+    mockControl.setMemberships(['circle-mindful', 'circle-tradition'])
+    mockControl.seedTopics([
+      { title: '静观圈话题', body: BODY, circleId: 'circle-mindful' },
+      { title: '传统圈话题', body: BODY, circleId: 'circle-tradition' }
+    ])
+    const r = render(<Index />)
+    await flush()
+    expect(has(r, '静观圈话题')).toBe(true)
+    expect(has(r, '传统圈话题')).toBe(true)
+    expect(r.toJSON()).toMatchSnapshot('home feed with circle filter and circle labels')
+    click(r, '圈子：传统养生')
+    await flush()
+    expect(has(r, '传统圈话题')).toBe(true)
+    expect(has(r, '静观圈话题')).toBe(false)
+    expect(calls('listTopics').slice(-1)[0].data).toEqual({ page: 1, size: 20, circleId: 'circle-tradition' })
+    click(r, '发起话题')
+    expect(Taro.navigateTo).toHaveBeenCalledWith({ url: '/pkg-community/pages/topic-new/index?circleId=circle-tradition' })
   })
 
   it('分页：首屏 20 条，触底再取第 2 页，到底显示「没有更多了」', async () => {
@@ -186,10 +230,24 @@ describe('发起话题（FE-M3-02）', () => {
     expect(hosts(r, n => n.type === 'Textarea')).toHaveLength(0)
   })
 
+  it('未入圈：介绍开放圈子与加入入口，不显示发话题表单', async () => {
+    signIn()
+    mockControl.seedCircles([{ id: 'circle-mindful', slug: 'mindful', name: '静观练习', desc: '练习分享' }])
+    mockControl.setMemberships([])
+    const r = render(<TopicNew />)
+    await flush()
+    expect(has(r, '先加入一个圈子')).toBe(true)
+    expect(has(r, '静观练习')).toBe(true)
+    expect(hosts(r, n => n.type === 'Textarea')).toHaveLength(0)
+    click(r, '输入邀请码')
+    expect(Taro.navigateTo).toHaveBeenCalledWith({ url: '/pkg-community/pages/join-circle/index' })
+  })
+
   it('空表单提交：各字段给出与云端一致的提示，不发请求', async () => {
     signIn()
     const r = render(<TopicNew />)
     await flush()
+    expect(labelled(r, '发布到：静观练习')).toHaveLength(0)
     click(r, PUBLISH_TEXT)
     await flush()
     expect(texts(r)).toEqual(expect.arrayContaining(['标题至少 5 个字', '正文至少 50 个字']))
@@ -214,7 +272,7 @@ describe('发起话题（FE-M3-02）', () => {
     expect((Taro as any).__storage.size).toBeGreaterThan(0)
     click(r, PUBLISH_TEXT)
     await flush()
-    expect(calls('createTopic')[0].data).toEqual({ title: '静坐走神 怎么办', body: BODY, anon: false, tags: ['冥想', '呼吸'] })
+    expect(calls('createTopic')[0].data).toEqual({ circleId: 'circle-mindful', title: '静坐走神 怎么办', body: BODY, anon: false, tags: ['冥想', '呼吸'] })
     expect(toastTitles()).toContain(PUBLISHED_TEXT)
     const id = mockControl.topics[0].id
     expect(Taro.redirectTo).toHaveBeenCalledWith({ url: `/pkg-community/pages/topic/index?id=${id}` })
@@ -235,6 +293,32 @@ describe('发起话题（FE-M3-02）', () => {
     click(r, PUBLISH_TEXT)
     await flush()
     expect(calls('createTopic')[0].data).toMatchObject({ anon: true })
+  })
+
+  it('多圈发话题可选择圈子，草稿恢复后继续提交到原圈子', async () => {
+    signIn()
+    mockControl.seedCircles([
+      { id: 'circle-mindful', slug: 'mindful', name: '静观练习' },
+      { id: 'circle-tradition', slug: 'tradition', name: '传统养生' }
+    ])
+    mockControl.setMemberships(['circle-mindful', 'circle-tradition'])
+    ;(Taro as any).__routerParams = { circleId: 'circle-tradition' }
+    const first = render(<TopicNew />)
+    await flush()
+    expect(labelled(first, '发布到：传统养生')).toHaveLength(1)
+    click(first, '发布到：传统养生')
+    click(first, '静观练习')
+    fill(first, { title: '准备发布到静观圈', body: BODY })
+    act(() => first.unmount())
+    mounted.splice(mounted.indexOf(first), 1)
+
+    const restored = render(<TopicNew />)
+    await flush()
+    expect(field(restored, 'Input', '标题').props.value).toBe('准备发布到静观圈')
+    expect(labelled(restored, '发布到：静观练习')).toHaveLength(1)
+    click(restored, PUBLISH_TEXT)
+    await flush()
+    expect(calls('createTopic')[0].data).toMatchObject({ circleId: 'circle-mindful' })
   })
 
   it('本地草稿：输入即存；重新进入恢复并提示；清除草稿后为空', async () => {
@@ -345,10 +429,31 @@ describe('话题详情（FE-M3-03）', () => {
     signIn()
     const id = seedTopic({ title: '静坐走神怎么办', tags: ['冥想', '呼吸'], authorName: '松声' })
     const r = await openTopic(id)
-    expect(texts(r)).toEqual(expect.arrayContaining(['静坐走神怎么办', BODY, '#冥想', '#呼吸', '松声']))
+    expect(texts(r)).toEqual(expect.arrayContaining(['静坐走神怎么办', BODY, '#冥想', '#呼吸', '松声', '静观练习']))
     expect(labelled(r, A11Y.reportTopic)).toHaveLength(1)
     expect(labelled(r, A11Y.deleteTopic)).toHaveLength(0)
     expect(calls('getTopic')[0].data).toEqual({ id })
+    click(r, '圈子：静观练习')
+    expect(Taro.navigateTo).toHaveBeenCalledWith({ url: '/pkg-community/pages/circle/index?id=circle-mindful' })
+  })
+
+  it('圈内话题：非成员或圈子已关闭时沿用统一不存在文案，且不加载回复', async () => {
+    signIn()
+    const nonMemberId = seedTopic({ title: '非成员不可见', circleId: 'circle-mindful' })
+    mockControl.setMemberships([])
+    const nonMember = await openTopic(nonMemberId)
+    expect(has(nonMember, NOT_FOUND_TEXT)).toBe(true)
+    expect(calls('listReplies')).toHaveLength(0)
+
+    act(() => {
+      mockControl.seedCircles([{ id: 'circle-mindful', slug: 'mindful', name: '静观练习', status: 'closed' }])
+      mockControl.seedTopics([{ title: '关闭圈子话题', body: BODY, circleId: 'circle-mindful' }])
+      ;(Taro as any).__routerParams = { id: mockControl.topics[mockControl.topics.length - 1].id }
+    })
+    const closedId = (Taro as any).__routerParams.id as string
+    const closed = await openTopic(closedId)
+    expect(has(closed, NOT_FOUND_TEXT)).toBe(true)
+    expect(calls('listReplies')).toHaveLength(0)
   })
 
   it('匿名话题：只有「匿名·代号」；自己的匿名话题带「我」', async () => {

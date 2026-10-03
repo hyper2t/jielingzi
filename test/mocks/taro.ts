@@ -6,6 +6,7 @@ const store = new Map<string, unknown>()
 const showHandlers = new Set<() => void>()
 const bottomHandlers = new Set<() => void>()
 const pullHandlers = new Set<() => void>()
+const shareHandlers = new Set<(res: any) => any>()
 
 export function useDidShow (cb: () => void) {
   const ref = useRef(cb)
@@ -38,8 +39,19 @@ export function usePullDownRefresh (cb: () => void) {
   }, [])
 }
 
+export function useShareAppMessage (cb: (res: any) => any) {
+  const ref = useRef(cb)
+  ref.current = cb
+  useEffect(() => {
+    const handler = (res: any) => ref.current(res)
+    shareHandlers.add(handler)
+    return () => { shareHandlers.delete(handler) }
+  }, [])
+}
+
 const Taro: any = {
   showToast: jest.fn(() => Promise.resolve()),
+  setClipboardData: jest.fn(() => Promise.resolve()),
   showModal: jest.fn(() => Promise.resolve({ confirm: true })),
   chooseImage: jest.fn(() => Promise.resolve({ tempFilePaths: ['wxfile://tmp/avatar.jpg'], tempFiles: [{ path: 'wxfile://tmp/avatar.jpg', size: 80 * 1024 }] })),
   __routerParams: {} as Record<string, string>,
@@ -66,6 +78,10 @@ const Taro: any = {
   useDidShow,
   useReachBottom,
   usePullDownRefresh,
+  __shareAppMessage (res: any) {
+    const handlers = [...shareHandlers]
+    return handlers.length ? handlers[handlers.length - 1](res) : undefined
+  },
   stopPullDownRefresh: jest.fn(),
   __emitNetwork (isConnected: boolean) { listeners.forEach(cb => cb({ isConnected })) },
   __emitShow () { showHandlers.forEach(h => h()) },

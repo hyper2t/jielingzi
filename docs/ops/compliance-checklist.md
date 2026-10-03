@@ -47,7 +47,7 @@
 | 手机号快捷验证组件计费 | 微信对手机号验证组件按次计费（有免费额度），以微信公众平台最新说明为准；上线前确认额度 / 余额，避免实名入口失效 | ☐ |
 | 云函数环境变量 | `user`：`WX_MP_APP_ID` / `WX_MP_APP_SECRET` / `PHONE_HASH_SECRET`；`community` / `moderation`：`WX_MP_APP_ID` / `WX_MP_APP_SECRET`（见 `.env.example`） | ✅ 2026-10-01 已配置并部署（凭证经 stable_token 校验有效） |
 | `PHONE_HASH_SECRET` 保管 | 2026-10-01 已随机生成写入 `.env`（不入库）；**请离线备份**，启用后不可更换（更换会让已绑定的手机号全部失效） | ☐ 待备份 |
-| 索引 | `node scripts/ops/ensure-indexes.mjs --apply`（`docs/ops/collections.md` §3） | ✅ 2026-10-01 已建 19 个（users / profiles 的 `_openid` 改为唯一）；TTL 待控制台确认 |
+| 索引 | `node scripts/ops/ensure-indexes.mjs --apply`（`docs/ops/collections.md` §3） | ✅ 2026-10-01 已建基础 19 个；后续媒体 / M3 / M4 索引已补齐，2026-10-02 共 26 个 M0–M4 索引存在且无冲突（见上线清单）；M5 新索引未应用，TTL 待控制台确认 |
 
 ## 4. 待你提供 / 确认
 
@@ -57,4 +57,4 @@
 - [ ] Apple 开发者账号（`.env`：`APPLE_TEAM_ID`、`APPLE_KEY_ID`、`APPLE_PRIVATE_KEY`）
 - [ ] 用于备案的域名
 - [ ] 内容审核值班人（至少 2 人，响应时效 24h）
-- [ ] 小程序 AppSecret（`WX_MP_APP_SECRET`）与手机号哈希密钥 `PHONE_HASH_SECRET`（M1 实名用）
+- [x] 小程序 AppSecret（`WX_MP_APP_SECRET`）与手机号哈希密钥 `PHONE_HASH_SECRET`：已配置 / 生成并写入 `.env`（2026-10-01）；不在文档或聊天中记录密钥明文。`PHONE_HASH_SECRET` 离线备份仍待完成（见 §3.1）

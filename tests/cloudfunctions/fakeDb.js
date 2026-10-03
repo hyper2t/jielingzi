@@ -1,7 +1,7 @@
 'use strict'
 /**
  * 内存版 @cloudbase/node-sdk database() 子集，用于本地单测：
- * where(等值 / command.in / nin / gt / gte / lt / lte / neq / exists) / orderBy / skip / limit / field / get / count / add / update / remove /
+ * where(等值 / command.in / nin / gt / gte / lt / lte / neq / exists) / orderBy / skip / limit / field / get / count / add / update（inc / push） / remove /
  * doc(id).get|update|remove，支持点号路径更新与唯一索引模拟。calls 记录每次操作，便于断言查询条件。
  * remove 返回 { deleted }、update 返回 { updated }，与 SDK 一致。
  */
@@ -40,6 +40,11 @@ function matches(d, where) {
 function applyPatch(d, patch) {
   for (const [k, v] of Object.entries(patch)) {
     if (v && typeof v === 'object' && typeof v.$inc === 'number') setPath(d, k, (Number(getPath(d, k)) || 0) + v.$inc)
+    else if (v && typeof v === 'object' && Object.prototype.hasOwnProperty.call(v, '$push')) {
+      const current = getPath(d, k)
+      const list = Array.isArray(current) ? current : []
+      setPath(d, k, [...list, clone(v.$push)])
+    }
     else setPath(d, k, clone(v))
   }
 }
@@ -155,6 +160,7 @@ function createFakeDb({ data = {}, unique = {}, strictCollections = false } = {}
     neq: (v) => ({ $ne: v }),
     exists: (b = true) => ({ $exists: !!b }),
     inc: (n) => ({ $inc: n }),
+    push: (v) => ({ $push: v }),
   }
   async function createCollection(name) {
     calls.push({ op: 'createCollection', collection: name })

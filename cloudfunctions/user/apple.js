@@ -4,7 +4,7 @@
  *
  * 校验项（Apple「Verifying a user」）：
  *   - JWS 头 alg = RS256，kid 在 https://appleid.apple.com/auth/keys（JWKS，进程内缓存 1 小时，kid 未命中时强制刷新一次）
- *   - 签名、iss = https://appleid.apple.com、aud = 本 App 的 Bundle ID（APPLE_BUNDLE_ID，缺省 cn.jielingzi.app）
+ *   - 签名、iss = https://appleid.apple.com、aud = 本 App 的 Bundle ID（APPLE_BUNDLE_ID，缺省 com.jielingzi.app）
  *   - exp 未过期（容忍 60 s 时钟偏差）
  *   - nonce：客户端传原始 nonce，token 里是它的 SHA-256 十六进制（@invertase/react-native-apple-authentication 的 nonceEnabled 行为），防重放
  * 最小化采集（决策 L8）：只用 sub，不读 / 不存 email、姓名。
@@ -20,7 +20,7 @@ const ISSUER = 'https://appleid.apple.com'
 const JWKS_URL = 'https://appleid.apple.com/auth/keys'
 const TOKEN_URL = 'https://appleid.apple.com/auth/token'
 const REVOKE_URL = 'https://appleid.apple.com/auth/revoke'
-const DEFAULT_BUNDLE_ID = 'cn.jielingzi.app'
+const DEFAULT_BUNDLE_ID = 'com.jielingzi.app'
 const JWKS_TTL_MS = 60 * 60 * 1000
 const CLOCK_SKEW_S = 60
 const TIMEOUT_MS = 5000

@@ -30,7 +30,7 @@
 
 ## M0 · 准备（0.5 周）
 
-> **进度（2026-10-01 复核）**：代码与文档已完成，自动化全绿，三端构建通过（`docs/test/cases/M0.md` M0-13）。Windows 实机复核修复 3 处：RN 打包脚本 spawn `npx.cmd` 报 EINVAL；运维脚本把 cloudbaserc 的 envId 模板原文当环境 ID；moderation 云函数误用 App 的微信凭证（应为小程序凭证）。2026-10-01 已部署 user / community / moderation，并执行 M0-12（下发安全规则、建 16 个集合）。待办（非代码，需人工）：OPS-M0-01 资质申请（需企业材料）、控制台建索引（`docs/ops/collections.md` §3）、M0-11 真机视觉走查。
+> **进度（2026-10-01 复核，2026-10-02 更新）**：代码与文档已完成，自动化全绿，三端构建通过（`docs/test/cases/M0.md` M0-13）。Windows 实机复核修复 3 处：RN 打包脚本 spawn `npx.cmd` 报 EINVAL；运维脚本把 cloudbaserc 的 envId 模板原文当环境 ID；moderation 云函数误用 App 的微信凭证（应为小程序凭证）。2026-10-01 已部署 user / community / moderation，并执行 M0-12（下发安全规则、建 16 个集合）。2026-10-02 复核确认 M0–M4 的 26 个索引已存在、无冲突；M5 专属 checkins 月索引另见 M5，尚未应用。待办（需人工 / 企业材料）：OPS-M0-01 资质申请、M0-11 真机视觉走查。
 > 产出：`cloudfunctions/_shared/{collections,config,guard}.js`、`cloudfunctions/{community,moderation,practice}/`、`docs/ops/{compliance-checklist,collections}.md`、`docs/prd/{wording,community-rules}.md`、`docs/test/`、练习 Tab 与两个新分包、品牌色令牌（竹青）与新标志。
 
 | 编号 | 负责 | 任务 | 验收 |
@@ -49,7 +49,7 @@
 > 产出：`user.bindPhoneWeapp / confirmAdult`、`login / whoami` 账号状态、`linkPhoneSession` 登记号码（`_shared/{phone,wxmp,moderation}.js`、`account.js linkPhone`）；`community.getProfile / updateProfile`（`community/{profile,alias}.js`）；
 > 前端 18+ 确认页、发布门禁 `features/auth/gates.ts`（`requirePhone` / `ensureAdult`）、小程序手机号弹层 `PhoneSheet`、档案卡与编辑档案页、`AuthorBadge` / `Avatar`、12 款预置头像。
 > **范围调整**：FE-M1-03 头像先提供预置头像，**自定义上传随 BE-M2-02 图片机审一起上线**（未经机审的图片不展示，PRD §3 / §9）。
-> 待办（需人工 / 授权）：配置 `WX_MP_APP_ID` / `WX_MP_APP_SECRET` / `PHONE_HASH_SECRET` 并部署 user / community；小程序隐私保护指引声明「手机号」；建 `profiles` 唯一索引；QA-M1-01 三端真机执行（M1-19）。
+> **平台状态（2026-10-02）**：`user` / `community` 环境变量已配置并部署（2026-10-01）；`profiles._openid` 唯一索引已包含在已建立的 M0–M4 索引中。仍待人工 / 平台处理：小程序隐私保护指引声明手机号与档案信息、确认手机号验证组件费用 / 额度、离线备份 `PHONE_HASH_SECRET`；QA-M1-01 三端真机执行（M1-19）仍未完成。
 
 | 编号 | 负责 | 任务 | 验收 |
 |---|---|---|---|
@@ -86,7 +86,7 @@
 
 > **进度（2026-10-01，纯文字版，已部署）**：BE-M3-01～04（`cloudfunctions/community/topics.js` + `service.js` 6 个 action：`createTopic / listTopics / getTopic / createReply / listReplies / deleteMine`；限额在 `_shared/config`；匿名脱敏）、FE-M3-01～03（首页话题流 + `TopicCard`、`pkg-community/pages/topic-new`、`pkg-community/pages/topic`、`Toggle`）、QA-M3-01 自动化部分已完成，用例见 `docs/test/cases/M3.md`，契约见 `docs/api/community.md`。审核页对机审待复核的内容显示「通过」（放行）。
 > **范围决策**：先做纯文字版；话题配图（PRD / 本计划均未含，新增范围）与 App 头像上传暂缓，**统一挂在「原生选图」任务上**（新增原生选图组件、重新打包一次；话题配图复用 `media.js` 图片审核流程，App 上传走人工复核）。`TopicSummary.images` 暂为 `[]`。
-> 2026-10-01 已部署 community / moderation，`topics` 建好索引（status + createdAt）。待办：三端真机执行与匿名抓包留存；M4 接入圈子可见性。
+> 2026-10-01 已部署 M3 `community` / `moderation`，`topics` 建好索引（status + createdAt）。2026-10-02 M4 `community` / `moderation` 已部署并通过 `ping`；三个开放圈子及 M4 索引已写入当前共享 CloudBase。圈子尚无成员 / 邀请码，M4 三端真机验收未执行；M3 三端真机执行与匿名抓包留存仍待人工完成。
 
 | 编号 | 负责 | 任务 | 验收 |
 |---|---|---|---|
@@ -101,9 +101,9 @@
 
 ## M4 · 官方圈子 + 邀请码（1 周）
 
-> **状态（2026-10-01）**：计划已完善；**BE-M4-00 ~ BE-M4-03、OPS-M4-01 已完成**（配置、索引登记、`fakeDb` 条件操作符、夹具；`listCircles / getCircle`；云函数 217 例、jest 470 例全绿，未部署），其余任务未开工。完整的决策、数据模型差异、成员校验矩阵、并发 / 幂等设计、运维脚本、测试与上线 / 回滚方案见 [`m4-plan.md`](./m4-plan.md)；接口契约草案见 `docs/api/community.md`「圈子与邀请码（M4，草案）」。
+> **状态（2026-10-02）**：BE-M4-00～03、OPS-M4-01、FE-M4-00～02 已完成；QA-M4-01 用例文件、自动化及变异验证已通过；DOC-M4 已完成（集合索引核对后无需改动）。部署前最近验证：`yarn test:functions` 217 / 217、`yarn test:ops` 32 / 32、Jest 35 suites / 510 tests / 31 snapshots、`yarn typecheck` 全绿。当前共享 CloudBase 已创建 3 个 M4 索引、写入 3 个开放圈子，`community` / `moderation` 已部署且 `ping` 通过；用户确认圈子文案 §5 法务审阅已通过。**首批成员与官方邀请码尚未配置；小程序 / iOS / Android 真机验收、客户端发布及 M4 上线签核仍待完成。**完整实施与上线 / 回滚方案见 [`m4-plan.md`](./m4-plan.md)；接口契约见 `docs/api/community.md`「圈子与邀请码（M4 契约）」。
 > **关键决策（默认，可推翻）**：3 个官方圈子（`wording.md` §5）；邀请码绑定圈子、一次性、7 天、初始名额 3、过期未用退名额；圈内内容仅成员可见（非成员详情 40401）；首页聚合我的圈子；发帖缺省圈子在「只加入 1 个圈子」时自动归属（兼容 M3 客户端）；审核员无额外读圈内内容的特权；第一批成员靠运维脚本签发官方码 / 直接加入。
-> **待产品确认**：圈子名称与公约、第一批成员入圈方式、M3 期间旧话题处理（见 `m4-plan.md` §2.2）。
+> **本轮采用的默认决策**：圈子名称 / 简介 / 公约按 `wording.md` §5 与种子 JSON；用户于 2026-10-02 确认法务审阅通过且三圈种子已写入。第一批成员仍通过运维 `grant` + 官方码，尚未执行；本轮审计旧话题 / 回复为 0、无需迁移，客户端发布前重跑 `audit`。详见 `m4-plan.md` §2.2 与 `docs/ops/release-checklist.md`。
 
 | 编号 | 负责 | 任务 | 验收 |
 |---|---|---|---|
@@ -113,11 +113,13 @@
 | BE-M4-02 | BE | 邀请码：`createInvite`（成员才能签发、名额懒初始化 + 原子扣减、7 天有效）、`listInvites`（状态、过期退名额）、`redeemInvite`（一次性、写 memberships、已是成员不消耗码、日限含失败尝试） | 单测：过期 / 已用 / 名额不足 / 并发抢最后名额 / 并发重复兑换 / 退名额只退一次 |
 | BE-M4-03 | BE | 话题读写加成员校验（`listTopics` 聚合我的圈子；`getTopic / listReplies / createReply` 非成员 40401；`createTopic` 缺省圈子规则；`moderation.report` 成员校验）；名额增发规则（每月按有效回复数）先做手动脚本（`invite-quota.mjs`，见 OPS-M4-01） | 非成员读圈内话题被拒；M3 用例补成员种子后全绿 |
 | FE-M4-00 | FE | 类型 / 常量 / 邀请码规范化（共享 fixture）/ 服务层 / mock 云端（`reset()` 默认 1 个圈子 + 默认账号是成员）/ `app.config` / `router` | `tsc` 无错；规则单测 |
-| FE-M4-01 | FE | 圈子列表 `circles` / 详情 `circle`、输入邀请码入圈 `join-circle`（支持 `?code=` 预填）、我的邀请码 `invites`（分享卡片：小程序 `onShareAppMessage`，App 复制文本）、「我的」入口 | 三端走通；页面测试 |
-| FE-M4-02 | FE | 首页话题流按"我的圈子"聚合（`FilterChips` 切换）；未入圈用户看到引导页；发起话题选圈子；卡片 / 详情显示圈子名 | 快照测试 |
-| QA-M4-01 | QA | 用例：邀请全链路、越权读取、名额边界、注销后成员关系清理（`docs/test/cases/M4.md`，用例清单见 `m4-plan.md` §10） | 自动化全绿 + 真机清单入库 |
+| FE-M4-01 | FE | 圈子列表 `circles` / 详情 `circle`、输入邀请码入圈 `join-circle`（支持 `?code=` 预填）、我的邀请码 `invites`（分享卡片：小程序 `onShareAppMessage`，App 复制文本）、「我的」入口 | 页面自动化通过；三端真机统一由 QA-M4-01 上线后执行 |
+| FE-M4-02 | FE | 首页按圈子筛选并将当前 `circleId` 传给发话题页；未入圈引导说明「结灵子是邀请制社区」；单圈只读、多圈用 `Sheet`；默认当前筛选圈子、草稿保存 / 恢复 `circleId`；卡片与详情显示圈名，详情可导航到圈子；非成员 / 关闭圈子沿用 D6 通用不存在文案 | 页面测试；首页话题流快照通过 |
+| QA-M4-01 | QA | 邀请全链路、越权读取、名额边界、注销后成员关系清理；用例见 [`docs/test/cases/M4.md`](../test/cases/M4.md)，含自动化证据、变异验证及小程序 / iOS / Android 真机清单 | 自动化与变异验证全绿；真机执行待部署后登记 |
 
 ## M5 · 冥想计时 + 打卡（1 周，可并行）
+
+> **进度（2026-10-02）**：BE-M5-01、FE-M5-01/02 实现及自动化用例已写入工作区。全套 Jest 38 suites / 523 tests 通过（`.wav` 已映射至测试 file stub），practice Node 单测 5/5（fake DB）。用户明确授权后，`practice` 已部署到共享 Dev/Prod CloudBase，`ping` 成功；新增 `idx_owner_month_date` 后 27 个索引齐全、0 冲突。`npm run build:weapp` 成功；QA-A 完成四个预设、5 分钟计时和 Tab 往返的部分检查；用户完成 ConsentSheet 后，练习页显示 `已同步`、月历 5 分钟 / 1 天，未重复打卡。冷启动 QA-B UI 为 5 分钟 / 1 天、`已同步`；用户确认测试前基线亦为 5 分钟 / 1 天，且原记录日为 2026-10-02，与 QA-A 新记录同日。无可见汇总增量，故 D05 在本场景应用层通过；但未直接审计云记录或运行时响应，也未测反向 QA-B→QA-A，完整 D05 仍部分验收。未手动打卡；页面加载会尝试本机队列同步，是否发生远端同步未独立确认；未读取年龄缓存或账号标识。2026-10-03 复核：`src/services/mock/client.ts` 缺 `Circle` 类型导入已补齐，`tsc --noEmit` 全绿；Jest 38 suites / 525 tests、云函数 222 例、运维 32 例通过。M5-D05 的跨账号汇总异常定位为客户端本机队列按设备存储却未按账号绑定归属（小程序登录态无 `accountId`），已改为入队即绑定云端身份、补传前认领无主行、日历只合并当前账号记录，并补 2 条回归用例与变异验证；服务端 `practice` 全程按 `_openid` 过滤，未见跨账号读取路径。补 M5-A06（清除本机数据不留痕）自动化并通过；只读闸门 `circles.mjs audit`（旧话题 0）、`ensure-indexes` 预览（27 索引 / 0 冲突）、`build:weapp` 均通过；重跑 Jest 526 tests / 云函数 222 例 / 运维 32 例全绿。真机 D01–D06（含 D05 同设备 A→B 复测）仍未执行。D01–D04、D06 QA 未完成，不代表 M5 签核，详见 [`docs/test/cases/M5.md`](../test/cases/M5.md)。
 
 | 编号 | 负责 | 任务 | 验收 |
 |---|---|---|---|

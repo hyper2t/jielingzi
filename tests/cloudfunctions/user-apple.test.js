@@ -8,7 +8,7 @@ const { createAppleClient, appleAccountId, normalizeP8, JWKS_URL, TOKEN_URL, REV
 const { setup, links } = require('./userHarness')
 
 const NOW = 1790000000000
-const BUNDLE = 'cn.jielingzi.app'
+const BUNDLE = 'com.jielingzi.app'
 const SUB = '001234.0a1b2c3d4e5f60718293a4b5c6d7e8f9.0123'
 const RAW_NONCE = 'raw-nonce-0123456789abcdef'
 const sha256 = (s) => createHash('sha256').update(s).digest('hex')

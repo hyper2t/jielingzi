@@ -1,4 +1,4 @@
-package cn.jielingzi.app.wxapi;
+package com.jielingzi.app.wxapi;
 
 import android.app.Activity;
 import android.content.Intent;

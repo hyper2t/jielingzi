@@ -1,10 +1,12 @@
 # M4 实施计划：官方圈子 + 邀请码
 
 > 范围：PRD §5 G1 / G2 / G3（`docs/prd/README.md`）、§7.1 / §7.5 线框；任务编号沿用 `mvp-plan.md` M4，并补充拆分项。
-> 状态：**BE-M4-00 ~ BE-M4-03、OPS-M4-01 已完成（2026-10-01）**，其余任务未开工。OPS-M4-01 产出：`scripts/ops/circles.mjs`（seed / grant / issue / audit / migrate-topics / recount）、`scripts/ops/invite-quota.mjs`（`--report` / `--add`）、`scripts/ops/circles.seed.json`、`scripts/lib/ops-db.mjs`、`cloudfunctions/_shared/invite-code.js`（邀请码规范化与生成，云函数与脚本共用）；脚本单测 15 例；云端只读验证（`seed` 预览、`audit`、`--report`）正常，旧话题为 0；**尚未 `--apply`，云端还没有圈子**。BE-M4-03 产出：`topics.js` 的成员校验（`createTopic` 选圈子 / 默认归属、`listTopics` 聚合与过滤、`getTopic` / `listReplies` / `createReply` 越权 40401、`circle` 展示字段、`topicCount` 近似维护）、`circles.js` 的 `myOpenCircles` / `circleAccess`、`moderation.report` 的成员校验、`tests/cloudfunctions/m4-topics.test.js`（12 例；M2 / M3 既有用例的种子数据已补圈子与成员）。BE-M4-02 产出：`cloudfunctions/community/invites.js`（`listInvites` / `createInvite` / `redeemInvite` / `normalizeInviteCode`）、`tests/fixtures/invite-code.json`（前后端共享的规范化用例）、`tests/cloudfunctions/m4-invites.test.js`（19 例，含并发与回滚）。BE-M4-01 产出：`cloudfunctions/community/circles.js`（`listCircles` / `getCircle` + 成员关系读取入口 `myCircleIds` / `isMember`）、`common.js`（从 `topics.js` 抽出的 `findById` / `findRows` / `countRows` / `requireReader`，避免循环引用）、`tests/cloudfunctions/m4.test.js`（11 例）。BE-M4-00 产出：`config.js` 的 `INVITE_RULES` / `CIRCLE_RULES` / `DAILY_LIMITS.redeemInvite`（前端 `constants/community.ts` 同名并由测试比对）；`collections.js` 的 3 个新索引；`fakeDb` 支持 `gt / gte / lt / lte / neq / nin / exists`（并与云端一致：等值 `null` 匹配缺失字段、比较不匹配缺失字段、不认识的条件直接抛错）；夹具 `tests/cloudfunctions/circleFixtures.js`；`tests/cloudfunctions/m4-base.test.js`（10 例，含「抢最后一个名额 / 同一个码」的原子性模式）。接口契约草案见 `docs/api/community.md`「圈子与邀请码（M4，草案）」。
-> 约定：「默认」= 我按 PRD 与已有代码取的值，没有被推翻前照此实现；标 ❓ 的是需要产品确认的开放项（§2）。
+> 状态（2026-10-02）：**BE-M4-00～03、OPS-M4-01、FE-M4-00～02 已完成；QA-M4-01 自动化与变异验证已通过；DOC-M4 已完成**。部署前最近验证：云函数 217 / 217、运维 32 / 32、Jest 35 suites / 510 tests / 31 snapshots、`yarn typecheck` 全绿；三端真机尚未执行。
+> **当前共享 CloudBase 已完成 M4 后端初始化**：3 个 M4 索引已创建（全量 26 个存在、0 冲突）；`mindful`、`tradition`、`lifestyle` 均为 open（各 0 成员 / 0 话题）；`community` / `moderation` 已部署且 `ping` 均通过。用户于 2026-10-02 确认 `wording.md` §5 圈子文案法务审阅已通过。
+> **首批成员 grant、官方邀请码、三端真机 QA、客户端发布尚未完成；M4 未签上线。**已完成项的实现细节见下文。OPS-M4-01 产出：`scripts/ops/circles.mjs`（seed / grant / issue / audit / migrate-topics / recount）、`scripts/ops/invite-quota.mjs`（`--report` / `--add`）、`scripts/ops/circles.seed.json`、`scripts/lib/ops-db.mjs`、`cloudfunctions/_shared/invite-code.js`；BE-M4-03 产出：话题 / 回复 / 举报成员校验、`circle` 展示字段、`topicCount` 近似维护及 `tests/cloudfunctions/m4-topics.test.js`（12 例）；BE-M4-02 邀请码云函数与 `m4-invites.test.js`（19 例）；BE-M4-01 圈子接口与 `m4.test.js`（11 例）；BE-M4-00 配置、索引、`fakeDb` 条件操作符与 `m4-base.test.js`（10 例）。接口定稿见 `docs/api/community.md`「圈子与邀请码（M4 契约）」。
+> 约定：「默认」= 按 PRD 与现有代码确定的 M4 采用值；§2.2 记录了最初开放项的处理结论。若未获后续产品决定推翻，按此实施。
 
-## 1. 已有基础（盘点，M4 不重复做）
+## 1. 开工前盘点（历史基线，不代表当前状态）
 
 | 项 | 现状 | 位置 |
 |---|---|---|
@@ -15,7 +17,7 @@
 | 邀请名额字段 | `users.inviteQuota` 只出现在**账号合并**的补齐字段里，**没有任何代码初始化它** → 需要明确的懒初始化（§4） | `_shared/account.js` |
 | 前端占位 | `app.config.ts`（`TODO(M4)：circle-detail、join-circle、invites`）、`router.ts` 注释、`FilterChips`、`requirePhone`、`useRequest` / `usePaged`、`Toggle` / `TopicCard` | `src/` |
 | 测试夹具 | `tests/cloudfunctions/fakeDb.js` 已支持等值 / `$in` / `$inc`，**不支持** `$gte` / `$lt` / `$exists` / `$ne`（邀请名额扣减与过期判断要用到，见 BE-M4-00） | `tests/cloudfunctions/` |
-| 文案与公约 | 圈子名与简介在 `wording.md` §5（待确认）；全站公约 `community-rules.md` v0.1 | `docs/prd/` |
+| 文案与公约 | M4 采用的圈子文案在 `wording.md` §5，与种子 JSON 同步；法务审阅于 2026-10-02 经用户确认通过，三圈已写入当前共享 CloudBase；全站公约 `community-rules.md` v0.1 的审阅另按其上线门槛追踪 | `docs/prd/` |
 
 ## 2. 决策
 
@@ -23,7 +25,7 @@
 
 | # | 决策 | 理由 |
 |---|---|---|
-| D1 | **圈子 3 个**：静观练习 / 传统养生 / 正念生活（简介与公约草稿见 `wording.md` §5）；名称不含任何宗教名称 | PRD G1、`wording.md` §1 |
+| D1 | **圈子 3 个**：静观练习 / 传统养生 / 正念生活（采用文案见 `wording.md` §5）；名称不含任何宗教名称 | PRD G1、`wording.md` §1 |
 | D2 | **邀请码绑定圈子**：一个码只能加入签发它的那个圈子；一个人可加入多个圈子（每个圈子各用一个码） | `invites.circleId`（PRD §8） |
 | D3 | **只有圈子成员能签发该圈子的码**；初始名额 3（`users.inviteQuota`，懒初始化）；每码一次性、7 天有效 | PRD G3、mvp-plan BE-M4-02 |
 | D4 | **过期未使用的码退回名额**（每个码只退一次）。名额只有 3 个，被丢弃的码不应白白烧掉 | 本计划新增，可裁剪（裁剪后过期码不退，运维脚本补发） |
@@ -33,16 +35,16 @@
 | D8 | **首页话题流 = 我加入的所有圈子聚合**（按时间），顶部用 `FilterChips` 切换「全部 / 某圈子」；没有加入任何圈子 → 空列表（不是错误），前端展示引导 | PRD §7.1 |
 | D9 | **发话题必须归属圈子**。为兼容未升级的 M3 客户端与现有测试：`circleId` 缺省时，若用户**恰好加入 1 个圈子**则默认归到该圈子；加入多个圈子必须显式传（40001「请选择圈子」） | 平滑升级 |
 | D10 | **审核员没有读圈内内容的特权**：审核页只给内容摘要，已够处理举报；需要看上下文再单独加（会同时写审计日志） | 最小权限 |
-| D11 | **M3 期间没有圈子的旧话题（`circleId = null`）对任何人不可见**；上线前先审计数量，> 0 则用一次性脚本归到指定圈子（§8） | PRD 红线：圈内才可见；线上目前应无真实内容 |
+| D11 | **M3 期间没有圈子的旧话题（`circleId = null`）对任何人不可见**；上线前先审计数量，> 0 则用一次性脚本归到指定圈子（§8）。2026-10-01 只读审计为 0，上线前仍要重跑 | PRD 红线：圈内才可见 |
 | D12 | **无「退出圈子」「移除成员」**（PRD 未要求）；注销账号时 `memberships` 随账号清理（已有登记），圈子计数由运维脚本 `recount` 校正 | 范围 |
 | D13 | **名额增发先做运维脚本**：`invite-quota.mjs --report` 列出本月有效回复（≥ 30 字、状态 ok）数，`--add N` 手工补发；**不做自动规则**（PRD 只说「按活跃与贡献增发」，没有数字，等内测数据再定） | mvp-plan BE-M4-03 |
-| D14 | **兑换尝试计入频控**：`redeemInvite` 每次调用（含失败）计 1 次，每天 10 次；邀请码空间 32⁸ ≈ 1.1×10¹²，另有频控，暴力猜码不可行 | 防猜码 |
+| D14 | **兑换尝试计入频控**：格式规范化及 `guardWrite` 门禁通过后，每次兑换尝试（含无效 / 已用 / 过期码及「已是成员」）计 1 次，每天 10 次；格式错误（40001）或账号门禁失败不计；邀请码空间 32⁸ ≈ 1.1×10¹²，另有频控，暴力猜码不可行 | 防猜码 |
 
-### 2.2 开放项（❓ 需要产品确认；不阻塞开工，开工前给结论最省返工）
+### 2.2 最初开放项的处理结论（M4 采用；上线前保留审批门槛）
 
-1. ❓ **圈子名称 / 简介 / 公约**：默认用 D1。名称写在种子脚本里，上线后改名只需重跑一次 `circles.mjs seed --apply`（按 `slug` 更新，不影响成员与话题）。
-2. ❓ **第一批成员怎么进圈**：默认 **运维脚本签发「官方码」**（不占任何人的名额，`_openid = null`、`official = true`）+ 按手机号 / 账号直接加入（`circles.mjs grant`，与 `set-role.mjs` 同样的定位方式，默认预览、`--apply` 才写）。备选：管理员自动是所有圈子成员（省脚本，但管理员 3 个名额很快用完，且审核员与普通成员身份混在一起，不推荐）。
-3. ❓ **旧话题处理**：默认 D11（先审计；有数据才迁移）。
+1. **圈子名称 / 简介 / 公约**：M4 采用 `wording.md` §5 与 `scripts/ops/circles.seed.json` 的三圈数据；法务审阅于 2026-10-02 经用户确认通过，三圈已写入当前共享 CloudBase。后续若改文案，须重新审阅、同步两处并重跑 `scripts/ops/circles.test.mjs`。
+2. **第一批成员入圈方式**：采用 **运维 `circles.mjs grant` + 官方邀请码**。`grant` 默认预览、`--apply` 才写；官方码不占名额、`_openid = null`、`official = true`。首批成员 grant 与官方码签发尚未执行，操作步骤见 `docs/ops/release-checklist.md`。
+3. **旧话题处理**：采用 D11；2026-10-02 部署前后只读审计均为 0（旧话题 / 回复），无需迁移；客户端发布前仍须重跑 `circles.mjs audit`，若出现旧话题 / 回复再决定迁移目标；2026-10-03 重跑 `node scripts/ops/circles.mjs audit` 仍为 0（三圈 0 成员 / 0 话题、名额异常无、邀请码 0）。
 
 ## 3. 数据模型（相对 PRD §8 的差异）
 
@@ -145,7 +147,7 @@ DAILY_LIMITS += { redeemInvite: 10 }     // createInvite: 5 已有；兑换每�
 - **首页**：话题流上方 `FilterChips`（全部 / 各圈子，只有 1 个圈子时不显示）；**未入圈空状态**：「结灵子是邀请制社区」+ [输入邀请码] + 圈子介绍列表（`listCircles`）；卡片显示圈子名（`TopicCard` 加 `circle` 一行元信息）。
 - **发起话题**：圈子选择（只加入 1 个圈子时只读展示；多个时用 `Sheet` 选择；默认当前首页筛选的圈子）；草稿里存 `circleId`；未入圈用户点 ✎ → 引导进 `join-circle`。
 - **我的**：新增「我的圈子」「邀请码（剩余 N）」两行（名额数异步取，取不到不显示数字）。
-- **话题详情**：非成员 / 圈子关闭 → 沿用「话题不存在」文案（D6）；顶部元信息加圈子名，点击进 `circle`。
+- **话题详情**：非成员 / 圈子关闭 → 沿用通用「话题不存在或已被删除」文案（D6），不揭露具体原因；顶部元信息加圈子名，点击进 `circle`。
 
 ### 7.3 分享（FE-M4-01）
 
@@ -183,8 +185,8 @@ DAILY_LIMITS += { redeemInvite: 10 }     // createInvite: 5 已有；兑换每�
 | OPS-M4-01 | OPS | `circles.mjs`（seed / grant / issue / audit / migrate-topics / recount）、`invite-quota.mjs`、`circles.seed.json`；`ensure-indexes` 建 3 个新索引 | 脚本单测（参数解析、预览不写、幂等）；云端 `audit` 输出符合预期 | 0.5d |
 | FE-M4-00 | FE | 类型、`constants/community.ts`（`INVITE_RULES` 等，与 config 比对）、`features/circle/rules.ts`（邀请码规范化）、`services/community.ts` 新方法、`guard.ts`、mock 云端、`app.config.ts` / `router.ts` | `tsc` 无错；规则单测读共享 fixture | 0.5d |
 | FE-M4-01 | FE | 页面 `circles / circle / join-circle / invites`；「我的」两行入口；分享 / 复制 | 页面测试（§10）；快照 1 个 | 1.5d |
-| FE-M4-02 | FE | 首页 `FilterChips` 与未入圈空状态；发起话题圈子选择与草稿；`TopicCard` 圈子名；话题详情圈子名与非成员文案 | 页面测试；「首页话题流」快照更新 | 1d |
-| QA-M4-01 | QA | `docs/test/cases/M4.md`；邀请全链路、越权读取、名额边界、注销后成员关系清理的自动化与真机清单 | 自动化全绿；真机清单入库 | 0.5d |
+| FE-M4-02 | FE | 首页按圈子筛选并将当前筛选 `circleId` 传给发话题页；未入圈文案体现邀请制社区；单圈只读、多圈用 `Sheet`；默认圈子与草稿 `circleId`；卡片 / 详情圈名与详情导航；非成员 / 关闭圈子使用 D6 通用文案 | 页面测试；「首页话题流」快照更新 | 1d |
+| QA-M4-01 | QA | `docs/test/cases/M4.md`；邀请全链路、越权读取、名额边界、注销后成员关系清理的自动化 / 变异验证及三端真机清单 | 自动化 / 变异验证通过；三端清单已登记，真机执行待部署 | 0.5d |
 | DOC-M4 | PM / BE | 契约定稿（`docs/api/community.md`）、`docs/ops/collections.md` 索引表、`wording.md` §5 定稿、`mvp-plan.md` 进度、`docs/ops/release-checklist.md` | 文档与实现一致 | 随各项 |
 
 合计约 7 个工作日（含并行）。依赖：BE-M4-00 → 01 / 02 / 03；FE-M4-00 可与 BE 并行（先 mock）；OPS-M4-01 在 BE-M4-01 之后；FE-M4-01 / 02 在 FE-M4-00 之后。
@@ -209,11 +211,18 @@ DAILY_LIMITS += { redeemInvite: 10 }     // createInvite: 5 已有；兑换每�
 - 服务层：未同意 / 未 18+ 不请求；`createInvite` / `redeemInvite` 写前拦截与缓存失效；`_id` 映射。
 - 变异验证：去掉成员校验 / 去掉名额扣减 / 去掉兑换时的「已是成员」判断，相应用例必须变红（M3 起的习惯）。
 
-**真机清单（☐，小程序 / iOS / Android）**：A 签发 → 分享 → B 打开分享卡片兑换 → B 在圈内发帖 → A 看到；C（非成员）看不到圈内内容、直接打开话题链接提示不存在；名额耗尽；邀请码 7 天后过期并退额度（可用运维脚本把 `expiresAt` 提前验证）；匿名话题抓包无 `usedBy` / `invitedBy` / `_openid`。
+**真机清单（☐，小程序 / iOS / Android）**：完整步骤与记录表见 [`docs/test/cases/M4.md`](../test/cases/M4.md) M4-D01～D13；包含 A 签发 → 分享 → B 兑换 → 圈内发帖 / 回复、C 非成员越权、名额与过期退额、匿名 / 邀请数据抓包。M4 后端已部署，但 QA 成员与邀请码尚未配置；需先完成测试账号 / 邀请码准备再跑端到端流程。未记录三端结果不得签 M4 上线。
 
 ## 11. 上线与回滚
 
-1. 合并前：`yarn test:functions && yarn test && yarn typecheck` 全绿；新文件跑 eslint。
+1. 合并前逐项运行并记录：
+   ```bash
+   yarn test:functions
+   yarn test:ops
+   yarn test --runInBand --silent
+   yarn typecheck
+   ```
+   新文件按仓库脚本执行 lint；三端结果另记入 `docs/test/cases/M4.md`。
 2. `node scripts/sync-shared.mjs`；`ensure-indexes.mjs`（预览 → `--apply`，只新增 3 个索引）。
 3. `circles.mjs audit`（只读）：确认旧话题数量；> 0 则先 `migrate-topics`。
 4. `circles.mjs seed --apply` 建圈子。
@@ -233,4 +242,4 @@ DAILY_LIMITS += { redeemInvite: 10 }     // createInvite: 5 已有；兑换每�
 | 旧话题与回复的 `circleId` 为空 | D11 审计 + 迁移脚本 |
 | `users.inviteQuota` 合并时「主账号没有才补齐」：两个账号各有 3 个名额合并后只剩主账号的 | 可接受（防止合并刷名额）；不改 |
 | 微信 `onShareAppMessage` 审核：分享标题不能含诱导 / 营销话术 | 文案固定为「邀请你加入「<圈子名>」」 |
-| 圈子名称 / 公约未最终确认（PRD §12 待确认项） | 种子 JSON 可随时重跑；公约上线前需法务审阅（同全站公约） |
+| M4 圈子公约的法务审阅 | 用户于 2026-10-02 确认 `wording.md` §5 当前文案审阅通过且已写入种子；后续修改须重新审阅、同步 PRD §5 / 种子 JSON 并重跑措辞测试 |

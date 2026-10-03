@@ -6,7 +6,7 @@
  * - RN：cloud.rn.ts（CloudBase HTTP API：公开读用 Publishable Key；身份类调用用登录后的会话，见 `CloudAuth`）
  * 云函数入参 / 出参以 docs/api/*.md 为准（starter：docs/api/user.md）。
  */
-import type { AccountStatus, MediaQueueItem, ModDecision, ModQueueItem, Profile, ProfilePatch, Reply, ReplyInput, ReportTarget, TopicDetail, TopicInput, TopicSummary, User, UserSettings } from '@/types/models'
+import type { AccountStatus, CheckinMonth, Circle, CircleDetail, Invite, InviteList, MediaQueueItem, ModDecision, ModQueueItem, PracticeCheckinInput, PracticeCheckinResult, Profile, ProfilePatch, Reply, ReplyInput, ReportTarget, TopicDetail, TopicInput, TopicSummary, User, UserSettings } from '@/types/models'
 
 /** 客户端可直读的集合（安全规则见 docs/api/README.md「安全规则」）；业务集合落地时在这里补充 */
 export interface CollectionMap {
@@ -122,10 +122,20 @@ export interface FunctionMap {
     updateProfile: [ProfilePatch, { profile: Profile }]
     /** 上传头像后登记并机审（BE-M2-02）：pending = 等微信机审回调；review = 人工复核（App 用户等）。通过前只记 avatarPending */
     setAvatar: [{ fileID: string }, { profile: Profile, status: 'pending' | 'review' }]
+    /** 官方圈子列表（M4）：仅 open 圈子，非成员也可看简介与公约；joined 表示当前账号是否已加入 */
+    listCircles: [void, { list: Circle[] }]
+    /** 官方圈子详情（M4）：不存在 / 已关闭为 40401 */
+    getCircle: [{ id: string }, { circle: CircleDetail }]
+    /** 我的邀请码与剩余名额（M4）；会懒初始化名额并回收过期码额度 */
+    listInvites: [void, InviteList]
+    /** 为我所属的圈子签发邀请码，扣 1 个名额（M4） */
+    createInvite: [{ circleId: string }, { invite: Invite, quota: number }]
+    /** 兑换一次性邀请码并加入其绑定的圈子（M4） */
+    redeemInvite: [{ code: string }, { circle: Circle, joined: true }]
     /** 发起话题（M3）：标题 5–40 字、正文有效字数 ≥ 50；status = pending 表示机审待复核（只有本人看得到）；机审拒绝 40001 且不占额度 */
     createTopic: [TopicInput, { status: 'ok' | 'pending', topic: TopicDetail, remaining: number }]
     /** 话题流：只含 ok，新的在前；条目为摘要，作者已按匿名脱敏。需 18+，不要求实名 */
-    listTopics: [{ page?: number, size?: number }, PagedList<TopicSummary>]
+    listTopics: [{ page?: number, size?: number, circleId?: string }, PagedList<TopicSummary>]
     /** 话题详情；不存在 / 已下架 / 别人的待审 40401 */
     getTopic: [{ id: string }, { topic: TopicDetail }]
     /** 回复：有效字数 ≥ 1，< 30 标记 short；quoteId 必须是同一话题里的正常回复 */
@@ -147,6 +157,13 @@ export interface FunctionMap {
     mediaQueue: [{ page?: number, size?: number }, { list: MediaQueueItem[], total: number, page: number, size: number, hasMore: boolean }]
     /** 图片复核结论（仅 mod / admin）：pass 生效；reject 删除文件并通知上传者 */
     decideMedia: [{ mediaId: string, decision: 'pass' | 'reject', note?: string }, { ok: true, status: string, changed: boolean }]
+  }
+  /** 私人练习记录（docs/api/practice.md，M5）；服务端只按当前身份读写 */
+  practice: {
+    /** 单次完成记录；同一 sessionId 重试幂等 */
+    checkin: [PracticeCheckinInput, { checkin: PracticeCheckinResult }]
+    /** 指定月份的个人热力图数据 */
+    listCheckins: [{ month: string }, CheckinMonth]
   }
   // 业务云函数在这里按同样格式声明：<函数名>: { <action>: [入参, 出参] }，并在 cloud.rn.ts 标注公开 / 免身份动作
 }

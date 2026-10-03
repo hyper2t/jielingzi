@@ -62,6 +62,11 @@ export function isStorageHydrated (): boolean {
   return true
 }
 
+/** 小程序 / H5 同步写入；RN 由 storage.rn.ts 等待 AsyncStorage 写透。 */
+export function flushStorage (): Promise<void> {
+  return Promise.resolve()
+}
+
 export function createLRU<T> (prefix: string, max: number): LRUStore<T> {
   return createLRUWith<T>({ getItem, setItem, removeItem }, prefix, max)
 }

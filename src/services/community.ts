@@ -5,7 +5,9 @@
  * 页面取数：useRequest(ready ? PROFILE_KEY : null, getProfile)
  */
 import Taro from '@tarojs/taro'
-import type { Profile, ProfilePatch, Reply, ReplyInput, TopicDetail, TopicInput, TopicSummary } from '@/types/models'
+import type { Circle, CircleDetail, Invite, InviteList, Profile, ProfilePatch, Reply, ReplyInput, TopicDetail, TopicInput, TopicSummary } from '@/types/models'
+import { INVITE_RULES } from '@/constants/community'
+import { normalizeInviteCode } from '@/features/circle/rules'
 import { canSync, isAdultConfirmed } from '@/store/user'
 import { invalidate } from '@/hooks/requestCache'
 import { getClient } from './client'
@@ -15,10 +17,59 @@ import { CloudError, ERROR_CODES } from './cloud.types'
 /** 本人档案的请求缓存 key */
 export const PROFILE_KEY = 'me:profile'
 
+/** 圈子与本人邀请码的请求缓存 key */
+export const CIRCLES_KEY = 'circles:all'
+export const INVITES_KEY = 'invites:mine'
+export const circleKey = (id: string) => `circle:${id}`
+
 export async function getProfile (): Promise<Profile | null> {
   if (!canSync()) return null
   const res = await getClient().fn.call('community', 'getProfile')
   return res.profile
+}
+
+/** 全部开放圈子；未满足社区读取门槛时不发请求 */
+export async function listCircles (): Promise<Circle[]> {
+  if (!canReadCommunity()) return []
+  const res = await getClient().fn.call('community', 'listCircles')
+  return res.list
+}
+
+/** 圈子详情（含公约）；没有读取权限时返回 null */
+export async function getCircle (id: string): Promise<CircleDetail | null> {
+  if (!canReadCommunity()) return null
+  const res = await getClient().fn.call('community', 'getCircle', { id })
+  return res.circle
+}
+
+/** 我的剩余名额与邀请码；云端会在读取时懒初始化名额并回收过期码 */
+export async function listInvites (): Promise<InviteList> {
+  if (!canReadCommunity()) return { quota: 0, ttlDays: INVITE_RULES.ttlDays, list: [] }
+  return getClient().fn.call('community', 'listInvites')
+}
+
+function invalidateCircleViews (): void {
+  invalidate('circles:')
+  invalidate('circle:')
+  invalidate(INVITES_KEY)
+  touchFeed()
+}
+
+/** 为已加入的圈子签发邀请码；成功后失效圈子 / 邀请缓存并刷新话题流 */
+export async function createInvite (circleId: string): Promise<{ invite: Invite, quota: number }> {
+  assertCanWrite()
+  const res = await getClient().fn.call('community', 'createInvite', { circleId })
+  invalidateCircleViews()
+  return res
+}
+
+/** 规范化后兑换邀请码；成功后失效圈子 / 邀请缓存并刷新话题流 */
+export async function redeemInvite (rawCode: string): Promise<{ circle: Circle, joined: true }> {
+  assertCanWrite()
+  const code = normalizeInviteCode(rawCode)
+  const res = await getClient().fn.call('community', 'redeemInvite', { code })
+  invalidateCircleViews()
+  return res
 }
 
 /** 部分更新档案；需已确认 18+（云端 40303）。返回完整档案 */
@@ -96,9 +147,9 @@ export function canReadCommunity (): boolean {
 export const FEED_PAGE_SIZE = 20
 export const REPLY_PAGE_SIZE = 30
 
-export async function listTopics (page = 1, size = FEED_PAGE_SIZE): Promise<PagedResult<TopicCard>> {
+export async function listTopics (page = 1, size = FEED_PAGE_SIZE, circleId?: string): Promise<PagedResult<TopicCard>> {
   if (!canReadCommunity()) return { list: [], total: 0, hasMore: false }
-  const res = await getClient().fn.call('community', 'listTopics', { page, size })
+  const res = await getClient().fn.call('community', 'listTopics', { page, size, ...(circleId ? { circleId } : {}) })
   return { list: res.list.map(t => ({ ...t, _id: t.id })), total: res.total, hasMore: res.hasMore }
 }
 

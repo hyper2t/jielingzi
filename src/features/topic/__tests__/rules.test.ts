@@ -123,8 +123,8 @@ describe('本地草稿', () => {
   beforeEach(() => { ;(Taro as any).__storage.clear() })
   it('保存 → 读取；清除后为 null', () => {
     expect(loadDraft()).toBeNull()
-    saveDraft({ title: '标题', body: '正文', tags: '冥想', anon: true }, 123)
-    expect(loadDraft()).toEqual({ title: '标题', body: '正文', tags: '冥想', anon: true, savedAt: 123 })
+    saveDraft({ circleId: 'circle-tradition', title: '标题', body: '正文', tags: '冥想', anon: true }, 123)
+    expect(loadDraft()).toEqual({ circleId: 'circle-tradition', title: '标题', body: '正文', tags: '冥想', anon: true, savedAt: 123 })
     clearDraft()
     expect(loadDraft()).toBeNull()
   })

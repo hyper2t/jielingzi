@@ -3,9 +3,10 @@
  * 切换真实数据：在 .env / .env.local 写 TARO_APP_DATA_SOURCE=cloud（见 services/client.ts），业务层不改。
  * 业务云函数落地时：在 FunctionMap 声明后，这里的 handlers 必须补上同名实现（类型会强制要求）。
  */
-import type { AccountStatus, AuthorView, MediaQueueItem, ModQueueItem, Profile, Reply, ReplyQuote, TopicDetail, TopicStatus, TopicSummary, User, UserSettings } from '@/types/models'
+import type { AccountStatus, AuthorView, CheckinMonth, Circle, DailyCheckin, Invite, MediaQueueItem, ModQueueItem, PracticeCheckinInput, PracticeCheckinResult, Profile, Reply, ReplyQuote, TopicDetail, TopicStatus, TopicSummary, User, UserSettings } from '@/types/models'
 import type { AccountIdentities } from '../cloud.types'
-import { CONSENT_VERSION, DAILY_LIMITS, TOPIC_RULES } from '@/constants/community'
+import { CONSENT_VERSION, DAILY_LIMITS, INVITE_RULES, PRACTICES, TOPIC_RULES } from '@/constants/community'
+import { normalizeInviteCode } from '@/features/circle/rules'
 import { normalizeLine, patchError } from '@/features/profile/rules'
 import { clip, isShortReply, normalizeBody, replyError, topicInputError } from '@/features/topic/rules'
 import { readAuth, useUserStore } from '@/store/user'
@@ -19,6 +20,49 @@ import {
 let remoteSettings: UserSettings = {}
 
 const NO_STATUS: AccountStatus = { phoneVerified: false, adult: false, role: 'user', bannedUntil: null, mutedUntil: null }
+const MOCK_OPENID = 'mock-openid'
+interface MockCircle {
+  id: string
+  slug: string
+  name: string
+  desc: string
+  cover: string | null
+  rules: string[]
+  memberCount: number
+  topicCount: number
+  sort: number
+  status: 'open' | 'closed'
+}
+interface MockMembership { circleId: string, accountId: string }
+interface MockInvite {
+  code: string
+  circleId: string
+  ownerId: string | null
+  official: boolean
+  createdAt: number
+  expiresAt: number
+  usedBy: string | null
+  usedAt: number | null
+  refunded: boolean
+}
+const DEFAULT_CIRCLE_ID = 'circle-mindful'
+const defaultMockCircle = (): MockCircle => ({
+  id: DEFAULT_CIRCLE_ID,
+  slug: 'mindful',
+  name: '静观练习',
+  desc: '冥想、正念、内观的日常练习与困惑',
+  cover: 'circle:mindful',
+  rules: ['说具体：做法、时长、当时的感受，少下结论。', '讲方法时先说明这是个人经验，不替别人定「应该」。', '不评判他人的练习方式。'],
+  memberCount: 1,
+  topicCount: 0,
+  sort: 1,
+  status: 'open'
+})
+let circles: MockCircle[] = [defaultMockCircle()]
+let memberships: MockMembership[] = [{ circleId: DEFAULT_CIRCLE_ID, accountId: MOCK_OPENID }]
+let invites: MockInvite[] = []
+let inviteQuota: number | undefined
+let inviteSeq = 0
 /** mock 云端账号状态（实名 / 18+ / 角色 / 处罚） */
 let account: AccountStatus = { ...NO_STATUS }
 /** mock 云端练习档案（community.getProfile / updateProfile） */
@@ -41,12 +85,14 @@ function settleMock (m: MockMedia, verdict: 'pass' | 'reject') {
  * mock 云端话题 / 回复（community.createTopic / listTopics / getTopic / createReply / listReplies / deleteMine，M3）。
  * 规则与云函数一致（features/topic/rules.ts）；机审可用标记演示：标题 / 正文含 [reject] → 40001 拒绝，含 [review] → 待复核（pending，只有本人看得到）。
  */
-interface MockTopic { id: string, title: string, body: string, tags: string[], anon: boolean, mine: boolean, authorName: string, status: TopicStatus, replyCount: number, createdAt: number, lastReplyAt: number, featured: boolean }
+interface MockTopic { id: string, circleId: string | null, title: string, body: string, tags: string[], anon: boolean, mine: boolean, authorName: string, status: TopicStatus, replyCount: number, createdAt: number, lastReplyAt: number, featured: boolean }
 interface MockReply { id: string, topicId: string, body: string, anon: boolean, mine: boolean, authorName: string, status: TopicStatus, quoteId: string | null, createdAt: number }
 let topics: MockTopic[] = []
 let replies: MockReply[] = []
 let postSeq = 0
-let postedToday = { topic: 0, reply: 0 }
+interface MockCheckin { date: string, practice: PracticeCheckinInput['practice'], minutes: number, sessionIds: string[] }
+let checkins: MockCheckin[] = []
+let postedToday = { topic: 0, reply: 0, createInvite: 0, redeemInvite: 0 }
 export const MOCK_REJECT_MARK = '[reject]'
 export const MOCK_REVIEW_MARK = '[review]'
 /** getPhoneNumber 回调里以这个前缀开头的 code 视为失效（测试 / 演示「code 失效」分支） */
@@ -76,6 +122,49 @@ export const mockControl = {
   seedReports (list: Array<Omit<MockReport, 'state' | 'note' | 'contentType'> & { note?: string, contentType?: MockReport['contentType'] }>) {
     reports = list.map(r => ({ note: '', contentType: r.targetType === 'user' ? 'topic' : r.targetType as MockReport['contentType'], ...r, state: 'open' }))
   },
+  /** 预置官方圈子（默认 reset 只放静观练习一个圈子） */
+  seedCircles (list: Array<Partial<MockCircle> & Pick<MockCircle, 'slug' | 'name'>>) {
+    circles = list.map((c, i) => {
+      const base = defaultMockCircle()
+      return {
+        ...base,
+        ...c,
+        id: c.id || `circle-${c.slug}`,
+        slug: c.slug,
+        desc: c.desc ?? '',
+        cover: c.cover ?? (c.slug ? `circle:${c.slug}` : null),
+        rules: c.rules ? [...c.rules] : [...base.rules],
+        memberCount: c.memberCount ?? 0,
+        topicCount: c.topicCount ?? 0,
+        sort: c.sort ?? i + 1,
+        status: c.status ?? 'open'
+      }
+    })
+  },
+  /** 覆盖当前 mock 账号的圈子成员关系；传 [] 模拟未入圈 */
+  setMemberships (circleIds: string[]) {
+    memberships = circleIds.map(circleId => ({ circleId, accountId: MOCK_OPENID }))
+  },
+  /** 预置邀请码（仅测试 / 演示使用） */
+  seedInvites (list: Array<Partial<MockInvite> & Pick<MockInvite, 'code' | 'circleId'>>) {
+    const now = Date.now()
+    invites = list.map((inv, i) => ({
+      code: inv.code,
+      circleId: inv.circleId,
+      ownerId: inv.ownerId ?? (inv.official ? null : MOCK_OPENID),
+      official: inv.official ?? false,
+      createdAt: inv.createdAt ?? now - (list.length - i) * 60000,
+      expiresAt: inv.expiresAt ?? now + INVITE_RULES.ttlDays * 24 * 3600 * 1000,
+      usedBy: inv.usedBy ?? null,
+      usedAt: inv.usedAt ?? null,
+      refunded: inv.refunded ?? false
+    }))
+  },
+  setInviteQuota (quota: number | undefined) { inviteQuota = quota },
+  get circles (): MockCircle[] { return circles.map(c => ({ ...c, rules: [...c.rules] })) },
+  get memberships (): MockMembership[] { return memberships.map(m => ({ ...m })) },
+  get invites (): MockInvite[] { return invites.map(i => ({ ...i })) },
+  get inviteQuota (): number | undefined { return inviteQuota },
   get reports (): MockReport[] { return reports.map(r => ({ ...r })) },
   get media (): MockMedia[] { return media.map(m => ({ ...m })) },
   /** 模拟微信机审回调：最近一张待审头像的结论 */
@@ -88,7 +177,8 @@ export const mockControl = {
     const base = Date.now() - list.length * 60000
     list.forEach((t, i) => {
       const createdAt = t.createdAt ?? base + i * 60000
-      topics.push({ id: `t${++postSeq}`, tags: [], anon: false, mine: false, authorName: '林然', status: 'ok', replyCount: 0, lastReplyAt: createdAt, featured: false, ...t, createdAt })
+      const circleId = t.circleId === undefined ? (circles.find(c => c.status === 'open')?.id ?? null) : t.circleId
+      topics.push({ id: `t${++postSeq}`, tags: [], anon: false, mine: false, authorName: '林然', status: 'ok', replyCount: 0, lastReplyAt: createdAt, featured: false, ...t, circleId, createdAt })
     })
   },
   seedReplies (list: Array<Partial<MockReply> & { topicId: string, body: string }>) {
@@ -99,6 +189,7 @@ export const mockControl = {
   },
   get topics (): MockTopic[] { return topics.map(t => ({ ...t })) },
   get replies (): MockReply[] { return replies.map(r => ({ ...r })) },
+  get checkins (): MockCheckin[] { return checkins.map(c => ({ ...c, sessionIds: [...c.sessionIds] })) },
   get account (): AccountStatus { return { ...account } },
   get profile (): Profile | null { return profile ? { ...profile } : null },
   reset () {
@@ -115,8 +206,14 @@ export const mockControl = {
     mediaSeq = 0
     topics = []
     replies = []
+    checkins = []
     postSeq = 0
-    postedToday = { topic: 0, reply: 0 }
+    circles = [defaultMockCircle()]
+    memberships = [{ circleId: DEFAULT_CIRCLE_ID, accountId: MOCK_OPENID }]
+    invites = []
+    inviteQuota = undefined
+    inviteSeq = 0
+    postedToday = { topic: 0, reply: 0, createInvite: 0, redeemInvite: 0 }
   }
 }
 
@@ -139,18 +236,16 @@ async function gate () {
   }
 }
 
-const MOCK_OPENID = 'mock-openid'
-
 type Handler<N extends FnName, A extends FnAction<N>> = (data: FnInput<N, A>) => FnOutput<N, A>
 type Handlers = { [N in FnName]: { [A in FnAction<N>]: Handler<N, A> } }
 
 /** 与云端 guardWrite 一致的拦截：封禁 → 18+ → 实名 → 禁言 */
-function guard (opts: { requirePhone: boolean }) {
+function guard (opts: { requirePhone: boolean, allowMuted?: boolean }) {
   const now = Date.now()
   if (account.bannedUntil && account.bannedUntil > now) throw new CloudError(ERROR_CODES.BANNED, 'mock: 账号已被封禁')
   if (!account.adult) throw new CloudError(ERROR_CODES.ADULT_REQUIRED, 'mock: 请先确认年满 18 周岁')
   if (opts.requirePhone && !account.phoneVerified) throw new CloudError(ERROR_CODES.PHONE_REQUIRED, 'mock: 请先绑定手机号')
-  if (account.mutedUntil && account.mutedUntil > now) throw new CloudError(ERROR_CODES.MUTED, 'mock: 账号禁言中')
+  if (!opts.allowMuted && account.mutedUntil && account.mutedUntil > now) throw new CloudError(ERROR_CODES.MUTED, 'mock: 账号禁言中')
 }
 
 const MOCK_ALIASES = ['竹影', '松声', '云眠', '溪语', '石径', '月光']
@@ -163,6 +258,61 @@ function noUnknown (input: unknown, allowed: string[]) {
 }
 function readGuard () {
   if (!account.adult) throw new CloudError(ERROR_CODES.ADULT_REQUIRED, 'mock: 请先确认年满 18 周岁')
+}
+const presentCircle = (circle: MockCircle, joined: boolean): Circle => ({
+  id: circle.id,
+  slug: circle.slug,
+  name: circle.name,
+  desc: circle.desc,
+  cover: circle.cover,
+  memberCount: Math.max(0, Math.floor(circle.memberCount)),
+  topicCount: Math.max(0, Math.floor(circle.topicCount)),
+  joined
+})
+const isMockMember = (circleId: string | null | undefined, accountId = MOCK_OPENID): boolean =>
+  !!circleId && circles.some(c => c.id === circleId && c.status === 'open') && memberships.some(m => m.circleId === circleId && m.accountId === accountId)
+const hasMockMembership = (circleId: string | null | undefined, accountId = MOCK_OPENID): boolean =>
+  !!circleId && memberships.some(m => m.circleId === circleId && m.accountId === accountId)
+const openMembershipIds = (): Set<string> => new Set(circles.filter(c => c.status === 'open' && isMockMember(c.id)).map(c => c.id))
+const circleRef = (circleId: string | null): { id: string, name: string } | null => {
+  const c = circleId && circles.find(x => x.id === circleId && x.status === 'open')
+  return c ? { id: c.id, name: c.name } : null
+}
+function ensureInviteQuota (): number {
+  if (inviteQuota === undefined) inviteQuota = INVITE_RULES.initialQuota
+  return inviteQuota
+}
+function refundExpiredMockInvites (ownerId: string, now: number): number {
+  let refunded = 0
+  for (const inv of invites) {
+    if (inv.ownerId === ownerId && !inv.official && !inv.usedBy && !inv.refunded && inv.expiresAt <= now) {
+      inv.refunded = true
+      refunded += 1
+    }
+  }
+  if (refunded) inviteQuota = ensureInviteQuota() + refunded
+  return refunded
+}
+const presentInvite = (inv: MockInvite, now: number): Invite => {
+  const circle = circles.find(c => c.id === inv.circleId)
+  return {
+    code: inv.code,
+    circle: { id: inv.circleId, name: circle?.name || '' },
+    status: inv.usedBy ? 'used' : inv.expiresAt <= now ? 'expired' : 'active',
+    createdAt: inv.createdAt,
+    expiresAt: inv.expiresAt,
+    usedAt: inv.usedAt
+  }
+}
+function nextMockInviteCode (): string {
+  const alphabet = INVITE_RULES.alphabet
+  let n = ++inviteSeq
+  let code = ''
+  for (let i = 0; i < INVITE_RULES.codeLength; i++) {
+    code = `${alphabet[n % alphabet.length]}${code}`
+    n = Math.floor(n / alphabet.length)
+  }
+  return code
 }
 function ensureMockProfile () {
   if (!profile) profile = { nickname: '', avatar: null, practices: [], years: null, goal: '', bio: '', badges: [], anonAlias: MOCK_ALIASES[0], updatedAt: Date.now() }
@@ -184,7 +334,7 @@ function mockAuthor (d: { anon: boolean, mine: boolean, authorName: string }): A
 const canSee = (d: { status: TopicStatus, mine: boolean }) => d.status === 'ok' || d.status === 'folded' || (d.status === 'pending' && d.mine)
 function topicBase (d: MockTopic) {
   return {
-    id: d.id, title: d.title, tags: [...d.tags], anon: d.anon, author: mockAuthor(d), replyCount: d.replyCount,
+    id: d.id, circle: circleRef(d.circleId), title: d.title, tags: [...d.tags], anon: d.anon, author: mockAuthor(d), replyCount: d.replyCount,
     createdAt: d.createdAt, lastReplyAt: d.lastReplyAt, featured: d.featured, images: [] as string[], folded: d.status === 'folded', pending: d.status === 'pending'
   }
 }
@@ -251,6 +401,12 @@ const handlers: Handlers = {
       if (confirm !== 'DELETE') throw new CloudError(ERROR_CODES.BAD_PARAM, 'mock: confirm 必须为 DELETE')
       if (!mockSession) throw new CloudError(ERROR_CODES.UNAUTHORIZED, 'mock: 未登录')
       const removed = { user: 1, links: 1, profiles: profile ? 1 : 0 }
+      for (const membership of memberships.filter(m => m.accountId === MOCK_OPENID)) {
+        const circle = circles.find(c => c.id === membership.circleId)
+        if (circle) circle.memberCount = Math.max(0, circle.memberCount - 1)
+      }
+      memberships = memberships.filter(m => m.accountId !== MOCK_OPENID)
+      invites = invites.filter(inv => inv.ownerId !== MOCK_OPENID && inv.usedBy !== MOCK_OPENID)
       remoteSettings = {}
       identities = { mp: false, wechat: false, phone: false, apple: false }
       account = { ...NO_STATUS }
@@ -259,6 +415,66 @@ const handlers: Handlers = {
     }
   },
   community: {
+    listCircles: () => {
+      readGuard()
+      const joined = openMembershipIds()
+      const list = circles.filter(c => c.status === 'open').sort((a, b) => a.sort - b.sort || a.slug.localeCompare(b.slug)).map(c => presentCircle(c, joined.has(c.id)))
+      return { list }
+    },
+    getCircle: ({ id }) => {
+      readGuard()
+      const circle = circles.find(c => c.id === id && c.status === 'open')
+      if (!circle) throw new CloudError(ERROR_CODES.NOT_FOUND, '圈子不存在或已关闭')
+      return { circle: { ...presentCircle(circle, isMockMember(circle.id)), rules: [...circle.rules] } }
+    },
+    listInvites: (input) => {
+      noUnknown(input, [])
+      readGuard()
+      const now = Date.now()
+      ensureInviteQuota()
+      refundExpiredMockInvites(MOCK_OPENID, now)
+      const list = invites.filter(inv => inv.ownerId === MOCK_OPENID).sort((a, b) => b.createdAt - a.createdAt).slice(0, INVITE_RULES.listMax).map(inv => presentInvite(inv, now))
+      return { quota: ensureInviteQuota(), ttlDays: INVITE_RULES.ttlDays, list }
+    },
+    createInvite: (input) => {
+      noUnknown(input, ['circleId'])
+      if (!input.circleId) throw badParam('circleId 必填')
+      guard({ requirePhone: true })
+      const circle = circles.find(c => c.id === input.circleId && c.status === 'open')
+      if (!circle || !isMockMember(input.circleId)) throw new CloudError(ERROR_CODES.FORBIDDEN, '加入圈子后才能邀请')
+      if (postedToday.createInvite >= DAILY_LIMITS.createInvite) throw new CloudError(ERROR_CODES.TOO_MANY, 'mock: 今天创建的邀请码已达上限')
+      const now = Date.now()
+      ensureInviteQuota()
+      refundExpiredMockInvites(MOCK_OPENID, now)
+      if (inviteQuota! < 1) throw new CloudError(ERROR_CODES.TOO_MANY, '邀请名额已用完')
+      inviteQuota = inviteQuota! - 1
+      const invite: MockInvite = {
+        code: nextMockInviteCode(), circleId: circle.id, ownerId: MOCK_OPENID, official: false,
+        createdAt: now, expiresAt: now + INVITE_RULES.ttlDays * 24 * 3600 * 1000, usedBy: null, usedAt: null, refunded: false
+      }
+      invites.push(invite)
+      postedToday.createInvite += 1
+      return { invite: presentInvite(invite, now), quota: inviteQuota! }
+    },
+    redeemInvite: (input) => {
+      noUnknown(input, ['code'])
+      const code = normalizeInviteCode(input.code)
+      guard({ requirePhone: true, allowMuted: true })
+      if (postedToday.redeemInvite >= DAILY_LIMITS.redeemInvite) throw new CloudError(ERROR_CODES.TOO_MANY, 'mock: 今天兑换邀请码的尝试次数已达上限')
+      postedToday.redeemInvite += 1
+      const now = Date.now()
+      const invite = invites.find(inv => inv.code === code)
+      const circle = invite && circles.find(c => c.id === invite.circleId)
+      if (!invite || invite.usedBy || invite.expiresAt <= now || !circle || circle.status !== 'open') {
+        throw new CloudError(ERROR_CODES.NOT_FOUND, '邀请码无效、已被使用或已过期')
+      }
+      if (isMockMember(circle.id)) throw new CloudError(ERROR_CODES.CONFLICT, '你已在这个圈子里')
+      invite.usedBy = MOCK_OPENID
+      invite.usedAt = now
+      memberships.push({ circleId: circle.id, accountId: MOCK_OPENID })
+      circle.memberCount += 1
+      return { circle: presentCircle(circle, true), joined: true }
+    },
     getProfile: () => ({ profile: profile ? { ...profile } : null }),
     // 与云端一致：先校验字段（同一份规则），再走写入链路（需 18+，不要求实名），首次保存分配匿名代号
     updateProfile: (patch) => {
@@ -293,30 +509,48 @@ const handlers: Handlers = {
     },
     // 与云端一致：先校验字段，再走写入链路（18+ → 实名 → 禁言 → 当日额度）→ 机审 → 落库
     createTopic: (input) => {
-      noUnknown(input, ['title', 'body', 'anon', 'tags'])
+      noUnknown(input, ['title', 'body', 'anon', 'tags', 'circleId'])
       const first = topicInputError(input)
       if (first) throw badParam(first)
       guard({ requirePhone: true })
+      if (input.circleId !== undefined && !input.circleId) throw badParam('circleId 格式不正确')
+      const memberIds = [...openMembershipIds()]
+      let circleId: string
+      if (input.circleId) {
+        if (!memberIds.includes(input.circleId)) throw new CloudError(ERROR_CODES.FORBIDDEN, '加入圈子后才能发帖')
+        circleId = input.circleId
+      } else if (memberIds.length === 1) circleId = memberIds[0]
+      else if (memberIds.length > 1) throw badParam('请选择圈子')
+      else throw new CloudError(ERROR_CODES.FORBIDDEN, '加入圈子后才能发帖')
       if (postedToday.topic >= DAILY_LIMITS.createTopic) throw new CloudError(ERROR_CODES.TOO_MANY, 'mock: 今天发起的话题已达上限')
       const tags = Array.from(new Set((input.tags || []).map(t => normalizeLine(t.replace(/^#+/, '')))))
       const status = mockModerate(`${input.title}\n${input.body}\n${tags.join(' ')}`)
       ensureMockProfile()
       const now = Date.now()
-      const d: MockTopic = { id: `t${++postSeq}`, title: normalizeLine(input.title), body: normalizeBody(input.body), tags, anon: input.anon === true, mine: true, authorName: '', status, replyCount: 0, createdAt: now, lastReplyAt: now, featured: false }
+      const d: MockTopic = { id: `t${++postSeq}`, circleId, title: normalizeLine(input.title), body: normalizeBody(input.body), tags, anon: input.anon === true, mine: true, authorName: '', status, replyCount: 0, createdAt: now, lastReplyAt: now, featured: false }
       topics.push(d)
+      if (status === 'ok') {
+        const circle = circles.find(c => c.id === circleId)
+        if (circle) circle.topicCount += 1
+      }
       postedToday.topic += 1
       return { status: status === 'ok' ? 'ok' : 'pending', topic: topicDetail(d), remaining: DAILY_LIMITS.createTopic - postedToday.topic }
     },
     listTopics: (input) => {
       readGuard()
-      const all = topics.filter(t => t.status === 'ok').sort((a, b) => b.createdAt - a.createdAt)
+      noUnknown(input, ['page', 'size', 'circleId'])
+      if (input.circleId !== undefined && !input.circleId) throw badParam('circleId 格式不正确')
+      const memberIds = openMembershipIds()
+      if (input.circleId && !memberIds.has(input.circleId)) throw new CloudError(ERROR_CODES.FORBIDDEN, '加入圈子后才能查看')
+      const visibleIds = input.circleId ? new Set([input.circleId]) : memberIds
+      const all = topics.filter(t => t.status === 'ok' && !!t.circleId && visibleIds.has(t.circleId)).sort((a, b) => b.createdAt - a.createdAt)
       const p = pageOf(all, input, 20)
       return { ...p, list: p.list.map(topicSummary) }
     },
     getTopic: ({ id }) => {
       readGuard()
       const t = topics.find(x => x.id === id)
-      if (!t || !canSee(t)) throw new CloudError(ERROR_CODES.NOT_FOUND, '话题不存在或已下架')
+      if (!t || !canSee(t) || !isMockMember(t.circleId)) throw new CloudError(ERROR_CODES.NOT_FOUND, '话题不存在或已下架')
       return { topic: topicDetail(t) }
     },
     createReply: (input) => {
@@ -326,7 +560,7 @@ const handlers: Handlers = {
       guard({ requirePhone: true })
       if (postedToday.reply >= DAILY_LIMITS.createReply) throw new CloudError(ERROR_CODES.TOO_MANY, 'mock: 今天发布的回复已达上限')
       const t = topics.find(x => x.id === input.topicId)
-      if (!t || t.status !== 'ok') throw new CloudError(ERROR_CODES.NOT_FOUND, '话题不存在或暂时不能回复')
+      if (!t || t.status !== 'ok' || !isMockMember(t.circleId)) throw new CloudError(ERROR_CODES.NOT_FOUND, '话题不存在或暂时不能回复')
       if (input.quoteId) {
         const q = replies.find(x => x.id === input.quoteId)
         if (!q || q.topicId !== t.id || q.status !== 'ok') throw badParam('引用的回复不存在或已不可用')
@@ -343,7 +577,7 @@ const handlers: Handlers = {
     listReplies: (input) => {
       readGuard()
       const t = topics.find(x => x.id === input.topicId)
-      if (!t || !canSee(t)) throw new CloudError(ERROR_CODES.NOT_FOUND, '话题不存在或已下架')
+      if (!t || !canSee(t) || !isMockMember(t.circleId)) throw new CloudError(ERROR_CODES.NOT_FOUND, '话题不存在或已下架')
       const all = replies.filter(r => r.topicId === t.id && canSee(r)).sort((a, b) => a.createdAt - b.createdAt)
       const p = pageOf(all, input, 30)
       return { ...p, list: p.list.map(replyOut) }
@@ -356,6 +590,10 @@ const handlers: Handlers = {
       if (doc.status === 'removed') return { ok: true, changed: false }
       const wasOk = doc.status === 'ok'
       doc.status = 'removed'
+      if (input.type === 'topic' && wasOk) {
+        const circle = circles.find(c => c.id === (doc as MockTopic).circleId)
+        if (circle) circle.topicCount = Math.max(0, circle.topicCount - 1)
+      }
       if (input.type === 'reply' && wasOk) {
         const t = topics.find(x => x.id === (doc as MockReply).topicId)
         if (t) t.replyCount = Math.max(0, t.replyCount - 1)
@@ -369,9 +607,15 @@ const handlers: Handlers = {
       if (account.bannedUntil && account.bannedUntil > Date.now()) throw new CloudError(ERROR_CODES.BANNED, 'mock: 账号已被封禁')
       if (!account.adult) throw new CloudError(ERROR_CODES.ADULT_REQUIRED, 'mock: 请先确认年满 18 周岁')
       if (input.note && Array.from(input.note).length > 200) throw new CloudError(ERROR_CODES.BAD_PARAM, 'note 长度不能超过 200')
+      if (input.targetType === 'user' && !input.contentType) throw badParam('举报用户时需提供 contentType（他发布的话题 / 回复）')
+      if (input.targetType !== 'user' && input.contentType && input.contentType !== input.targetType) throw badParam('contentType 与 targetType 不一致')
+      const contentType = input.contentType || (input.targetType === 'user' ? 'topic' : input.targetType)
+      const target = contentType === 'topic' ? topics.find(t => t.id === input.targetId) : replies.find(r => r.id === input.targetId)
+      const targetTopic = contentType === 'topic' ? target as MockTopic | undefined : topics.find(t => t.id === (target as MockReply | undefined)?.topicId)
+      if (!target || !hasMockMembership(targetTopic?.circleId)) throw new CloudError(ERROR_CODES.NOT_FOUND, '内容不存在或已删除')
+      if (target.mine) throw badParam('不能举报自己发布的内容')
       const dup = reports.some(r => r.targetType === input.targetType && r.targetId === input.targetId && r.by === MOCK_OPENID)
       if (!dup) {
-        const contentType = input.contentType || (input.targetType === 'user' ? 'topic' : input.targetType)
         reports.push({ targetType: input.targetType, targetId: input.targetId, contentType, reason: input.reason, note: input.note || '', state: 'open', by: MOCK_OPENID })
       }
       return { ok: true, duplicate: dup, folded: false }
@@ -382,7 +626,7 @@ const handlers: Handlers = {
       const groups = new Map<string, ModQueueItem>()
       for (const r of reports.filter(x => x.state === state)) {
         const key = `${r.targetType}:${r.targetId}`
-        const found = r.targetType === 'topic' ? topics.find(x => x.id === r.targetId) : r.targetType === 'reply' ? replies.find(x => x.id === r.targetId) : undefined
+        const found = r.contentType === 'topic' ? topics.find(x => x.id === r.targetId) : replies.find(x => x.id === r.targetId)
         const g: ModQueueItem = groups.get(key) || {
           targetType: r.targetType, targetId: r.targetId, contentType: r.contentType, count: 0, reasons: {}, notes: [], latestAt: Date.now(),
           target: found
@@ -424,6 +668,45 @@ const handlers: Handlers = {
       const changed = m.status === 'pending' || m.status === 'review'
       if (changed) settleMock(m, decision)
       return { ok: true, status: m.status, changed }
+    }
+  },
+  practice: {
+    checkin: (input: PracticeCheckinInput) => {
+      noUnknown(input, ['sessionId', 'date', 'practice', 'minutes'])
+      const date = typeof input.date === 'string' ? input.date : ''
+      const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
+      const dateOk = !!dateMatch && Number(dateMatch[1]) >= 2000 && Number(dateMatch[1]) <= 2100 && new Date(Date.UTC(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]))).toISOString().slice(0, 10) === date
+      if (typeof input.sessionId !== 'string' || !/^[A-Za-z0-9_-]{8,80}$/.test(input.sessionId)) throw badParam('sessionId 格式不正确')
+      if (!dateOk) throw badParam('date 必须是有效的 YYYY-MM-DD 日期')
+      if (!PRACTICES.some(p => p.id === input.practice)) throw badParam('practice 不在支持范围内')
+      if (!Number.isInteger(input.minutes) || input.minutes < 1 || input.minutes > 180) throw badParam('minutes 必须为 1–180 的整数')
+      guard({ requirePhone: false, allowMuted: true })
+      let row = checkins.find(c => c.date === input.date && c.practice === input.practice)
+      const duplicate = !!row?.sessionIds.includes(input.sessionId)
+      if (!row) {
+        row = { date: input.date, practice: input.practice, minutes: input.minutes, sessionIds: [input.sessionId] }
+        checkins.push(row)
+      } else if (!duplicate) {
+        row.minutes += input.minutes
+        row.sessionIds.push(input.sessionId)
+      }
+      const result: PracticeCheckinResult = { date: row.date, practice: row.practice, minutes: row.minutes, duplicate }
+      return { checkin: result }
+    },
+    listCheckins: (input: { month: string }) => {
+      noUnknown(input, ['month'])
+      if (typeof input.month !== 'string' || !/^(\d{4})-(0[1-9]|1[0-2])$/.test(input.month) || Number(input.month.slice(0, 4)) < 2000 || Number(input.month.slice(0, 4)) > 2100) throw badParam('month 必须是 YYYY-MM 格式')
+      guard({ requirePhone: false, allowMuted: true })
+      const days = new Map<string, DailyCheckin>()
+      checkins.filter(c => c.date.slice(0, 7) === input.month).forEach(c => {
+        const day = days.get(c.date) || { date: c.date, minutes: 0, practices: {} }
+        day.minutes += c.minutes
+        day.practices[c.practice] = (day.practices[c.practice] || 0) + c.minutes
+        days.set(c.date, day)
+      })
+      const list = [...days.values()].sort((a, b) => a.date.localeCompare(b.date))
+      const result: CheckinMonth = { month: input.month, list, totalMinutes: list.reduce((sum, day) => sum + day.minutes, 0) }
+      return result
     }
   }
 }

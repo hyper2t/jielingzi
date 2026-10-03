@@ -3,6 +3,8 @@
  * → 圈子 / 话题等业务区块（M3 / M4）→ 协议页脚（用户协议 · 隐私政策 · 社区公约）。
  * 未同意 / App 端未登录时不发任何云端请求；档案取数：useRequest(ready ? PROFILE_KEY : null, getProfile)。
  */
+import { useRef } from 'react'
+import { useDidShow } from '@tarojs/taro'
 import { View, Text } from '@tarojs/components'
 import type { Profile } from '@/types/models'
 import { Avatar, Button, ConsentSheet, Empty, Icon, Screen, Skeleton } from '@/components'
@@ -10,7 +12,7 @@ import { authMethodText, HAS_LOGIN, useUserStore } from '@/store/user'
 import { ensureSignedIn, loginGate } from '@/features/auth/require-login'
 import { ensureAdult } from '@/features/auth/gates'
 import { profileMeta } from '@/features/profile/rules'
-import { getProfile, PROFILE_KEY } from '@/services/community'
+import { getProfile, listInvites, INVITES_KEY, PROFILE_KEY } from '@/services/community'
 import { useRequest } from '@/hooks/useRequest'
 import { navigate } from '@/utils/router'
 import { a11yButton } from '@/utils/a11y'
@@ -24,13 +26,27 @@ export const CONSENT_HINT = '同意协议后可使用云端同步'
 /** App 端登录卡片 */
 export const LOGIN_CARD_TEXT = '登录后数据云端同步，小程序与 App 互通'
 export const LOGIN_ACTION = '登录'
-export const MINE_PLACEHOLDER = '我的圈子、话题与消息即将开放'
+export const MINE_PLACEHOLDER = '我的话题与消息即将开放'
 /** 已同意但还没确认 18+ */
 export const ADULT_HINT = '确认年满 18 周岁后可参与交流'
 export const PROFILE_SETUP = '完善练习档案'
 export const PROFILE_SETUP_HINT = '设置昵称与练习方式，让同好认识你'
 /** 审核入口（仅 mod / admin） */
 export const ADMIN_ENTRY = '审核队列'
+
+function MineEntry ({ label, onClick, className = '' }: { label: string, onClick: () => void, className?: string }) {
+  return (
+    <View
+      {...tw('flex flex-row items-center justify-between min-h-touch px-4 rounded-md bg-paper-light', className)}
+      hoverClass={tw('bg-paper-dark').className}
+      onClick={onClick}
+      {...a11yButton(label)}
+    >
+      <Text {...tw('font-body text-body text-ink')}>{label}</Text>
+      <Icon name='chevron-right' tone='soft' size='sm' />
+    </View>
+  )
+}
 
 const AGREEMENTS = [
   { type: 'user', text: '用户协议' },
@@ -94,6 +110,12 @@ export default function Mine () {
   /** 缺哪一道门：'consent' | 'login' | null；null 才读云端（业务区块用） */
   const ready = !loginGate(consent, signedIn)
   const profile = useRequest(ready ? PROFILE_KEY : null, getProfile)
+  const inviteSummary = useRequest(ready && adultOk ? INVITES_KEY : null, listInvites)
+  const shown = useRef(false)
+  useDidShow(() => {
+    if (shown.current && ready && adultOk) void inviteSummary.refresh()
+    shown.current = true
+  })
   const editProfile = () => { if (ensureAdult({ reason: '编辑档案', returnTo: 'profileEdit' })) void navigate('profileEdit') }
 
   const settingsEntry = (
@@ -139,6 +161,13 @@ export default function Mine () {
       )}
 
       {/* 圈子 / 话题 / 邀请码 / 消息（M3、M4、M6）；ready 为 false 时只读本机数据 */}
+      {ready && <View {...tw('flex flex-col mx-page mt-3')}>
+        <MineEntry label='我的圈子' onClick={() => { void navigate('circles') }} className='mb-2' />
+        <MineEntry
+          label={inviteSummary.data ? `邀请码（剩余 ${inviteSummary.data.quota}）` : '邀请码'}
+          onClick={() => { void navigate('invites') }}
+        />
+      </View>}
       <Empty compact text={ready ? MINE_PLACEHOLDER : CONSENT_HINT} />
 
       {/* 撑开剩余高度：内容不足一屏时页脚贴底（tabBar 之上） */}

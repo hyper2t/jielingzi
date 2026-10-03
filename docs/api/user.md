@@ -135,7 +135,7 @@ App 端微信登录的服务端一跳。**用 Publishable Key 调用（未登录
 | identityToken | 20–4096 字符 | `ASAuthorizationAppleIDCredential.identityToken`（JWT） |
 | nonce | 8–256 字符 | 客户端发起请求时生成的**原始** nonce；Apple 在 token 里放的是它的 SHA-256，服务端比对防重放 |
 
-- 校验：Apple JWKS（`https://appleid.apple.com/auth/keys`，缓存 1 小时，kid 未命中强制刷新）RS256 验签；`iss = https://appleid.apple.com`；`aud = APPLE_BUNDLE_ID`（默认 `cn.jielingzi.app`）；`exp` 允许 60 s 时钟偏差；`nonce = sha256(原始 nonce)`
+- 校验：Apple JWKS（`https://appleid.apple.com/auth/keys`，缓存 1 小时，kid 未命中强制刷新）RS256 验签；`iss = https://appleid.apple.com`；`aud = APPLE_BUNDLE_ID`（默认 `com.jielingzi.app`）；`exp` 允许 60 s 时钟偏差；`nonce = sha256(原始 nonce)`
 - 只取 `sub`，**不保存邮箱 / 姓名**（L8 最小采集）
 - 出参：`{ ticket: string, linkToken: string, isNew: boolean, accountId: string }`
 - 错误：40001；40101（token 无效 / 过期 / nonce 不符）；50201（未配置自定义登录私钥、Apple 公钥拉取失败）
@@ -203,7 +203,7 @@ App 端微信登录的服务端一跳。**用 Publishable Key 调用（未登录
 | `WX_APP_ID` / `WX_APP_SECRET` | 开放平台「移动应用」 | `wechatAppLogin` / `bindWechat` 返回 50201 |
 | `TCB_CUSTOM_LOGIN_JSON` | 控制台 → 身份认证 → 登录方式 → 自定义登录 下载的私钥 JSON（原文或 base64；也接受只含 PEM） | `wechatAppLogin` 返回 50201 |
 | `TCB_CUSTOM_LOGIN_KEY_ID` | 上面只放 PEM 时必填：控制台显示的私钥 ID | 同上 |
-| `APPLE_BUNDLE_ID` | 可选，默认 `cn.jielingzi.app` | — |
+| `APPLE_BUNDLE_ID` | 可选，默认 `com.jielingzi.app` | — |
 | `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` | Apple Developer → Keys 创建的「Sign in with Apple」密钥（`.p8` 原文、字面量 `\n` 或 base64） | 注销时不撤销 Apple 授权（`appleRevoked: null`）；登录不受影响 |
 | `WX_MP_APP_ID` / `WX_MP_APP_SECRET` | **小程序**后台 → 开发管理 → 开发设置（与开放平台移动应用不是同一套；moderation 函数 M2 也用） | `bindPhoneWeapp` 返回 50201 |
 | `PHONE_HASH_SECRET` | ≥ 16 位随机串（如 `openssl rand -hex 32`），**启用后不可更换** | `bindPhoneWeapp` 返回 50201；App 手机号登录照常标记实名，但不建 `phone:` 别名（不做小程序 / App 同号识别） |

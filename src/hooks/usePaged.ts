@@ -61,7 +61,14 @@ export function usePaged<T extends { _id: string }> (key: string, fetchPage: (pa
     }
   }, [])
 
-  useEffect(() => { load(1, true) }, [key, load])
+  useEffect(() => {
+    setList([])
+    setPage(0)
+    setHasMore(true)
+    setLoadingMore(false)
+    setMoreError(null)
+    load(1, true)
+  }, [key, load])
 
   const loadMore = useCallback(() => {
     if (busy.current || !hasMore || error) return
