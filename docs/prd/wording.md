@@ -81,3 +81,17 @@
 | 拒绝原因 other | 暂未通过，欢迎之后再申请 |
 
 **审核台（pkg-admin）**：只显示上表字段与申请人档案摘要；拒绝必须选择原因；「其他」可附 ≤ 60 字备注（不下发申请人）。
+## 7. 站内消息文案（M6 · BE-M6-03 已实现）
+
+写死在 `_shared/notify.js` 的调用方，不进数据库；规则是**只说「发生了什么 + 去哪儿看」**：不含被处理内容的原文、不含他人昵称 / 花名、
+不承诺时间、不诱导操作（§1 / §2 同样适用）。
+
+| 类型 `type` | 文案 | 写入方 |
+|---|---|---|
+| `reply` | 你的话题收到了新回复 | `community.createReply`（只发话题作者） |
+| `moderation` | 按处理结果分别固定：内容已下架 / 已禁言（含解除日期）/ 已恢复可见；举报人收到「你举报的内容已处理」 | `moderation.decide` |
+| `prompt` | 今天的每日一题已经准备好，可以写下你的回答 | `practice` 定时触发器（一题对一人最多一条） |
+
+维护：文案与 `cloudfunctions/community/topics.js`（`REPLY_NOTICE`）、`cloudfunctions/_shared/reminder.js`（`REMINDER_TEXT`）、
+`cloudfunctions/moderation/service.js`（`MESSAGES`）一致，改动要同步 `tests/cloudfunctions/m6-notify.test.js` 里钉住的字符串。
+「精选 / 精华」的用词仍未统一（见 `m6-plan.md` §8），本表先沿用云端既有的「精华」不引入新说法。

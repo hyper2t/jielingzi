@@ -74,6 +74,8 @@ node scripts/ops/security-rules.mjs --apply       # 下发：全部集合 {read:
 说明：
 - **M4 新增的 3 个索引**（`circles.uniq_slug`、`memberships.idx_member`、`invites.idx_owner_time`）已登记在 `collections.js`；M5 新增 `checkins.idx_owner_month_date`（支持按 `_openid + monthKey` 查询并按 `date` 排序）。2026-10-02 共享 Dev/Prod CloudBase 复核：`checkins` 集合存在，`uniq_owner_day` 原已存在；经用户明确授权，`ensure-indexes.mjs --apply` 仅新建 `idx_owner_month_date`（created=1、present=26、conflicts=0），复查 27 个索引齐全、无冲突。`practice` 已部署且 `ping` 成功。QA-A 用户本人完成 ConsentSheet 后，应用显示 `已同步`、5 分钟 / 1 天（应用级证据，未独立直查集合记录）。冷启动 QA-B UI 与用户确认的测试前基线相符：10 月 5 分钟 / 1 天，10/02 为 5 分钟；D05 本场景应用层无可见增量。源码查询限定 accountId、返回日汇总而非身份字段；未直查云记录 / 运行时响应，未测反向 QA-B→QA-A，因此完整 D05 仍部分验收。未手动打卡；页面加载可能尝试同步本机待同步队列，是否触发未独立核验。
 - **M6 每日一题**：`daily_prompts.uniq_date` 与 `prompt_answers.idx_prompt_list` 已登记在 `collections.js`（BE-M6-00）；`idx_prompt_list` 是否已在云端创建要由 `node scripts/ops/ensure-indexes.mjs` 预览确认，**须经用户授权才 `--apply`**。m6-plan 原稿设想的 `prompt_answers.idx_owner_time` 未采纳：M6 没有按人回溯作答历史的动作，「答过没」走 `idx_prompt_owner`。录题与巡检见 `scripts/ops/daily-prompt.mjs`（OPS-M6-01）。
+
+- **M6 站内消息（BE-M6-03）**：不新增索引——`notifications` 的读写都以 `_openid` 打头，`idx_owner_read_time` 一条前缀就够；「同一件事只提醒一次」由 `notify()` 的先查后写实现，没有建 `(_openid, type, refId)` 唯一索引，因为 `refId` 允许为 `null`，唯一索引会把多条 `null` 判成重复（`moderation` 那两条就是这种）。
 - **注销会解除归属的集合（topics / replies / reports / prompt_answers，`onDelete: 'detach'`）不能建包含 `_openid` 的唯一索引**：注销把 `_openid` 置 null，第二个注销的人会撞索引而失败。这些集合的去重在应用层（举报：同人同目标只计一次、计数按不同举报人去重；每日一题：作答前查询）。`scripts/ops/ensure-indexes.test.mjs` 会拦这类配置。
 - **过期清理（TTL）**：平台 OpenAPI 只支持普通 / 唯一 / 稀疏索引，不支持 TTL。`rate_limits` / `mod_logs` 的 `expireAt` 上建的是普通索引；需要自动过期请在控制台确认是否提供 TTL 选项，否则后续加定时清理（数据量很小：频控每人每动作每天一条，日志保留 6 个月）。
 - 唯一索引只能在集合里没有重复数据时创建；新环境先跑 `ensure-collections.mjs` 再跑本脚本。

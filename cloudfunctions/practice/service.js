@@ -15,6 +15,8 @@ const { isDuplicateKeyError, withCollection } = require('./_shared/db')
 const { cnDate, PROMPT_RULES } = require('./_shared/config')
 const { checkText, logModeration } = require('./_shared/moderation')
 
+const { NOTIFY_COLLECTION } = require('./_shared/notify')
+
 /** 不要求身份的动作（入口据此不因副作用建号） */
 const IDENTITY_FREE_ACTIONS = ['ping']
 
@@ -24,6 +26,11 @@ const PRACTICE_IDS = new Set([
 ])
 const MAX_SESSION_MINUTES = 180
 const MONTH_PAGE_SIZE = 100
+
+/** 站内消息（BE-M6-03）：列表每页默认 20、上限 50；一次最多标记 100 条已读 */
+const NOTIFY_PAGE_SIZE = 20
+const NOTIFY_PAGE_MAX = 50
+const NOTIFY_MARK_MAX = 100
 
 function noUnknown (input, allowed) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw badParam('参数格式不正确')
@@ -385,6 +392,83 @@ async function listAnswers (params, ctx) {
   }
 }
 
+/** 消息列表入参：只有分页两项 */
+function validateNotificationList (params) {
+  noUnknown(params, ['page', 'size'])
+  const page = params.page === undefined ? 1 : params.page
+  if (!isPositiveInt(page)) throw badParam('page 需为正整数')
+  const size = params.size === undefined ? NOTIFY_PAGE_SIZE : params.size
+  if (!isPositiveInt(size) || size > NOTIFY_PAGE_MAX) throw badParam(`size 需为 1–${NOTIFY_PAGE_MAX} 的整数`)
+  return { page: Number(page), size: Number(size) }
+}
+
+/** 标记已读入参：all: true 或 ids 非空数组，二选一（都不给是参数错误，不做「顺手全标」） */
+function validateMarkRead (params) {
+  noUnknown(params, ['ids', 'all'])
+  if (params.all === true) return { all: true, ids: null }
+  if (params.all !== undefined && params.all !== false) throw badParam('all 需为布尔值')
+  const ids = Array.isArray(params.ids) ? params.ids : null
+  if (!ids || !ids.length) throw badParam('请传 ids 数组，或 all: true')
+  if (ids.length > NOTIFY_MARK_MAX) throw badParam(`一次最多标记 ${NOTIFY_MARK_MAX} 条`)
+  if (ids.some((id) => typeof id !== 'string' || !id)) throw badParam('ids 需为非空字符串数组')
+  return { all: false, ids: [...new Set(ids)] }
+}
+
+/** 未读条数（前端红点用）；集合还不存在时按 0 算 */
+async function countUnread (db, accountId) {
+  const res = await withCollection(db, NOTIFY_COLLECTION, () =>
+    db.collection(NOTIFY_COLLECTION).where({ _openid: accountId, read: false }).count())
+  const total = res && (res.total != null ? res.total : res.count)
+  return Number.isFinite(Number(total)) ? Number(total) : 0
+}
+
+/**
+ * 消息列表（BE-M6-03，m6-plan D16）：只取本人（_openid）的通知，createdAt 倒序分页 + 未读数。
+ * 读动作也过 guardWrite（limit = 0）：保住登录 / 18+ / 封禁门禁但不占额度，与 todayPrompt 同口径。
+ * 通知正文是平台写的固定说明（不含他人内容原文），所以这里原样下发即可，不做脱敏处理。
+ */
+async function listNotifications (params, ctx) {
+  const input = validateNotificationList(params)
+  const { accountId } = await guardWrite(ctx, 'listNotifications', { requirePhone: false, allowMuted: true, limit: 0 })
+  const res = await withCollection(ctx.db, NOTIFY_COLLECTION, () =>
+    ctx.db.collection(NOTIFY_COLLECTION)
+      .where({ _openid: accountId })
+      .orderBy('createdAt', 'desc')
+      .skip((input.page - 1) * input.size)
+      .limit(input.size + 1)
+      .get())
+  const rows = (res && res.data) || []
+  return {
+    page: input.page,
+    size: input.size,
+    hasMore: rows.length > input.size,
+    unread: await countUnread(ctx.db, accountId),
+    list: rows.slice(0, input.size).map((r) => ({
+      id: r._id,
+      type: r.type,
+      refType: r.refType || null,
+      refId: r.refId || null,
+      text: r.text || '',
+      read: r.read === true,
+      createdAt: r.createdAt || null
+    }))
+  }
+}
+
+/**
+ * 标记已读（BE-M6-03，D16）：ids 或 all: true。更新条件里始终带 _openid，所以别人的 id 只会命中 0 条
+ * ——不报错、也不暴露那条消息是否存在；已读过的再标一次同样 updated = 0（幂等）。
+ */
+async function markNotificationsRead (params, ctx) {
+  const input = validateMarkRead(params)
+  const { accountId } = await guardWrite(ctx, 'markNotificationsRead', { requirePhone: false, allowMuted: true, limit: 0 })
+  const _ = ctx.db.command
+  const where = Object.assign({ _openid: accountId, read: false }, input.all ? null : { _id: _.in(input.ids) })
+  const res = await withCollection(ctx.db, NOTIFY_COLLECTION, () =>
+    ctx.db.collection(NOTIFY_COLLECTION).where(where).update({ read: true }))
+  return { updated: Number((res && res.updated) || 0), unread: await countUnread(ctx.db, accountId) }
+}
+
 const actions = {
   /** 健康检查：部署 / 安全规则验证用，不读写数据库 */
   async ping(_params, ctx) {
@@ -397,7 +481,10 @@ const actions = {
   /** BE-M6-01：每日一题（今日题目 / 作答 / 答案列表） */
   todayPrompt,
   answerPrompt,
-  listAnswers
+  listAnswers,
+  /** BE-M6-03：站内消息（列表 / 标记已读）。每日提醒由定时触发器直接进 _shared/reminder，不在此暴露给客户端 */
+  listNotifications,
+  markNotificationsRead
 }
 
 module.exports = { actions, IDENTITY_FREE_ACTIONS, PRACTICE_IDS }

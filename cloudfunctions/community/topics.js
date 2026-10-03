@@ -20,6 +20,7 @@
 const {
   badParam, conflict, notFound, forbidden, validate, pageSchema, guardWrite, checkText,
   logModeration, enqueueReview, withCollection, isCollectionMissingError, TEXT_RULES, TOPIC_RULES,
+  notify,
 } = require('./_shared')
 const { ensureProfile, textLength, cleanLine, INVISIBLE_RE } = require('./profile')
 const { findById, findRows, countRows, requireReader } = require('./common')
@@ -32,6 +33,8 @@ const PROFILES = 'profiles'
 const DELETED_NAME = '已注销用户'
 const IN_CHUNK = 100
 const REJECT_MSG = '内容不符合社区公约，请修改后再发布'
+/** 新回复通知的固定说明（BE-M6-03）：只说「有新回复」，不带回复原文，避免二次传播违规内容 */
+const REPLY_NOTICE = '你的话题收到了新回复'
 /** 慢话题（D11）：冷静期内回复时的话术（40901） */
 const SLOW_REPLY_MSG = '这条话题还没开放回复'
 /** 下发给前端的话题 / 回复里不允许出现的内部字段（测试据此断言） */
@@ -304,6 +307,11 @@ async function createReply(params, ctx) {
   if (status === 'pending') await enqueueReview(ctx.db, { contentType: 'reply', targetId: reply._id, now })
   else await ctx.db.collection(TOPICS).doc(topic._id).update({ replyCount: ctx.db.command.inc(1), lastReplyAt: now })
   await g.commit()
+  // 站内通知（BE-M6-03，m6-plan D13）：只提醒话题作者。给自己回复不发；复核中（pending）的回复
+  // 在列表里对作者不可见，所以也不发（复核通过后不补发，避免「通知里有条回复、点进去没有」）。
+  if (status === 'ok' && topic._openid && topic._openid !== g.accountId) {
+    await notify(ctx.db, { uid: topic._openid, type: 'reply', refType: 'topic', refId: topic._id, text: REPLY_NOTICE, now })
+  }
   const profiles = await readProfiles(ctx.db, [quoted && quoted._openid])
   profiles.set(g.accountId, profile)
   return { reply: presentReply(reply, profiles, g.accountId, quoted ? presentQuote(input.quoteId, quoted, profiles, g.accountId) : null), status, remaining: g.remaining }

@@ -65,15 +65,22 @@
     },
     {
       "name": "practice",
-      "description": "ping / checkin / dailyPrompt（M5、M6）",
+      "description": "ping / checkin / dailyPrompt / notifications（M5、M6）；每日提醒由定时触发器唤起",
       "runtime": "Nodejs20.19",
       "handler": "index.main",
-      "timeout": 10,
+      "timeout": 60,
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
         "node_modules",
         "node_modules/**/*"
+      ],
+      "triggers": [
+        {
+          "name": "dailyPromptReminder",
+          "type": "timer",
+          "config": "0 0 8 * * * *"
+        }
       ]
     },
     {

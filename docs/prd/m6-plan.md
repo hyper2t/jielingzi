@@ -89,7 +89,7 @@
 | ✅ BE-M6-00 | BE | 已完成（2026-10-03，本地）：`config.js` 加 `PROMPT_RULES`（`textMax 120`、`answer { min: 5, max: 500 }`、`listMax 50`、`defaultAnon true`）并导出；`collections.js` 的 `prompt_answers` 补分页索引 `idx_prompt_list`（`promptId + status + createdAt`）。`daily_prompts` / `prompt_answers`、`idx_prompt_owner` 与「每日一次在应用层判断（不能建含 `_openid` 的唯一索引）」原已在册，故未新增 `idx_owner_time`；`fakeDb`（已支持 `count` / `$ne` / `orderBy`）与 `userHarness` 无需改动 | 现有云函数用例不回归：244/244（含新增 22 例） | 0.5d ✔ |
 | ✅ BE-M6-01 | BE | 已完成（本地）：`practice/service.js` 新增 `todayPrompt` / `answerPrompt` / `listAnswers` 并注册进 `actions`；机审复用 `checkText`（scene `comment`）+ `logModeration`，`reject` → `40001` 不落库不扣额度、`review` → 落库 `status: 'pending'`；拦截文案与社区逐字一致。**顺序修正**：`answerPrompt` 的「题目失效 / 已作答」前置判断放在 `guardWrite` 之前（每日额度只有 1 次，先扣额度会让 `40901` 被 `42901` 盖掉），与 `community.redeemInvite` 同序 | 单测 22 例：无题目兜底、只认当日 `ok`、重复 `40901` 不扣额度、同日第二题 `42901`、`40401`、字数与参数校验、四类门禁码、reject / review、未作答 `40301` 零内容、他人 `ok` 过滤、匿名与实名展示、注销形态、分页 | 1d ✔ |
 | ✅ BE-M6-02 | BE | 已完成（2026-10-03，本地）：`TOPIC_RULES.slowHours = 24`（前后端同名常量，一致性由 Jest 用例比对）；`createTopic` 增 `slow` 布尔 → 落库 `slowUntil = createdAt + 24h`，`presentTopic` 随摘要与详情下发；`createReply` 在机审与 `g.commit()` 之前判 `slowUntil`，未到 → 40901「这条话题还没开放回复」（作者本人同样受限，不扣额度、不落库）；`listTopics` 增 `featured` 布尔筛选（只 `true` 生效，圈子成员校验不动）；`moderation.markFeatured`（`guardRole` + `topics.featured` + `mod_logs` `kind: 'featured'`，只允许对 `ok` 话题标精华，同值调用 `changed: false`） | 实测：`tests/cloudfunctions/m6-slow-featured.test.js` 17 例全通过（差 1ms 不可回 / 到点可回、旧文档缺字段兜 `null`、`slow` 只接受布尔、已有回复照常读、非成员 40401 优先、`featured` 只含 `ok` 且不越圈、非 mod 40301、二次调用幂等仍留审计）；变异验证 7 处全部被捕获；`npm run test:functions` 261/261、`test:ops` 32/32、Jest 40 suites / 551 tests / 32 snapshots、`tsc --noEmit` 0 错 | 1d ✔ |
-| BE-M6-03 | BE | 通知：`reply` / `moderation` / `prompt` 落 `notifications`（`_shared/notify.js`）+ `listNotifications` / `markNotificationsRead`；`cloudbaserc.json` 加定时触发器；订阅消息按 D14（模板 ID 缺则跳过） | 单测：同 `(uid, type, refId)` 只一条、未读数与分页正确、触发器函数在无题目时不写任何记录、`envVariables` 缺键不抛错 | 1.5d |
+| ✅ BE-M6-03 | BE | 已完成（2026-10-03，本地）：通知：`reply` / `moderation` / `prompt` 落 `notifications`（`_shared/notify.js`）+ `listNotifications` / `markNotificationsRead`；`cloudbaserc.json` 加定时触发器；订阅消息按 D14（模板 ID 缺则跳过） | 单测：同 `(uid, type, refId)` 只一条、未读数与分页正确、触发器函数在无题目时不写任何记录、`envVariables` 缺键不抛错 | 1.5d |
 | ✅ OPS-M6-01 | OPS | 已完成（2026-10-03，本地）：`scripts/ops/daily-prompt.mjs` 的 `set`（单日 / `--from-file` 批量，幂等 upsert，**只改正文不悄悄放开已 close 的日子**，重开要显式 `--reopen`）、`list`（逐日条数 / 状态 / 作答 / 可见 / 待复核）、`close`（只翻 `status`，正文留着）、`audit`（同日多条、非法 `status`、超长 / 空 / 脏空白、全被隐藏、孤儿答案、连续缺口起点）；`scripts/ops/daily-prompt.seed.json` 首周 7 题；长度与归日复用 `PROMPT_RULES.textMax` / `cnDate()`，不另写一套 | 实测：`scripts/ops/daily-prompt.test.mjs` 15 例全通过（含「预览一个字节都不写」「`--apply` 后再跑同一条 → `unchanged`，不产生第二条」「`close` 之后云函数 `todayPrompt` 返回 `prompt: null`」「集合还没建也不报错」「种子文件自身被 CI 校验」）；`npm run test:ops` 47/47、`test:functions` 261/261、Jest 40 / 551 / 32、`tsc --noEmit` 0 错 | 0.5d ✔ |
 | ✅ FE-M6-00 | FE | 已完成（2026-10-03，本地）：`types/models.ts` 加每日一题类型（`DailyPrompt` / `PromptAnswer` / `PromptAnswerItem` / `PromptAnswerPage` 等）；`constants/community.ts` 的 `PROMPT_RULES`（`textMax 120`、`answer { min:5, max:500 }`、`listMax 50`、`defaultAnon true`）；`services/practice.ts` 的 `todayPrompt` / `answerPrompt` / `listAnswers` 与 `guard.ts` 的 `WRITE_ACTIONS.practice`；`cloud.types.ts` 的 `FunctionMap`；`mock/client.ts` 补齐同名 handler（校验顺序、`40901` 先于额度、`anon: input.anon !== false` 均与云函数一致） | 实测：`npx tsc --noEmit` 0 错；「mock 与云函数共用规则由测试比对」= `src/constants/__tests__/community.test.ts` 新增「每日一题规则（M6）」用例，对 `PROMPT_RULES` 整对象 `toEqual`，任一侧漂移即红 | 0.5d ✔ |
 | ✅ FE-M6-01 | FE | 已完成（2026-10-03，本地）：`features/practice/prompt.ts`（状态机 `none` / `unanswered` / `answered` / `pending`、字数校验、`answerCounter`、署名文案、`promptError` 码表）、`PromptCard.tsx` 挂进练习 Tab、`pkg-practice/pages/prompt` 作答页（默认匿名可切实名、未作答不请求 `listAnswers`、分页「查看更多」、`pending` 只出现在我那条、列表失败可重试且不打断作答）、`utils/router.ts` 的 `prompt` 路由与参数、`app.config.ts` 分包页、`utils/track.ts` 的 `prompt_answer` | 实测：`src/pkg-practice/__tests__/m6.test.tsx` 12 例（卡片 5 + 作答页 7）与 `src/features/practice/__tests__/prompt.test.ts` 全绿，快照 1 个（未作答态卡片）；全量 Jest 40 suites / 551 tests / 32 snapshots | 1d ✔ |
@@ -124,6 +124,21 @@
   `markTopicFeatured` 只做到服务层（写动作门禁 + `invalidate(topicKey)` + 话题流版本 +1），**审核页的按钮留到下一轮**：它得跟 `decide` 同屏才有用，那是 pkg-admin 的改动。
   前端也补了 mock 的同款行为（发帖落 `slowUntil`、列表按 `featured` 筛、回复冷静期闸门、markFeatured 的角色与状态校验），否则「真机过、mock 红」迟早出现。
 
+- **实现结果（2026-10-03，BE-M6-03）**：通知这一轮把「送达」和「打扰」分开处理——**送达**靠 `notify()` 的唯一收口：三类
+  （`reply` / `moderation` / `prompt`）都从这一个函数写，接收人为空就不写（作者注销是常态而不是异常）；**不打扰**靠新增的
+  `dedupe` 开关：只对 `(uid, type, refId)` 齐全、且重复发出去确实没意义的类型打开（每日一题），`moderation` 沿用默认不去重，
+  免得「二次处理同一目标」的通知被吞掉。三个刻意的取舍：① `createReply` 的通知在 `g.commit()` 之后发，回复本身已经站住了，
+  通知只是附加品——它失败不该让发帖人看到「回复失败」；② 每日提醒做成**定时触发器 + 纯函数模块**（`_shared/reminder.js`），
+  不暴露成 action，宁可接受「定时事件不是可信来源」，所以那个入口不收业务参数、不回数据、且天然幂等；③ 外发（订阅消息）
+  一行代码都不写，「模板 ID 缺键不抛错」是靠**没有读环境的代码**保证的，而不是靠判空——这一点在 `m6-notify.test.js` 里
+  用源码断言钉住（`reminder.js` 不得出现 `process.env` / `WX_MP_` / `subscribeMessage`）。
+  `tests/cloudfunctions/m6-notify.test.js` 26 例全通过（云函数全量 287/287）；变异验证 **23/23 被捕获**，含本轮点名的
+  「去掉通知去重查询」、以及「去重条件去掉 `_openid`」（否则 A 的已提醒会吞掉 B 的）、「`read: false` 去掉」破坏幂等、
+  「列表去掉 `_openid` 过滤」的越权、`users` 翻页 `break` 提前（只发前 100 人）、`isTimerEvent` 不判 `action`、
+  以及 `index.js` 的接线被摘掉。触发器配置与 `timeout` 提升也进了用例（`cloudbaserc.json` 断言只有 `practice` 挂了
+  一个 `timer` 且没有 `envVariables`）。**未做**：订阅消息外发（D17）、`notifications` 的推送优先级/合并（PRD 未要求）、
+  复核通过后补发回复通知（明确不做，见上）。
+
 ## 7. 上线与回滚
 
 1. 合并前逐项运行并记录：`yarn test:functions`、`yarn test:ops`、`yarn test --runInBand --silent`、`yarn typecheck`；新文件按仓库风格 `npx eslint`；三端结果记入 `docs/test/cases/M6.md`。
@@ -141,7 +156,7 @@
 | ★ 订阅消息模板 ID 未申请 | 阻塞 FE-M6-03 的真实送达验收（`QA-M6-01` 的「订阅消息实际送达」项在模板到位前记为受阻，不得标为通过） |
 | ★ 题目文案与提醒文案需法务 / 措辞审阅 | 走 `wording.md` §1 / §2 流程；未通过前不 `--apply` 写题 |
 | 并发双写导致同日多条答案（D7） | `daily-prompt.mjs audit` 观测；若内测真实出现，再评估把 `prompt_answers` 的注销语义从 `detach` 改成删除并补唯一索引 |
-| 提醒定时触发器成本与时区 | 每日一次、08:00 北京时间；无题目即早退；触发器重跑由 `(uid, type, refId)` 去重兜住 |
+| 提醒定时触发器成本与时区 | 每日一次、08:00 北京时间（控制台时区待部署时核对）；无题目即早退；触发器重跑由 `(uid, type, refId)` 去重兜住。**已按此实现**；另记一笔：定时事件不是安全边界，靠「不收业务参数 + 不回数据 + 幂等」兜，真隔离要等平台侧「仅平台调用」配置 |
 | 精华列表变成越权通道 | D12 明确不解除成员校验，并在用例里专测（`listTopics({ featured: true })` 对非成员不返回圈内内容） |
 | M4 / M5 真机未闭合就推进 M6 部署 | 本计划第 7 节第 3 步之前必须完成 M4 签核与 M5 真机验收；否则只在本地与隔离 Dev 环境验证 |
 | 用户可见文案「精选」（前端 `FEATURED_BADGE`）与「精华」（云端提示 / 本文档）用词不一 | FE-M6-02 先沿用前端既有文案不动快照；待 `wording.md` 定稿后一次性统一（TopicCard 徽标、圈内筛选、`markFeatured` 的 40001 提示、`docs/api/*.md`），连带更新快照 |

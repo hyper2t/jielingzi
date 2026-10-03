@@ -101,10 +101,16 @@ describe('练习 Tab 的每日一题卡片', () => {
   })
 
   it('卡片快照（未作答态）', async () => {
-    mockControl.seedPrompts([{ text: QUESTION }])
-    act(() => { mounted = create(<PromptCard />) })
-    await flush()
-    expect(mounted!.toJSON()).toMatchSnapshot()
+    // 快照里带「今天」的日期（mock 的 prompt.date 缺省取运行当天），不钉住时钟这条用例每天会红一次
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 3, 12, 0, 0))
+    try {
+      mockControl.seedPrompts([{ text: QUESTION }])
+      act(() => { mounted = create(<PromptCard />) })
+      await flush()
+      expect(mounted!.toJSON()).toMatchSnapshot()
+    } finally {
+      nowSpy.mockRestore()
+    }
   })
 })
 

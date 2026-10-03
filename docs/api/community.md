@@ -103,6 +103,7 @@ M6 起 `topics` 另有 `slowUntil`（毫秒时间戳，`null` = 没有冷静期�
 
 - 出参：`{ reply, status: 'ok' | 'pending', remaining }`。`status = ok` 时话题的 `replyCount` +1、`lastReplyAt` 更新。
 - `replyCount` 是展示用的近似值：审核员放行 / 下架、举报折叠不回写它。
+- 副作用（BE-M6-03）：回复落库并计额度之后，给**话题作者**写一条站内通知（`type: 'reply'`、`refType: 'topic'`、`refId = topicId`，正文是固定说明「你的话题收到了新回复」，不含回复原文）。回复自己的话题不发；机审判为 `pending` 的回复不发（作者当时看不见它，复核通过后也不补发）。被冷静期 / 机审 `reject` 挡下的回复在落库前就抛错，自然也没有通知。客户端读消息走 `practice.listNotifications`。
 - 错误：同 createTopic，另有 40401；慢话题冷静期未到 → **40901**「这条话题还没开放回复」（作者本人也一样）。被冷静期挡下的回复不落库、不扣当日额度、也不调用机审（判断在 `g.commit()` 与 `screen()` 之前）。
 
 ### listReplies
