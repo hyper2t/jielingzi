@@ -1,6 +1,7 @@
 /** M3 services/community.ts：话题 / 回复读写的前置拦截、字段映射、缓存与话题流版本（mock 数据源） */
 import { mockControl } from '@/services/mock/client'
 import * as community from '@/services/community'
+import * as moderation from '@/services/moderation'
 import { CloudError, ERROR_CODES } from '@/services/cloud.types'
 import { useUserStore } from '@/store/user'
 import { markRulesRead } from '@/features/consent/rules'
@@ -190,5 +191,65 @@ describe('topicKey', () => {
   it('每个话题一个缓存 key', () => {
     expect(community.topicKey('a')).toBe('topic:a')
     expect(community.topicKey('a')).not.toBe(community.topicKey('b'))
+  })
+})
+describe('慢话题与精华（FE-M6-02）', () => {
+  it('listTopics：只有 featuredOnly=true 才带 featured 键，与云函数「=== true 才过滤」一致', async () => {
+    signIn()
+    await community.listTopics(1, 20, 'circle-mindful')
+    expect(calls('listTopics')[0].data).toEqual({ page: 1, size: 20, circleId: 'circle-mindful' })
+    await community.listTopics(1, 20, 'circle-mindful', false)
+    expect(calls('listTopics')[1].data).toEqual({ page: 1, size: 20, circleId: 'circle-mindful' })
+    await community.listTopics(2, 5, undefined, true)
+    expect(calls('listTopics')[2].data).toEqual({ page: 2, size: 5, featured: true })
+  })
+  it('createTopic：slow 透传给云端，返回的摘要带 slowUntil = createdAt + slowHours', async () => {
+    signIn()
+    const before = Date.now()
+    const r = await community.createTopic({ ...INPUT, slow: true })
+    expect(calls('createTopic')[0].data).toMatchObject({ slow: true })
+    expect(typeof r.topic.slowUntil).toBe('number')
+    expect(r.topic.slowUntil! - r.topic.createdAt).toBe(24 * 3600000)
+    expect(r.topic.slowUntil!).toBeGreaterThanOrEqual(before)
+    const plain = await community.createTopic(INPUT)
+    expect(plain.topic.slowUntil).toBeNull()
+  })
+  it('冷静期内 createReply → 40901 且不占当日额度；到点后能发', async () => {
+    signIn()
+    const lockedId = seed({ slowUntil: Date.now() + 3600000 })
+    const pastId = seed({ slowUntil: Date.now() - 1000 })
+    const body = '我试着把注意力放回呼吸上，先把手机放远一点。'
+    await expect(community.createReply({ topicId: lockedId, body })).rejects.toMatchObject({ code: ERROR_CODES.CONFLICT, message: '这条话题还没开放回复' })
+    expect(calls('createReply')).toHaveLength(1) // 被拒的回复不落库
+    await expect(community.createReply({ topicId: pastId, body })).resolves.toMatchObject({ status: 'ok' })
+  })
+  it('markTopicFeatured：只改 featured、让详情缓存失效并推进话题流版本；普通账号被 40301 拦住', async () => {
+    signIn()
+    const id = seed()
+    mockControl.setAccount({ role: 'mod' })
+    const v0 = community.getFeedVersion()
+    await expect(moderation.markTopicFeatured(id, true)).resolves.toMatchObject({ ok: true, featured: true, changed: true })
+    expect(mockControl.topics.find(t => t.id === id)!.featured).toBe(true)
+    expect(invalidate).toHaveBeenCalledWith(community.topicKey(id))
+    expect(community.getFeedVersion()).toBe(v0 + 1)
+    await expect(moderation.markTopicFeatured(id, true)).resolves.toMatchObject({ changed: false, featured: true })
+    await expect(moderation.markTopicFeatured(id, false)).resolves.toMatchObject({ changed: true, featured: false })
+    mockControl.setAccount({ role: 'user' })
+    await expect(moderation.markTopicFeatured(id, true)).rejects.toMatchObject({ code: ERROR_CODES.FORBIDDEN })
+  })
+  it('标精华要求话题当前是 ok（下架 / 待审的不该被推到列表前面）；取消精华任何时候都行', async () => {
+    signIn()
+    mockControl.setAccount({ role: 'mod' })
+    const pendingId = seed({ status: 'pending' })
+    await expect(moderation.markTopicFeatured(pendingId, true)).rejects.toMatchObject({ code: ERROR_CODES.BAD_PARAM, message: '只有正常显示的话题能标为精华' })
+    expect(mockControl.topics.find(t => t.id === pendingId)!.featured).toBe(false)
+    const foldedId = seed({ status: 'folded', featured: true })
+    await expect(moderation.markTopicFeatured(foldedId, false)).resolves.toMatchObject({ ok: true, changed: true, featured: false })
+    expect(mockControl.topics.find(t => t.id === foldedId)!.featured).toBe(false)
+  })
+  it('markTopicFeatured：未同意协议时不发请求（写动作门禁）', async () => {
+    mockControl.calls.length = 0
+    await expect(moderation.markTopicFeatured('t1', true)).rejects.toMatchObject({ code: ERROR_CODES.CONSENT_REQUIRED })
+    expect(calls('markFeatured')).toHaveLength(0)
   })
 })

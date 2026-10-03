@@ -4,16 +4,17 @@
  * - 引用回复：点某条回复的「引用」，回复栏上方出现引用条；被引用的回复不可见时显示「引用的回复已不可见」
  * - 举报：话题 / 回复各有入口（先过 18+ 门禁，ReportSheet）；自己的内容只有「删除」（二次确认，软删除）
  * - 机审待复核的话题 / 回复只有作者看得到，标「审核中」；被多人举报折叠的内容保留位置、不显示正文
- * - 回复栏：实名（发布门禁）+ 匿名开关；额度用尽 / 机审拒绝给出明确提示
+ * - 回复栏：实名（发布门禁）+ 匿名开关；额度用尽 / 机审拒绝给出明确提示；慢话题在冷静期内换成一句说明，不显示输入框（M6 D11）
  */
 import { useState } from 'react'
 import Taro from '@tarojs/taro'
 import { View, Text, Textarea } from '@tarojs/components'
 import { ANON_PREFIX, AuthorBadge, Button, ConsentSheet, Icon, PhoneSheet, ReportSheet, Screen, showToast, Toggle } from '@/components'
+import { FEATURED_BADGE } from '@/components/TopicCard'
 import { TEXT_RULES } from '@/constants/community'
 import { ensureAdult, requirePhone } from '@/features/auth/gates'
 import { goLogin, loginGate } from '@/features/auth/require-login'
-import { clip, foldShortReplies, formatPostTime, publishError } from '@/features/topic/rules'
+import { clip, foldShortReplies, formatPostTime, isReplyLocked, publishError, slowReplyHint } from '@/features/topic/rules'
 import { createReply, deleteMine, getTopic, listReplies, topicKey } from '@/services/community'
 import type { ReplyItem } from '@/services/community'
 import { ERROR_CODES } from '@/services/cloud.types'
@@ -147,7 +148,9 @@ export default function Topic () {
   }
 
   const rows = foldShortReplies(replies.list, expanded)
-  const canReply = !!topic && !topic.pending && !topic.folded
+  // 冷静期（M6 D11）：只锁回复，读与举报都照常；到点重新进页面即可回复（云端同样会再判一次）
+  const locked = isReplyLocked(topic ?? {})
+  const canReply = !!topic && !topic.pending && !topic.folded && !locked
   const topicCircle = topic?.circle
 
   const composer = status === 'ready' && canReply
@@ -184,6 +187,14 @@ export default function Topic () {
       )
     : undefined
 
+  const lockedNotice = status === 'ready' && locked
+    ? (
+      <View {...tw('flex flex-row items-center px-page py-3 bg-paper-light border-t border-solid border-paper-dark')}>
+        <Text {...tw('flex-1 font-body text-caption text-ink-soft')}>{slowReplyHint(topic?.slowUntil)}</Text>
+      </View>
+      )
+    : undefined
+
   return (
     <Screen
       nav={{ title: TOPIC_TITLE, showBack: true }}
@@ -193,7 +204,7 @@ export default function Topic () {
       onEmptyAction={onEmptyAction}
       onRetry={() => { void topicReq.refresh() }}
       onReachBottom={replies.loadMore}
-      footer={composer}
+      footer={composer || lockedNotice}
       overlay={
         <>
           <ConsentSheet />
@@ -207,6 +218,7 @@ export default function Topic () {
           {topic.pending && <Text {...tw('font-body text-caption text-ink-soft px-3 py-2 mb-3 rounded-sm bg-highlight')}>{PENDING_NOTE}</Text>}
           <Text {...tw('font-title font-bold text-title text-ink')}>{topic.title}</Text>
           <AuthorBadge author={topic.author} anon={topic.anon} meta={formatPostTime(topic.createdAt)} {...tw('mt-3')} />
+          {topic.featured && <Text {...tw('self-start mt-3 px-2 rounded-sm bg-highlight font-body text-caption text-apricot-dark')}>{FEATURED_BADGE}</Text>}
           {!!topicCircle?.name && (
             <View
               onClick={() => { void navigate('circle', { id: topicCircle.id }) }}

@@ -1,5 +1,5 @@
-/** 圈子详情（FE-M4-01）：非成员可读简介与公约，但只对成员加载圈内话题流。 */
-import { useEffect, useRef } from 'react'
+/** 圈子详情（FE-M4-01）：非成员可读简介与公约，但只对成员加载圈内话题流。M6 加「只看精华」筛选（D12：精华不改变可见性）。 */
+import { useEffect, useRef, useState } from 'react'
 import Taro, { useDidShow, usePullDownRefresh, useReachBottom } from '@tarojs/taro'
 import { View, Text } from '@tarojs/components'
 import { Button, ConsentSheet, Empty, Screen, TopicCard } from '@/components'
@@ -17,6 +17,9 @@ import { tw } from '@/utils/tw'
 
 export const CIRCLE_NOT_FOUND = '圈子不存在或已关闭'
 export const CIRCLE_FEED_EMPTY = '这个圈子还没有话题'
+export const CIRCLE_FEATURED_EMPTY = '这个圈子还没有精华话题'
+export const FEATURED_FILTER_ON = '只看精华'
+export const FEATURED_FILTER_OFF = '看全部'
 export const CIRCLE_MEMBER_HINT = '加入圈子后即可浏览圈内话题，也可以与圈友交流练习经验。'
 
 export default function CirclePage () {
@@ -25,9 +28,11 @@ export default function CirclePage () {
   const access = useCircleAccess('浏览圈子')
   const req = useRequest(access.ready && id ? circleKey(id) : null, () => getCircle(id))
   const circle = req.data
-  const feedKey = `circle-feed:${id}:${access.ready && circle?.joined ? 'member' : 'locked'}`
+  const [featuredOnly, setFeaturedOnly] = useState(false)
+  // 筛选条件进 key：切换就重新取数（与详情页回复列表同一手法），不会把两批结果拼在一起
+  const feedKey = `circle-feed:${id}:${access.ready && circle?.joined ? 'member' : 'locked'}:${featuredOnly ? 'featured' : 'all'}`
   const feed = usePaged<TopicCardData>(feedKey, page => circle?.joined
-    ? listTopics(page, FEED_PAGE_SIZE, id)
+    ? listTopics(page, FEED_PAGE_SIZE, id, featuredOnly || undefined)
     : Promise.resolve({ list: [], hasMore: false }))
   const shown = useRef(false)
   const pulled = useRef(false)
@@ -101,14 +106,23 @@ export default function CirclePage () {
           {circle.joined && (
             <View {...tw('flex flex-col mt-5')}>
               <>
-              <Text {...tw('font-title font-bold text-subtitle text-ink mb-2')}>圈内话题</Text>
+              <View {...tw('flex flex-row items-center justify-between mb-2')}>
+                <Text {...tw('font-title font-bold text-subtitle text-ink')}>圈内话题</Text>
+                <View
+                  onClick={() => setFeaturedOnly(v => !v)}
+                  {...a11yButton(featuredOnly ? '取消只看精华' : '只看精华')}
+                  {...tw('flex items-center justify-center min-h-touch px-2 rounded-full', featuredOnly ? 'bg-brand-light' : 'bg-paper-dark')}
+                >
+                  <Text {...tw('font-body text-caption', featuredOnly ? 'text-brand-dark' : 'text-ink-soft')}>{featuredOnly ? FEATURED_FILTER_ON : FEATURED_FILTER_OFF}</Text>
+                </View>
+              </View>
               {feed.loading && feed.list.length === 0 && <Text {...tw('font-body text-caption text-ink-faint py-4')}>加载中…</Text>}
               {feed.error && feed.list.length === 0 && (
                 <View onClick={feed.reload} {...a11yButton('圈内话题加载失败，点击重试')} {...tw('flex items-center justify-center min-h-touch')}>
                   <Text {...tw('font-body text-caption text-brand-dark')}>圈内话题加载失败，点击重试</Text>
                 </View>
               )}
-              {!feed.loading && !feed.error && feed.list.length === 0 && <Empty compact text={CIRCLE_FEED_EMPTY} />}
+              {!feed.loading && !feed.error && feed.list.length === 0 && <Empty compact text={featuredOnly ? CIRCLE_FEATURED_EMPTY : CIRCLE_FEED_EMPTY} />}
               {feed.list.map(topic => (
                 <TopicCard key={topic._id} topic={topic} onClick={() => { void navigate('topic', { id: topic.id }) }} />
               ))}

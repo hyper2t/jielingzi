@@ -56,11 +56,13 @@ export interface TopicForm {
   /** 标签输入框原文 */
   tags: string
   anon: boolean
+  /** M6 慢话题：开启后有一段时间不开放回复（时数见 TOPIC_RULES.slowHours） */
+  slow: boolean
 }
 export type TopicField = 'title' | 'body' | 'tags'
 export type TopicErrors = Partial<Record<TopicField, string>>
 
-export const EMPTY_TOPIC_FORM: TopicForm = { title: '', body: '', tags: '', anon: false }
+export const EMPTY_TOPIC_FORM: TopicForm = { title: '', body: '', tags: '', anon: false, slow: false }
 
 export function isEmptyForm (f: TopicForm): boolean {
   return !f.title.trim() && !f.body.trim() && !f.tags.trim()
@@ -84,7 +86,7 @@ export function topicInputError (input: TopicInput): string | undefined {
 }
 
 export function toTopicInput (f: TopicForm): TopicInput {
-  return { ...(f.circleId ? { circleId: f.circleId } : {}), title: normalizeLine(f.title), body: normalizeBody(f.body), anon: f.anon, tags: parseTags(f.tags) }
+  return { ...(f.circleId ? { circleId: f.circleId } : {}), title: normalizeLine(f.title), body: normalizeBody(f.body), anon: f.anon, tags: parseTags(f.tags), ...(f.slow ? { slow: true } : {}) }
 }
 
 /** 正文字数提示：还差多少 / 已达标（有效字数，不含空白） */
@@ -116,7 +118,7 @@ export function formatPostTime (ts: number, now: number = Date.now()): string {
 export const TOPIC_LIMIT_TEXT = `今天最多发起 ${DAILY_LIMITS.createTopic} 条话题，明天再来`
 export const REPLY_LIMIT_TEXT = `今天最多回复 ${DAILY_LIMITS.createReply} 条，明天再来`
 
-/** 发布失败的提示：额度用尽说清上限；参数错误（含机审拒绝）云端给的是中文说明，直接透出 */
+/** 发布失败的提示：额度用尽说清上限；参数错误（含机审拒绝）与冷静期冲突（40901）云端给的是中文说明，直接透出 */
 export function publishError (e: unknown, kind: 'topic' | 'reply'): string {
   if (errorCode(e) === ERROR_CODES.TOO_MANY) return kind === 'topic' ? TOPIC_LIMIT_TEXT : REPLY_LIMIT_TEXT
   return userFacingMessage(e)
@@ -161,7 +163,8 @@ export function loadDraft (): TopicDraft | null {
     title: typeof d.title === 'string' ? d.title : '',
     body: typeof d.body === 'string' ? d.body : '',
     tags: typeof d.tags === 'string' ? d.tags : '',
-    anon: d.anon === true
+    anon: d.anon === true,
+    slow: d.slow === true
   }
   return isEmptyForm(form) ? null : { ...form, savedAt: typeof d.savedAt === 'number' ? d.savedAt : 0 }
 }
@@ -169,9 +172,31 @@ export function loadDraft (): TopicDraft | null {
 /** 内容为空时直接删除草稿（不留空壳） */
 export function saveDraft (f: TopicForm, now: number = Date.now()): void {
   if (isEmptyForm(f)) { removeItem(STORAGE_KEYS.topicDraft); return }
-  setItem(STORAGE_KEYS.topicDraft, { ...(f.circleId ? { circleId: f.circleId } : {}), title: f.title, body: f.body, tags: f.tags, anon: f.anon, savedAt: now })
+  setItem(STORAGE_KEYS.topicDraft, { ...(f.circleId ? { circleId: f.circleId } : {}), title: f.title, body: f.body, tags: f.tags, anon: f.anon, slow: f.slow, savedAt: now })
 }
 
 export function clearDraft (): void {
   removeItem(STORAGE_KEYS.topicDraft)
+}
+// ---------- 慢话题（M6 D11）：冷静期内不开放回复 ----------
+
+/** 发帖页的开关文案：小时数取自 TOPIC_RULES.slowHours，与云函数同一份常量（改规则不会两边漂） */
+export const SLOW_LABEL = '慢话题'
+export const SLOW_HINT = `开启后 ${TOPIC_RULES.slowHours} 小时内不开放回复，让问题先沉一沉`
+/** 列表卡片上的状态标 */
+export const SLOW_LOCK_LABEL = `慢话题 · ${TOPIC_RULES.slowHours} 小时冷静期`
+
+/** 还在冷静期 = 有 slowUntil 且没到点；旧话题 / 没开的都是 null，一律视为可回复 */
+export function isReplyLocked (t: { slowUntil?: number | null }, now: number = Date.now()): boolean {
+  return typeof t.slowUntil === 'number' && t.slowUntil > now
+}
+
+/** 详情页的锁提示：说清还剩多久，不给「稍后再试」这种模糊话 */
+export function slowReplyHint (slowUntil: number | null | undefined, now: number = Date.now()): string {
+  const left = (typeof slowUntil === 'number' ? slowUntil : now) - now
+  if (left <= 0) return '这条话题已开放回复'
+  const h = Math.floor(left / 3600000)
+  const m = Math.ceil((left % 3600000) / 60000)
+  const span = h > 0 ? (m > 0 ? `${h} 小时 ${m} 分` : `${h} 小时`) : `${m} 分`
+  return `这条话题还在冷静期，${span}后开放回复`
 }

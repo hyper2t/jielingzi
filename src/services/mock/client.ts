@@ -85,7 +85,7 @@ function settleMock (m: MockMedia, verdict: 'pass' | 'reject') {
  * mock 云端话题 / 回复（community.createTopic / listTopics / getTopic / createReply / listReplies / deleteMine，M3）。
  * 规则与云函数一致（features/topic/rules.ts）；机审可用标记演示：标题 / 正文含 [reject] → 40001 拒绝，含 [review] → 待复核（pending，只有本人看得到）。
  */
-interface MockTopic { id: string, circleId: string | null, title: string, body: string, tags: string[], anon: boolean, mine: boolean, authorName: string, status: TopicStatus, replyCount: number, createdAt: number, lastReplyAt: number, featured: boolean }
+interface MockTopic { id: string, circleId: string | null, title: string, body: string, tags: string[], anon: boolean, mine: boolean, authorName: string, status: TopicStatus, replyCount: number, createdAt: number, lastReplyAt: number, featured: boolean, slowUntil: number | null }
 interface MockReply { id: string, topicId: string, body: string, anon: boolean, mine: boolean, authorName: string, status: TopicStatus, quoteId: string | null, createdAt: number }
 let topics: MockTopic[] = []
 let replies: MockReply[] = []
@@ -188,7 +188,7 @@ export const mockControl = {
     list.forEach((t, i) => {
       const createdAt = t.createdAt ?? base + i * 60000
       const circleId = t.circleId === undefined ? (circles.find(c => c.status === 'open')?.id ?? null) : t.circleId
-      topics.push({ id: `t${++postSeq}`, tags: [], anon: false, mine: false, authorName: '林然', status: 'ok', replyCount: 0, lastReplyAt: createdAt, featured: false, ...t, circleId, createdAt })
+      topics.push({ id: `t${++postSeq}`, tags: [], anon: false, mine: false, authorName: '林然', status: 'ok', replyCount: 0, lastReplyAt: createdAt, featured: false, slowUntil: null, ...t, circleId, createdAt })
     })
   },
   seedReplies (list: Array<Partial<MockReply> & { topicId: string, body: string }>) {
@@ -388,7 +388,9 @@ const canSee = (d: { status: TopicStatus, mine: boolean }) => d.status === 'ok' 
 function topicBase (d: MockTopic) {
   return {
     id: d.id, circle: circleRef(d.circleId), title: d.title, tags: [...d.tags], anon: d.anon, author: mockAuthor(d), replyCount: d.replyCount,
-    createdAt: d.createdAt, lastReplyAt: d.lastReplyAt, featured: d.featured, images: [] as string[], folded: d.status === 'folded', pending: d.status === 'pending'
+    createdAt: d.createdAt, lastReplyAt: d.lastReplyAt, featured: d.featured, images: [] as string[], folded: d.status === 'folded', pending: d.status === 'pending',
+    // 与云函数摘要一致：缺字段的旧话题兜成 null（前端据此判断「不限制」）
+    slowUntil: typeof d.slowUntil === 'number' ? d.slowUntil : null
   }
 }
 const topicSummary = (d: MockTopic): TopicSummary => ({ ...topicBase(d), excerpt: d.status === 'folded' ? '' : clip(d.body, TOPIC_RULES.excerptLen) })
@@ -562,7 +564,7 @@ const handlers: Handlers = {
     },
     // 与云端一致：先校验字段，再走写入链路（18+ → 实名 → 禁言 → 当日额度）→ 机审 → 落库
     createTopic: (input) => {
-      noUnknown(input, ['title', 'body', 'anon', 'tags', 'circleId'])
+      noUnknown(input, ['title', 'body', 'anon', 'tags', 'circleId', 'slow'])
       const first = topicInputError(input)
       if (first) throw badParam(first)
       guard({ requirePhone: true })
@@ -580,7 +582,7 @@ const handlers: Handlers = {
       const status = mockModerate(`${input.title}\n${input.body}\n${tags.join(' ')}`)
       ensureMockProfile()
       const now = Date.now()
-      const d: MockTopic = { id: `t${++postSeq}`, circleId, title: normalizeLine(input.title), body: normalizeBody(input.body), tags, anon: input.anon === true, mine: true, authorName: '', status, replyCount: 0, createdAt: now, lastReplyAt: now, featured: false }
+      const d: MockTopic = { id: `t${++postSeq}`, circleId, title: normalizeLine(input.title), body: normalizeBody(input.body), tags, anon: input.anon === true, mine: true, authorName: '', status, replyCount: 0, createdAt: now, lastReplyAt: now, featured: false, slowUntil: input.slow === true ? now + TOPIC_RULES.slowHours * 3600 * 1000 : null }
       topics.push(d)
       if (status === 'ok') {
         const circle = circles.find(c => c.id === circleId)
@@ -591,13 +593,15 @@ const handlers: Handlers = {
     },
     listTopics: (input) => {
       readGuard()
-      noUnknown(input, ['page', 'size', 'circleId'])
+      noUnknown(input, ['page', 'size', 'circleId', 'featured'])
       if (input.circleId !== undefined && !input.circleId) throw badParam('circleId 格式不正确')
       const memberIds = openMembershipIds()
       if (input.circleId && !memberIds.has(input.circleId)) throw new CloudError(ERROR_CODES.FORBIDDEN, '加入圈子后才能查看')
       const visibleIds = input.circleId ? new Set([input.circleId]) : memberIds
       const all = topics.filter(t => t.status === 'ok' && !!t.circleId && visibleIds.has(t.circleId)).sort((a, b) => b.createdAt - a.createdAt)
-      const p = pageOf(all, input, 20)
+      // 精华筛选（D12）：先按成员关系筛，再筛精华，与云函数的 where 顺序等价
+      const picked = input.featured === true ? all.filter(t => t.featured === true) : all
+      const p = pageOf(picked, input, 20)
       return { ...p, list: p.list.map(topicSummary) }
     },
     getTopic: ({ id }) => {
@@ -618,6 +622,8 @@ const handlers: Handlers = {
         const q = replies.find(x => x.id === input.quoteId)
         if (!q || q.topicId !== t.id || q.status !== 'ok') throw badParam('引用的回复不存在或已不可用')
       }
+      // 冷静期（M6 D11）：位置与云函数一致——机审与额度之前判，被拒的回复不占当日额度
+      if (typeof t.slowUntil === 'number' && t.slowUntil > Date.now()) throw new CloudError(ERROR_CODES.CONFLICT, '这条话题还没开放回复')
       const status = mockModerate(input.body)
       ensureMockProfile()
       const now = Date.now()
@@ -721,6 +727,18 @@ const handlers: Handlers = {
       const changed = m.status === 'pending' || m.status === 'review'
       if (changed) settleMock(m, decision)
       return { ok: true, status: m.status, changed }
+    },
+    /** 精华（M6 BE-M6-02）：只翻 featured，不动 status；标精华要求话题当前为 ok，取消任何时候都行 */
+    markFeatured: (input) => {
+      if (account.role !== 'mod' && account.role !== 'admin') throw new CloudError(ERROR_CODES.FORBIDDEN, '无权限')
+      noUnknown(input, ['topicId', 'featured', 'note'])
+      if (typeof input.featured !== 'boolean') throw badParam('featured 需为布尔值')
+      const t = topics.find(x => x.id === input.topicId)
+      if (!t) throw new CloudError(ERROR_CODES.NOT_FOUND, '话题不存在或已删除')
+      if (input.featured && t.status !== 'ok') throw badParam('只有正常显示的话题能标为精华')
+      const changed = (t.featured === true) !== input.featured
+      if (changed) t.featured = input.featured
+      return { ok: true, featured: input.featured, changed }
     }
   },
   practice: {

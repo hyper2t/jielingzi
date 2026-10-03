@@ -2,6 +2,7 @@
 import { act, create, ReactTestRenderer } from 'react-test-renderer'
 import { TopicCard, Toggle } from '@/components'
 import { FEATURED_BADGE, PENDING_BADGE } from '@/components/TopicCard'
+import { SLOW_LOCK_LABEL } from '@/features/topic/rules'
 import type { TopicSummary } from '@/types/models'
 
 const render = (el: JSX.Element) => { let r!: ReactTestRenderer; act(() => { r = create(el) }); return r }
@@ -21,6 +22,7 @@ const TOPIC: TopicSummary = {
   createdAt: NOW - 5 * 60000,
   lastReplyAt: NOW - 60000,
   featured: false,
+  slowUntil: null,
   images: [],
   folded: false,
   pending: false
@@ -89,5 +91,17 @@ describe('Toggle', () => {
     expect(root(r).props.accessibilityState).toEqual({ checked: false, disabled: true })
     act(() => { root(r).props.onClick() })
     expect(onChange).not.toHaveBeenCalled()
+  })
+})
+describe('TopicCard 慢话题标（FE-M6-02）', () => {
+  it('冷静期内带「慢话题 · N 小时冷静期」标，读屏补一句；到点后不显示', () => {
+    const locked = render(<TopicCard topic={{ ...TOPIC, slowUntil: NOW + 3600000 }} now={NOW} />)
+    expect(texts(locked)).toContain(SLOW_LOCK_LABEL)
+    expect(hosts(locked, n => n.props.ariaLabel === '话题：静坐走神怎么办，3 条回复，冷静期中')).toHaveLength(1)
+    // 刚好到点：不算锁定（与云端 `now < slowUntil` 同一边界）
+    const at = render(<TopicCard topic={{ ...TOPIC, slowUntil: NOW }} now={NOW} />)
+    expect(texts(at)).not.toContain(SLOW_LOCK_LABEL)
+    const past = render(<TopicCard topic={{ ...TOPIC, slowUntil: NOW - 1 }} now={NOW} />)
+    expect(texts(past)).not.toContain(SLOW_LOCK_LABEL)
   })
 })

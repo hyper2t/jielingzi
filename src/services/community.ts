@@ -137,7 +137,7 @@ export const topicKey = (id: string) => `topic:${id}`
 /** 话题流版本：发布 / 删除后加 1，首页回到前台时据此决定是否重新取数（不依赖下拉刷新） */
 let feedVersion = 0
 export const getFeedVersion = () => feedVersion
-const touchFeed = () => { feedVersion += 1 }
+export const touchFeed = () => { feedVersion += 1 }
 
 /** 当前能否读社区内容：已同意（App 还需登录）且已确认 18+ */
 export function canReadCommunity (): boolean {
@@ -147,9 +147,10 @@ export function canReadCommunity (): boolean {
 export const FEED_PAGE_SIZE = 20
 export const REPLY_PAGE_SIZE = 30
 
-export async function listTopics (page = 1, size = FEED_PAGE_SIZE, circleId?: string): Promise<PagedResult<TopicCard>> {
+/** M6：featuredOnly 为 true 时只看精华（云端也只在 featured === true 时加条件，false / 不传 = 不过滤） */
+export async function listTopics (page = 1, size = FEED_PAGE_SIZE, circleId?: string, featuredOnly?: boolean): Promise<PagedResult<TopicCard>> {
   if (!canReadCommunity()) return { list: [], total: 0, hasMore: false }
-  const res = await getClient().fn.call('community', 'listTopics', { page, size, ...(circleId ? { circleId } : {}) })
+  const res = await getClient().fn.call('community', 'listTopics', { page, size, ...(circleId ? { circleId } : {}), ...(featuredOnly ? { featured: true } : {}) })
   return { list: res.list.map(t => ({ ...t, _id: t.id })), total: res.total, hasMore: res.hasMore }
 }
 
@@ -166,7 +167,7 @@ export async function listReplies (topicId: string, page = 1, size = REPLY_PAGE_
   return { list: res.list.map(r => ({ ...r, _id: r.id })), total: res.total, hasMore: res.hasMore }
 }
 
-/** 发起话题：status = pending 表示机审待复核（只有本人看得到） */
+/** 发起话题：status = pending 表示机审待复核（只有本人看得到）；`input.slow` = 慢话题（M6 D11，冷静期内不开放回复） */
 export async function createTopic (input: TopicInput): Promise<{ status: 'ok' | 'pending', topic: TopicDetail, remaining: number }> {
   assertCanWrite()
   const res = await getClient().fn.call('community', 'createTopic', input)

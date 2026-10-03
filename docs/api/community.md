@@ -74,12 +74,15 @@ M6 起 `topics` 另有 `slowUntil`（毫秒时间戳，`null` = 没有冷静期�
 
 - 首次发帖会补建档案并分配匿名代号（`ensureProfile`），实名发帖时昵称没填则显示代号。
 - 慢话题只是**多存一个 `slowUntil`**：发帖流程、额度、机审都不变；服务端不设定时任务、不发「已开放」事件，前端拿 `slowUntil` 自己算剩余时间。
+- 前端接线（FE-M6-02）：发起话题页的开关**只在开启时带 `slow: true`**（不开就不带这个键，避免把 false 传上去）；列表卡片带冷静期状态标，详情页未到点时收起回复栏、改成一句「还有多久」（`src/features/topic/rules.ts` 的 `isReplyLocked` / `slowReplyHint`，边界与云端同为 `now < slowUntil`）。前端这份判断只是少发一次注定被拒的请求，**云端照样二次判定**（40901）。
 - 出参：`{ topic, status: 'ok' | 'pending', remaining }`；`topic` 为 `getTopic` 同样的完整对象。
 - 错误：40001（`msg` 可直接展示）、40101、40302、40303、40304、40305、42901。
 
 ### listTopics
 
 话题流：`status = ok`，新的在前。入参 `page`（默认 1）、`size`（1–50，默认 20）、`featured`（可选布尔：`true` = 只看精华，`false` 或不传 = 不过滤）；`circleId` 可选：不传 = 我所有开放圈子的聚合（没有圈子则空列表）；传了必须是成员（40301）。详见「圈子与邀请码」。
+
+前端接线（FE-M6-02）：圈子详情页有「只看精华」开关，开启才传 `featured: true`；筛选状态进了 `usePaged` 的 key，切换即重新取数（不会把两批结果拼在一起）。首页话题流暂未接这个开关——同一屏放两个筛选态要先想清交互，留到下一轮定。
 
 - 出参：`{ list, total, page, size, hasMore }`；list 项只给摘要：`{ id, title, excerpt（≤ 80 字）, tags, anon, author, replyCount, createdAt, lastReplyAt, featured, slowUntil, images, folded, pending }`，**不含正文**。
 - 错误：40101、40303。

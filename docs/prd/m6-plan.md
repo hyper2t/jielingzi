@@ -1,7 +1,7 @@
 # M6 实施计划：每日一题 / 慢话题 / 精华 / 通知
 
 > 范围：PRD §5 T3 / T5 / W3 / N1（`docs/prd/README.md`）、§7.1 与 §7.4 线框中的「每日一题」卡片与「精华」入口。
-> 状态（2026-10-03）：**已评审并部分实现**——D9（署名形态）与 N1（通知范围）由用户当日拍板（见 D9、D17）。已完成的都只在本地、**未部署**：BE-M6-00 与 BE-M6-01（每日一题：今日题目 / 作答 / 答案列表）、FE-M6-00 与 FE-M6-01（前端类型与常量、`services/practice.ts`、mock、练习 Tab 卡片 + 作答页）、BE-M6-02（慢话题 `slowUntil` 与精华 `featured`）、OPS-M6-01（`daily-prompt.mjs` 录题 / 巡检 + 首周题目种子）。未开工：通知（BE-M6-03、FE-M6-03）、FE-M6-02（慢话题与精华的前端）、QA-M6-01，以及 M4 签核与 M5 真机验收。接口见 [`docs/api/practice.md`](../api/practice.md)「每日一题」。
+> 状态（2026-10-03）：**已评审并部分实现**——D9（署名形态）与 N1（通知范围）由用户当日拍板（见 D9、D17）。已完成的都只在本地、**未部署**：BE-M6-00 与 BE-M6-01（每日一题：今日题目 / 作答 / 答案列表）、FE-M6-00 与 FE-M6-01（前端类型与常量、`services/practice.ts`、mock、练习 Tab 卡片 + 作答页）、BE-M6-02（慢话题 `slowUntil` 与精华 `featured`）、OPS-M6-01（`daily-prompt.mjs` 录题 / 巡检 + 首周题目种子）、FE-M6-02（发帖的慢话题开关、冷静期展示、圈内只看精华、`markTopicFeatured` 接线）。未开工：通知（BE-M6-03、FE-M6-03）、QA-M6-01、精华标记在审核页的按钮，以及 M4 签核与 M5 真机验收。接口见 [`docs/api/practice.md`](../api/practice.md)「每日一题」。
 > 前置：M4 签核（[`docs/ops/release-checklist.md`](../ops/release-checklist.md) 第 7~8 步）与 M5 真机验收（[`docs/test/cases/M5.md`](../test/cases/M5.md)）先闭合；M6 不得先于它们部署到共享环境。
 > 下游：`docs/prd/join-plan.md` 的申请结果通知（V2-1）依赖本里程碑的 N1。
 
@@ -93,7 +93,7 @@
 | ✅ OPS-M6-01 | OPS | 已完成（2026-10-03，本地）：`scripts/ops/daily-prompt.mjs` 的 `set`（单日 / `--from-file` 批量，幂等 upsert，**只改正文不悄悄放开已 close 的日子**，重开要显式 `--reopen`）、`list`（逐日条数 / 状态 / 作答 / 可见 / 待复核）、`close`（只翻 `status`，正文留着）、`audit`（同日多条、非法 `status`、超长 / 空 / 脏空白、全被隐藏、孤儿答案、连续缺口起点）；`scripts/ops/daily-prompt.seed.json` 首周 7 题；长度与归日复用 `PROMPT_RULES.textMax` / `cnDate()`，不另写一套 | 实测：`scripts/ops/daily-prompt.test.mjs` 15 例全通过（含「预览一个字节都不写」「`--apply` 后再跑同一条 → `unchanged`，不产生第二条」「`close` 之后云函数 `todayPrompt` 返回 `prompt: null`」「集合还没建也不报错」「种子文件自身被 CI 校验」）；`npm run test:ops` 47/47、`test:functions` 261/261、Jest 40 / 551 / 32、`tsc --noEmit` 0 错 | 0.5d ✔ |
 | ✅ FE-M6-00 | FE | 已完成（2026-10-03，本地）：`types/models.ts` 加每日一题类型（`DailyPrompt` / `PromptAnswer` / `PromptAnswerItem` / `PromptAnswerPage` 等）；`constants/community.ts` 的 `PROMPT_RULES`（`textMax 120`、`answer { min:5, max:500 }`、`listMax 50`、`defaultAnon true`）；`services/practice.ts` 的 `todayPrompt` / `answerPrompt` / `listAnswers` 与 `guard.ts` 的 `WRITE_ACTIONS.practice`；`cloud.types.ts` 的 `FunctionMap`；`mock/client.ts` 补齐同名 handler（校验顺序、`40901` 先于额度、`anon: input.anon !== false` 均与云函数一致） | 实测：`npx tsc --noEmit` 0 错；「mock 与云函数共用规则由测试比对」= `src/constants/__tests__/community.test.ts` 新增「每日一题规则（M6）」用例，对 `PROMPT_RULES` 整对象 `toEqual`，任一侧漂移即红 | 0.5d ✔ |
 | ✅ FE-M6-01 | FE | 已完成（2026-10-03，本地）：`features/practice/prompt.ts`（状态机 `none` / `unanswered` / `answered` / `pending`、字数校验、`answerCounter`、署名文案、`promptError` 码表）、`PromptCard.tsx` 挂进练习 Tab、`pkg-practice/pages/prompt` 作答页（默认匿名可切实名、未作答不请求 `listAnswers`、分页「查看更多」、`pending` 只出现在我那条、列表失败可重试且不打断作答）、`utils/router.ts` 的 `prompt` 路由与参数、`app.config.ts` 分包页、`utils/track.ts` 的 `prompt_answer` | 实测：`src/pkg-practice/__tests__/m6.test.tsx` 12 例（卡片 5 + 作答页 7）与 `src/features/practice/__tests__/prompt.test.ts` 全绿，快照 1 个（未作答态卡片）；全量 Jest 40 suites / 551 tests / 32 snapshots | 1d ✔ |
-| FE-M6-02 | FE | 发起话题的「慢话题」开关与详情页冷静期展示；「精华」入口与列表 | 组件测试 | 0.5d |
+| ✅ FE-M6-02 | FE | 已完成（2026-10-03，本地）：发起话题页的「慢话题」开关（默认关、开了才带 `slow: true`、随草稿一起保存恢复）；列表卡片与详情页的冷静期展示（未到点只收起回复栏并显示剩余时间，读 / 引用查看 / 举报照常）；圈内话题流「只看精华」筛选（筛选态进 `usePaged` 的 key）；`markTopicFeatured` 服务层接线。契约同步：`models.ts` 的 `TopicSummary.slowUntil` 与 `TopicInput.slow`、`cloud.types.ts` 的 `FunctionMap`（`listTopics` 入参加 `featured`、`moderation.markFeatured`）、`guard.ts` 的 `WRITE_ACTIONS.moderation`、`mock/client.ts`（create 落 `slowUntil` / list 按 `featured` 筛 / createReply 冷静期闸门 / markFeatured handler）与云函数同口径 | 实测：新增 `src/pkg-community/__tests__/m6.test.tsx` 6 例（开关与发布入参、草稿恢复、锁回复栏、到点放开、筛选透传与重新取数、精华空态）；`rules.test.ts` +6 例（`slow` 只在为真时下发、文案与 `TOPIC_RULES.slowHours` 同源、`isReplyLocked` 到点即解锁的边界、剩余时间给准数、40901 透出云端中文、老草稿缺字段不炸）；`topic-card` +1 例；`community-topics` +6 例（含 markFeatured 权限与状态校验、缓存失效、话题流版本、未同意不发请求）；全量 Jest **41 suites / 570 tests / 32 snapshots**、`tsc --noEmit` 0 错、`test:functions` 261/261、`test:ops` 47/47；**变异验证 17 处全部被捕获**（含「到点仍算锁住」「筛选没传下去」「切换不重新取数」「markFeatured 不校验状态」「锁住时整块提示消失」） | 0.5d ✔ |
 | FE-M6-03 | FE | 消息页 + 未读角标；订阅授权只在主动操作成功后请求；`Taro.requestSubscribeMessage` 失败静默 | 三端走通并留证 | 1d |
 | QA-M6-01 | QA | `docs/test/cases/M6.md`：作答可见性、每日一次与并发、慢话题时间边界、精华权限、通知去重与送达、越权专项 | 自动化 + 变异验证通过；三端清单登记 | 0.5d |
 | DOC-M6 | PM / BE | 契约定稿、`docs/ops/collections.md` 索引表、`wording.md` 补「每日一题 / 慢话题 / 精华」措辞规范（含题目与提醒文案送审） | 文档与实现一致 | 随各项 |
@@ -116,6 +116,14 @@
 
 - **实现结果（2026-10-03，OPS-M6-01）**：录题脚本只做「读—算计划—打印—（`--apply` 才）写」，所以每一句都会先被打印出来复核，误操作的回滚成本就是一次 `close`。与云函数共用 `PROMPT_RULES.textMax` 与 `cnDate()`，题目取法也与 `todayPrompt` 一致（`date` + `status: 'ok'` + `limit 1`，**不排序**）——`audit` 因此专门把「同一天多条」列为 `error`：`uniq_date` 本该拦住，一旦有就说明索引缺失或被绕过，此时前端会随机看到两条中的一条。`set` 的两条硬规矩：正文-only（`status` 只在 `--reopen` 时才改），批量整批校验通过才写（种子文件里日期重复直接拒绝，不产生半批写入）。索引侧只做了一件小事：把 `prompt_answers.idx_prompt_list` 补进 `docs/ops/collections.md` 的索引表（BE-M6-00 已登记在 `collections.js`，文档漏了一行），并把本计划原先设想的 `idx_owner_time` 标记为不采纳。**未执行任何云端 `--apply`，未部署。**
 
+- **实现结果（2026-10-03，FE-M6-02）**：这一轮的铁律是「前端只做减法，不做决定」——前端只传 `slow: true` / `featured: true` 两个开关，
+  `slowUntil` 由云端算、到点与否由云端判（`createReply` 仍会 40901），`isReplyLocked` 只用来少发一次注定被拒的请求并把话讲清楚，
+  所以「前端时钟漂移」不会变成绕过冷静期的通道。三个刻意的取舍：① 锁的是**回复栏**而不是整页（读、引用查看、举报都照常，被锁的人不该连内容都看不到）；
+  ② 提示给准数（「2 小时 1 分后开放回复」）而不是「稍后再试」，`slowReplyHint` 与卡片标共用 `TOPIC_RULES.slowHours`，改规则不会两边漂；
+  ③ 只在开启时带键（`slow` / `featured` 都是如此），与云函数「`=== true` 才生效」的读法严格对齐，避免 `false` 被下游当成第三种状态。
+  `markTopicFeatured` 只做到服务层（写动作门禁 + `invalidate(topicKey)` + 话题流版本 +1），**审核页的按钮留到下一轮**：它得跟 `decide` 同屏才有用，那是 pkg-admin 的改动。
+  前端也补了 mock 的同款行为（发帖落 `slowUntil`、列表按 `featured` 筛、回复冷静期闸门、markFeatured 的角色与状态校验），否则「真机过、mock 红」迟早出现。
+
 ## 7. 上线与回滚
 
 1. 合并前逐项运行并记录：`yarn test:functions`、`yarn test:ops`、`yarn test --runInBand --silent`、`yarn typecheck`；新文件按仓库风格 `npx eslint`；三端结果记入 `docs/test/cases/M6.md`。
@@ -136,3 +144,5 @@
 | 提醒定时触发器成本与时区 | 每日一次、08:00 北京时间；无题目即早退；触发器重跑由 `(uid, type, refId)` 去重兜住 |
 | 精华列表变成越权通道 | D12 明确不解除成员校验，并在用例里专测（`listTopics({ featured: true })` 对非成员不返回圈内内容） |
 | M4 / M5 真机未闭合就推进 M6 部署 | 本计划第 7 节第 3 步之前必须完成 M4 签核与 M5 真机验收；否则只在本地与隔离 Dev 环境验证 |
+| 用户可见文案「精选」（前端 `FEATURED_BADGE`）与「精华」（云端提示 / 本文档）用词不一 | FE-M6-02 先沿用前端既有文案不动快照；待 `wording.md` 定稿后一次性统一（TopicCard 徽标、圈内筛选、`markFeatured` 的 40001 提示、`docs/api/*.md`），连带更新快照 |
+| 精华只能由云端动作标记，审核页还没有入口 | `markTopicFeatured` 已在服务层与 mock 就绪（含权限与状态校验）；入口待 pkg-admin 与 `decide` 同屏改造 |

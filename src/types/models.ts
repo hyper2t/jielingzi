@@ -264,6 +264,8 @@ export interface TopicSummary {
   createdAt: number
   lastReplyAt: number
   featured: boolean
+  /** M6 慢话题（D11）：冷静期截止时间（毫秒），到点前不开放回复；null = 不限制（旧话题与未开启的都是 null） */
+  slowUntil: number | null
   /** M3 恒为 []，话题配图随统一原生选图一起做 */
   images: string[]
   folded: boolean
@@ -305,6 +307,8 @@ export interface TopicInput {
   body: string
   anon?: boolean
   tags?: string[]
+  /** M6 慢话题：true → 发出后 TOPIC_RULES.slowHours 小时内不开放回复（云端落 slowUntil） */
+  slow?: boolean
 }
 
 export interface ReplyInput {

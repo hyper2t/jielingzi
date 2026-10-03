@@ -132,13 +132,13 @@ export interface FunctionMap {
     createInvite: [{ circleId: string }, { invite: Invite, quota: number }]
     /** 兑换一次性邀请码并加入其绑定的圈子（M4） */
     redeemInvite: [{ code: string }, { circle: Circle, joined: true }]
-    /** 发起话题（M3）：标题 5–40 字、正文有效字数 ≥ 50；status = pending 表示机审待复核（只有本人看得到）；机审拒绝 40001 且不占额度 */
+    /** 发起话题（M3）：标题 5–40 字、正文有效字数 ≥ 50；status = pending 表示机审待复核（只有本人看得到）；机审拒绝 40001 且不占额度。`slow: true` = 慢话题（M6 D11） */
     createTopic: [TopicInput, { status: 'ok' | 'pending', topic: TopicDetail, remaining: number }]
-    /** 话题流：只含 ok，新的在前；条目为摘要，作者已按匿名脱敏。需 18+，不要求实名 */
-    listTopics: [{ page?: number, size?: number, circleId?: string }, PagedList<TopicSummary>]
+    /** 话题流：只含 ok，新的在前；条目为摘要，作者已按匿名脱敏。需 18+，不要求实名。M6：`featured: true` 只看精华（D12，不改变可见性判定） */
+    listTopics: [{ page?: number, size?: number, circleId?: string, featured?: boolean }, PagedList<TopicSummary>]
     /** 话题详情；不存在 / 已下架 / 别人的待审 40401 */
     getTopic: [{ id: string }, { topic: TopicDetail }]
-    /** 回复：有效字数 ≥ 1，< 30 标记 short；quoteId 必须是同一话题里的正常回复 */
+    /** 回复：有效字数 ≥ 1，< 30 标记 short；quoteId 必须是同一话题里的正常回复。慢话题未到 `slowUntil` → 40901（不扣额度、不发机审） */
     createReply: [ReplyInput, { status: 'ok' | 'pending', reply: Reply, remaining: number }]
     /** 回复列表：时间正序，默认每页 30 */
     listReplies: [{ topicId: string, page?: number, size?: number }, PagedList<Reply>]
@@ -157,6 +157,8 @@ export interface FunctionMap {
     mediaQueue: [{ page?: number, size?: number }, { list: MediaQueueItem[], total: number, page: number, size: number, hasMore: boolean }]
     /** 图片复核结论（仅 mod / admin）：pass 生效；reject 删除文件并通知上传者 */
     decideMedia: [{ mediaId: string, decision: 'pass' | 'reject', note?: string }, { ok: true, status: string, changed: boolean }]
+    /** 标 / 取消精华（M6 BE-M6-02，仅 mod / admin，否则 40301）：只改 topics.featured，不动 status；标精华要求话题当前为 ok，取消不限；同值调用 changed: false */
+    markFeatured: [{ topicId: string, featured: boolean }, { ok: true, featured: boolean, changed: boolean }]
   }
   /** 私人练习记录（docs/api/practice.md，M5）；服务端只按当前身份读写 */
   practice: {

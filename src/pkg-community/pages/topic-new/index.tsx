@@ -1,5 +1,5 @@
 /**
- * 发起话题（FE-M3-02，PRD T1）：标题（5–40 字）、正文（有效字数 ≥ 50，不含空白）、标签（最多 3 个，选填）、匿名开关。
+ * 发起话题（FE-M3-02，PRD T1）：标题（5–40 字）、正文（有效字数 ≥ 50，不含空白）、标签（最多 3 个，选填）、匿名开关、慢话题开关（M6 D11）。
  * - 校验与云函数一致（features/topic/rules.ts，同一份常量与提示文案）；发布前过发布门禁（实名 + 读过公约），云端仍会再校验
  * - 本地草稿：输入即存本机（STORAGE_KEYS.topicDraft），下次进来恢复；发布成功后删除
  * - 匿名：别人只看到「匿名·代号」，不显示头像与档案（预览见顶部「别人看到的你」）
@@ -16,7 +16,7 @@ import CircleJoinGuide from '@/features/circle/CircleJoinGuide'
 import { loginGate, goLogin } from '@/features/auth/require-login'
 import { normalizeLine, textLength } from '@/features/profile/rules'
 import {
-  bodyCounter, clearDraft, EMPTY_TOPIC_FORM, isEmptyForm, loadDraft, parseTags, publishError, saveDraft, toTopicInput, TopicErrors, TopicField, TopicForm, validateTopicForm
+  bodyCounter, clearDraft, EMPTY_TOPIC_FORM, isEmptyForm, loadDraft, parseTags, publishError, saveDraft, SLOW_HINT, SLOW_LABEL, toTopicInput, TopicErrors, TopicField, TopicForm, validateTopicForm
 } from '@/features/topic/rules'
 import { CIRCLES_KEY, createTopic, getProfile, listCircles, PROFILE_KEY } from '@/services/community'
 import { errorMessage, needsAdultConfirm } from '@/services/errors'
@@ -85,7 +85,7 @@ export default function TopicNew () {
   // 进入时恢复草稿（只恢复一次，用户开始输入前）
   useEffect(() => {
     const d = loadDraft()
-    if (d) { setForm({ circleId: d.circleId || initialCircleId, title: d.title, body: d.body, tags: d.tags, anon: d.anon }); setRestored(true) }
+    if (d) { setForm({ circleId: d.circleId || initialCircleId, title: d.title, body: d.body, tags: d.tags, anon: d.anon, slow: d.slow === true }); setRestored(true) }
   }, [])
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export default function TopicNew () {
     const next = { ...form, [key]: value }
     setForm(next)
     saveDraft(next)
-    if (key !== 'anon' && key !== 'circleId') setErrors(e => ({ ...e, [key as TopicField]: undefined }))
+    if (key !== 'anon' && key !== 'circleId' && key !== 'slow') setErrors(e => ({ ...e, [key as TopicField]: undefined }))
     setFormError('')
   }
 
@@ -257,6 +257,11 @@ export default function TopicNew () {
           />
           <Toggle on={form.anon} label={ANON_LABEL} onChange={v => set('anon', v)} disabled={busy} {...tw('mt-2')} />
           <Text {...tw('font-body text-caption text-ink-faint')}>{ANON_HINT}</Text>
+        </View>
+
+        <View {...tw('flex flex-col mt-3 p-4 rounded-md bg-paper-light')}>
+          <Toggle on={form.slow} label={SLOW_LABEL} onChange={v => set('slow', v)} disabled={busy} />
+          <Text {...tw('font-body text-caption text-ink-faint')}>{SLOW_HINT}</Text>
         </View>
 
         {!!formError && <Text {...tw('font-body text-caption text-danger text-center mt-4')}>{formError}</Text>}
