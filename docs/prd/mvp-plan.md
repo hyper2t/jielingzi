@@ -130,6 +130,11 @@
 
 ## M6 · 每日一题 / 慢话题 / 精华 / 通知（1.5 周）
 
+> **进度（2026-10-03）**：实施计划与接口契约草案见 [`docs/prd/m6-plan.md`](./m6-plan.md)（状态：未评审、未排期、未实现）。
+> 已预登记的部分：`daily_prompts`（`uniq_date`）、`prompt_answers`（`idx_prompt_owner`）、`notifications`（`idx_owner_read_time`）集合与索引已在云端齐全；
+> `DAILY_LIMITS.answerPrompt = 1` 已配置但暂无调用方，`_shared/notify.js` 有 `notify()` 而无人调用，`cloudbaserc.json` 尚无 `triggers`。
+> 门槛：M4 签核与 M5 真机验收先闭合；三项标 ★ 的产品决定（作答是否署名、订阅消息模板 ID、题目与提醒文案审阅）见 m6-plan §8。
+
 | 编号 | 负责 | 任务 | 验收 |
 |---|---|---|---|
 | BE-M6-01 | BE | 每日一题：`daily_prompts` 运营脚本录入；`answerPrompt`（每日一次）/ `listAnswers`（作答后才可读） | 单测 |
