@@ -39,5 +39,7 @@
 
 名额增发（手动）：`node scripts/ops/invite-quota.mjs --report` 看本月有效回复榜，再 `--account <id> --add N --apply`。
 
+每日一题录题（手动，OPS-M6-01）：`node scripts/ops/daily-prompt.mjs set --from-file scripts/ops/daily-prompt.seed.json` 预览 → 确认后加 `--apply`；当天要撤 `close --date … --apply`（只改 `status`，正文留着）；录完 `audit` 期望只输出「没问题 ✓」。索引侧待办 1 个：`prompt_answers.idx_prompt_list`，须用户授权后 `ensure-indexes.mjs --apply`。
+
 **回滚**：重新部署上一个提交的 `community` / `moderation`。`memberships` / `invites` 数据无副作用可保留；但旧代码不看 `circleId`，圈内话题会对所有人可见——回滚窗口内应暂停对外发版 / 先导出清单。计数偏差用 `circles.mjs recount --apply` 校正。
 

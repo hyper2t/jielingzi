@@ -1,0 +1,40 @@
+{
+  "_comment": "每日一题首周题目（docs/prd/m6-plan.md W3 / OPS-M6-01）。录入：先 `node scripts/ops/daily-prompt.mjs set --from-file scripts/ops/daily-prompt.seed.json` 预览，确认后加 --apply。题目只按 date 生效、提前录入未来日期是安全的（todayPrompt 只认当日 status=ok）；下架用 `close --date … [--apply]`。正文单行、≤ 120 字（PROMPT_RULES.textMax）；不写医疗与心理建议，不推销任何东西。",
+  "prompts": [
+    {
+      "date": "2026-10-03",
+      "text": "今天你想放下的一件小事是什么？",
+      "note": "周六，收尾型问题"
+    },
+    {
+      "date": "2026-10-04",
+      "text": "这一周里，哪一个瞬间你觉得自己慢下来了？",
+      "note": "周日回顾"
+    },
+    {
+      "date": "2026-10-05",
+      "text": "开工前的十分钟，你愿意拿来做什么？",
+      "note": "周一启动"
+    },
+    {
+      "date": "2026-10-06",
+      "text": "坐定之后，最先来打扰你的是什么？",
+      "note": "练习中的具体经验"
+    },
+    {
+      "date": "2026-10-07",
+      "text": "今天有一件事可以只做一半，你会选哪件？",
+      "note": "关于「够用就好」"
+    },
+    {
+      "date": "2026-10-08",
+      "text": "今晚打算几点把手机放下？",
+      "note": "睡前，避免评判性措辞"
+    },
+    {
+      "date": "2026-10-09",
+      "text": "这周有没有哪一次呼吸，是你记得的？",
+      "note": "周五收束"
+    }
+  ]
+}
