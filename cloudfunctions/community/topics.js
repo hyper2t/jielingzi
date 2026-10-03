@@ -10,13 +10,15 @@
  *   → 机审 checkText（reject：40001 不落库不扣额度；review：落库 status = pending 且进人工复核；pass：ok）→ 落库 → commit 计额度。
  * - 读：要求已确认 18+（PRD C5）；话题流只含 status = ok；pending 仅作者本人可见；folded 保留位置但不下发正文。
  * - 字数规则：标题单行、码点计；正文 / 回复的「有效字数」不含空白（防空格凑字数），与前端 src/features/topic/rules.ts 一致。
+ * - 慢话题与精华（M6）：`slow: true` → 落库 `slowUntil = createdAt + TOPIC_RULES.slowHours`，到点前 `createReply` 一律 40901（作者也一样），
+ *   已有回复与读取不受影响；`featured` 只由 moderation.markFeatured 改，不影响 `status`，所以精华列表不会越过圈子成员校验（D12）。
  * - 圈子（M4，BE-M4-03）：话题必须属于一个圈子，**只有圈子成员能读写**（审核员也没有读圈内内容的特权）。
  *   不是成员 / 圈子已关闭 / circleId 为空的旧话题：读详情、读回复、写回复一律 40401（与「不存在」一致，防遍历 ID）；
  *   话题流（listTopics）不传圈子 = 聚合我所有圈子，传了却不是成员 40301。deleteMine 不要求成员。
  *   circles.topicCount 是展示用近似值（发布 +1、作者删除 −1，运维脚本 recount 校正）。
  */
 const {
-  badParam, notFound, forbidden, validate, pageSchema, guardWrite, checkText,
+  badParam, conflict, notFound, forbidden, validate, pageSchema, guardWrite, checkText,
   logModeration, enqueueReview, withCollection, isCollectionMissingError, TEXT_RULES, TOPIC_RULES,
 } = require('./_shared')
 const { ensureProfile, textLength, cleanLine, INVISIBLE_RE } = require('./profile')
@@ -30,6 +32,8 @@ const PROFILES = 'profiles'
 const DELETED_NAME = '已注销用户'
 const IN_CHUNK = 100
 const REJECT_MSG = '内容不符合社区公约，请修改后再发布'
+/** 慢话题（D11）：冷静期内回复时的话术（40901） */
+const SLOW_REPLY_MSG = '这条话题还没开放回复'
 /** 下发给前端的话题 / 回复里不允许出现的内部字段（测试据此断言） */
 const INTERNAL_FIELDS = Object.freeze(['_openid', 'authorUid', 'openid', 'accountId', 'targetUid', 'reportCount', 'removedBy'])
 
@@ -76,11 +80,14 @@ function asAnon(v) {
 
 function parseTopic(params) {
   const src = asObject(params)
-  rejectUnknown(src, ['title', 'body', 'anon', 'tags', 'circleId'])
-  const { circleId } = validate({ circleId: src.circleId }, { circleId: { type: 'id', optional: true } })
+  rejectUnknown(src, ['title', 'body', 'anon', 'tags', 'circleId', 'slow'])
+  const { circleId, slow } = validate(
+    { circleId: src.circleId, slow: src.slow },
+    { circleId: { type: 'id', optional: true }, slow: { type: 'boolean', optional: true } },
+  )
   const title = cleanLine('title', '标题', src.title === undefined ? '' : src.title, TEXT_RULES.topicTitle)
   const body = cleanBody('正文', src.body === undefined ? '' : src.body, TEXT_RULES.topicBody)
-  return { title, body: body.text, tags: cleanTags(src.tags), anon: asAnon(src.anon), circleId: circleId || null }
+  return { title, body: body.text, tags: cleanTags(src.tags), anon: asAnon(src.anon), circleId: circleId || null, slow: slow === true }
 }
 
 function parseReply(params) {
@@ -146,6 +153,8 @@ function presentTopic(doc, profiles, me, { full = false, circles = null } = {}) 
     createdAt: doc.createdAt,
     lastReplyAt: doc.lastReplyAt || doc.createdAt,
     featured: doc.featured === true,
+    // 慢话题：到点前 createReply 会被拒；null = 没有冷静期（含 M6 之前的旧数据）
+    slowUntil: typeof doc.slowUntil === 'number' ? doc.slowUntil : null,
     images: [],
     folded,
     pending: doc.status === 'pending',
@@ -222,9 +231,11 @@ async function createTopic(params, ctx) {
   const now = ctx.now()
   const status = await screen(ctx, g, { scene: 'forum', texts: [input.title, input.body, ...input.tags], now })
   const { doc: profile } = await ensureProfile(ctx, g.accountId, now)
+  // 慢话题（D11）：只记「什么时候开放回复」，是否到点在读侧按 ctx.now() 判，不做定时任务、不额外存标记字段
+  const slowUntil = input.slow ? now + TOPIC_RULES.slowHours * 3600 * 1000 : null
   const topic = await insert(ctx, TOPICS, {
     _openid: g.accountId, circleId: circle._id, anon: input.anon, title: input.title, body: input.body, tags: input.tags, images: [],
-    status, featured: false, replyCount: 0, reportCount: 0, createdAt: now, lastReplyAt: now,
+    status, featured: false, slowUntil, replyCount: 0, reportCount: 0, createdAt: now, lastReplyAt: now,
   })
   if (status === 'pending') await enqueueReview(ctx.db, { contentType: 'topic', targetId: topic._id, now })
   else await bumpTopicCount(ctx, circle._id, 1)
@@ -235,7 +246,7 @@ async function createTopic(params, ctx) {
 /** community.listTopics：话题流（status = ok，新的在前）；列表只给摘要 */
 async function listTopics(params, ctx) {
   const src = asObject(params)
-  const input = validate(src, { ...pageSchema(50), circleId: { type: 'id', optional: true } })
+  const input = validate(src, { ...pageSchema(50), circleId: { type: 'id', optional: true }, featured: { type: 'boolean', optional: true } })
   const me = await requireReader(ctx)
   const mine = await myOpenCircles(ctx.db, me)
   const empty = { list: [], total: 0, page: input.page, size: input.size, hasMore: false }
@@ -247,6 +258,8 @@ async function listTopics(params, ctx) {
     if (!mine.size) return empty
     where = { status: 'ok', circleId: ctx.db.command.in([...mine.keys()]) }
   }
+  // 精华筛选（D12）：只加一个 where 条件，可见性仍由上面的圈子成员决定；featured=false 视为「不过滤」
+  if (input.featured === true) where.featured = true
   const total = await countRows(ctx.db.collection(TOPICS).where(where))
   const start = (input.page - 1) * input.size
   const rows = total > start ? await findRows(ctx.db.collection(TOPICS).where(where).orderBy('createdAt', 'desc').skip(start).limit(input.size)) : []
@@ -280,6 +293,8 @@ async function createReply(params, ctx) {
     if (!quoted || quoted.topicId !== input.topicId || quoted.status !== 'ok') throw badParam('引用的回复不存在或已被处理')
   }
   const now = ctx.now()
+  // 冷静期（D11）：放在机审与 g.commit() 之前——被拒的回复不占当日额度，也不消耗机审调用
+  if (typeof topic.slowUntil === 'number' && now < topic.slowUntil) throw conflict(SLOW_REPLY_MSG)
   const status = await screen(ctx, g, { scene: 'comment', texts: [input.body], now })
   const { doc: profile } = await ensureProfile(ctx, g.accountId, now)
   const reply = await insert(ctx, REPLIES, {

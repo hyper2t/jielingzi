@@ -54,10 +54,10 @@
 - 返回：`{ promptId, date, page, size, hasMore, list, mine }`；`list` 按 `createdAt` 升序、只含他人 `status: 'ok'`，每项 `{ id, date, text, status, createdAt, authorName, anon, isSelf, deleted }`；本人那条在 `mine` 单独返回（可能是 `pending`）。
 - 隐私（D9）：默认匿名。`authorName` 匿名时取 `profiles.anonAlias`、实名时取 `nickname`，注销或已解除归属（`_openid` 为 `null` 或 `authorDeleted`）固定「已注销用户」；不下发 `_openid` / 头像 / 徽章 / 练习方式 / 年限 / 手机号。
 
-### 同里程碑的其他接口
+### 同里程碑的其他接口（慢话题 / 精华：云函数已实现（本地，未部署）；前端未接）
 
 - `community.createTopic`：增可选 `slow: true` → 落库 `slowUntil = createdAt + 24h`；话题摘要与详情返回 `slowUntil`。
 - `community.createReply`：`slowUntil` 未到 → `40901`「这条话题还没开放回复」；已发布的回复不受影响。
 - `community.listTopics`：增 `featured: true` 筛选；圈内精华仍只对成员可见。
-- `moderation.markFeatured`：`{ topicId, featured }` → `{ ok: true, featured, changed }`，仅 `mod` / `admin`，写 `mod_logs`（`kind: 'featured'`）。
+- `moderation.markFeatured`：`{ topicId, featured }` → `{ ok: true, featured, changed }`，仅 `mod` / `admin`，写 `mod_logs`（`kind: 'featured'`）。**已实现**，详见 [`docs/api/moderation.md`](moderation.md)。
 - `practice.listNotifications` / `markNotificationsRead`：站内消息分页与已读；`listNotifications` 返回 `unread`。

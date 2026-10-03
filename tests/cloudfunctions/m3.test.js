@@ -435,5 +435,6 @@ test('集合登记：topics 话题流索引（status + createdAt）；topics / r
   assert.ok(topics.indexes.some((i) => i.name === 'idx_status_time' && JSON.stringify(i.keys) === '[["status",1],["createdAt",-1]]'))
   assert.equal(topics.owned.onDelete, 'detach')
   assert.equal(S.COLLECTIONS.find((c) => c.name === 'replies').owned.onDelete, 'detach')
-  assert.deepEqual(S.TOPIC_RULES, { tagsMax: 3, tag: { min: 1, max: 12 }, excerptLen: 80 })
+  // slowHours 是 M6 慢话题的冷静期时长（D11）：改这里要同时改前端 src/constants/community.ts，两边由 Jest 的一致性用例比对
+  assert.deepEqual(S.TOPIC_RULES, { tagsMax: 3, tag: { min: 1, max: 12 }, excerptLen: 80, slowHours: 24 })
 })

@@ -7,6 +7,8 @@
  * - 举报「用户」时不暴露任何 uid：传他发布的内容（contentType + targetId），服务端解析作者，记在 report.targetUid（不下发）
  * - queue / decide 仅 mod / admin（guardRole）；decide 的处理方式参数叫 decision（action 是路由字段）；mod 不能处罚 mod / admin（只有 admin 可以）
  * - 处罚写 users.mutedUntil / bannedUntil，guardWrite 立即生效；通知作者与举报人（不含原文）；全部写 mod_logs
+ * - 精华（BE-M6-02，D12）：markFeatured 只改 topics.featured 并写 mod_logs（kind: featured），不动 status——
+ *   可见性一律由 M4 的圈子成员校验决定，精华列表不会成为越权读圈内内容的通道
  */
 const {
   validate, badParam, notFound, forbidden, guardWrite, guardRole, isDuplicateKeyError, isCollectionMissingError,
@@ -23,6 +25,8 @@ const CONTENT_COLLECTION = { topic: 'topics', reply: 'replies' }
 const REASON_IDS = REPORT_REASONS.map((r) => r.id)
 const ACTIONS = ['dismiss', 'remove', 'restore', 'mute', 'ban']
 const QUEUE_SCAN_LIMIT = 300
+/** 精华（D12）：mod / admin 手工标记，只写审计日志，不通知（通知归 BE-M6-03） */
+const FEATURED_LOG_KIND = 'featured'
 
 /** 不要求身份的动作（入口据此不因副作用建号） */
 const IDENTITY_FREE_ACTIONS = ['ping']
@@ -306,6 +310,35 @@ async function decideMedia(params, ctx) {
   return { ok: true, status: r.status, changed: r.changed }
 }
 
+// ---------- 精华标记（BE-M6-02） ----------
+
+/**
+ * moderation.markFeatured：标 / 取消精华。只翻 topics.featured，不改 status（D12：精华不解除可见性判定）。
+ * 只允许对 status = ok 的话题标精华（下架、折叠、待复核的内容不该被推到列表前面）；取消则任何时候都允许，
+ * 便于撤销误标。二次调用是同值：数据不变、changed = false，但仍然留一条 mod_logs（人工操作逐次留痕）。
+ */
+async function markFeatured(params, ctx) {
+  const input = validate(params, {
+    topicId: idRule,
+    featured: { type: 'boolean' },
+    note: { type: 'string', maxLen: 200, optional: true },
+  })
+  const { accountId: actor } = await guardRole(ctx)
+  const topic = await findContent(ctx.db, 'topic', input.topicId)
+  if (!topic) throw notFound('话题不存在或已删除')
+  const on = input.featured
+  if (on && topic.status !== 'ok') throw badParam('只有正常显示的话题能标为精华')
+  const changed = (topic.featured === true) !== on
+  const now = ctx.now()
+  if (changed) await ctx.db.collection(CONTENT_COLLECTION.topic).doc(input.topicId).update({ featured: on })
+  await logModeration(ctx.db, {
+    kind: FEATURED_LOG_KIND, action: on ? 'feature' : 'unfeature',
+    targetType: 'topic', targetId: input.topicId, contentType: 'topic',
+    actor, subject: topic._openid || null, note: input.note || null,
+  }, now)
+  return { ok: true, featured: on, changed }
+}
+
 const actions = {
   /** 健康检查：部署 / 安全规则验证用，不读写数据库 */
   async ping(_params, ctx) {
@@ -316,6 +349,7 @@ const actions = {
   decide,
   mediaQueue,
   decideMedia,
+  markFeatured,
   // 图片机审回调不在这里：消息推送推给独立的 mediacheck 云函数（客户端无权调用），见 cloudfunctions/mediacheck
 }
 

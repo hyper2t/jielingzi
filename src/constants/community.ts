@@ -45,7 +45,9 @@ export const PROMPT_RULES = {
 export const TOPIC_RULES = {
   tagsMax: 3,
   tag: { min: 1, max: 12 },
-  excerptLen: 80
+  excerptLen: 80,
+  /** 慢话题冷静期小时数（D11）：作答页据此显示「N 小时后开放回复」，服务端到点前拒绝回复 */
+  slowHours: 24
 } as const
 
 /**

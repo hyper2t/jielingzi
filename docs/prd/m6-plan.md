@@ -1,7 +1,7 @@
 # M6 实施计划：每日一题 / 慢话题 / 精华 / 通知
 
 > 范围：PRD §5 T3 / T5 / W3 / N1（`docs/prd/README.md`）、§7.1 与 §7.4 线框中的「每日一题」卡片与「精华」入口。
-> 状态（2026-10-03）：**已评审并部分实现**——D9（署名形态）与 N1（通知范围）由用户当日拍板（见 D9、D17）。已完成的都只在本地、**未部署**：BE-M6-00 与 BE-M6-01（每日一题：今日题目 / 作答 / 答案列表）、FE-M6-00 与 FE-M6-01（前端类型与常量、`services/practice.ts`、mock 补齐、练习 Tab 卡片 + 作答页）。未开工：慢话题、精华、通知（BE-M6-02 / 03、OPS-M6-01、FE-M6-02 / 03）与 M4 签核、M5 真机验收。接口见 [`docs/api/practice.md`](../api/practice.md)「每日一题」。
+> 状态（2026-10-03）：**已评审并部分实现**——D9（署名形态）与 N1（通知范围）由用户当日拍板（见 D9、D17）。已完成的都只在本地、**未部署**：BE-M6-00 与 BE-M6-01（每日一题：今日题目 / 作答 / 答案列表）、FE-M6-00 与 FE-M6-01（前端类型与常量、`services/practice.ts`、mock、练习 Tab 卡片 + 作答页）、BE-M6-02（慢话题 `slowUntil` 与精华 `featured`：`createTopic` / `createReply` / `listTopics` / `moderation.markFeatured`）。未开工：通知（BE-M6-03、FE-M6-03）、OPS-M6-01、FE-M6-02（慢话题与精华的前端）、QA-M6-01，以及 M4 签核与 M5 真机验收。接口见 [`docs/api/practice.md`](../api/practice.md)「每日一题」。
 > 前置：M4 签核（[`docs/ops/release-checklist.md`](../ops/release-checklist.md) 第 7~8 步）与 M5 真机验收（[`docs/test/cases/M5.md`](../test/cases/M5.md)）先闭合；M6 不得先于它们部署到共享环境。
 > 下游：`docs/prd/join-plan.md` 的申请结果通知（V2-1）依赖本里程碑的 N1。
 
@@ -75,10 +75,10 @@
 | `answerPrompt` | 是 | 门禁见 D5；`{ promptId, text }` → `{ answer: { id, date, text, status, createdAt } }` |
 | `listAnswers` | 否 | `{ promptId, page, size }`；本人未作答 → `40301` 且不返回任何答案内容；他人只返回 `status = 'ok'`，本人条目在 `mine` 单独返回（可为 `pending`）；每项含 `authorName` / `anon`（D9：默认匿名），不含 `_openid` / 头像 / 徽章 / 练习档案 |
 | `listNotifications` / `markNotificationsRead` | 否 / 是 | 站内消息列表 + 未读数；只按 `_openid` 过滤 |
-| `community.createTopic` | — | 增 `slow` 入参（D11），返回体带 `slowUntil` |
-| `community.createReply` | — | `slowUntil` 未到 → 40901 |
-| `community.listTopics` | — | 增 `featured: true` 筛选；摘要与详情带 `featured` |
-| `moderation.markFeatured` | 是 | `mod` / `admin` 专用；写 `mod_logs`；不改变可见性判定（D12） |
+| ✅ `community.createTopic` | — | 增 `slow` 入参（D11），返回体带 `slowUntil`（BE-M6-02 已实现） |
+| ✅ `community.createReply` | — | `slowUntil` 未到 → 40901（已实现） |
+| ✅ `community.listTopics` | — | 增 `featured: true` 筛选；摘要与详情带 `featured` 与 `slowUntil`（已实现） |
+| ✅ `moderation.markFeatured` | 是 | `mod` / `admin` 专用；写 `mod_logs`；不改变可见性判定（D12，已实现） |
 
 错误码不新增：沿用 `40001` / `40101` / `40301` / `40302` / `40303` / `40304` / `40401` / `40901` / `42901`。
 
@@ -88,7 +88,7 @@
 |---|---|---|---|---|
 | ✅ BE-M6-00 | BE | 已完成（2026-10-03，本地）：`config.js` 加 `PROMPT_RULES`（`textMax 120`、`answer { min: 5, max: 500 }`、`listMax 50`、`defaultAnon true`）并导出；`collections.js` 的 `prompt_answers` 补分页索引 `idx_prompt_list`（`promptId + status + createdAt`）。`daily_prompts` / `prompt_answers`、`idx_prompt_owner` 与「每日一次在应用层判断（不能建含 `_openid` 的唯一索引）」原已在册，故未新增 `idx_owner_time`；`fakeDb`（已支持 `count` / `$ne` / `orderBy`）与 `userHarness` 无需改动 | 现有云函数用例不回归：244/244（含新增 22 例） | 0.5d ✔ |
 | ✅ BE-M6-01 | BE | 已完成（本地）：`practice/service.js` 新增 `todayPrompt` / `answerPrompt` / `listAnswers` 并注册进 `actions`；机审复用 `checkText`（scene `comment`）+ `logModeration`，`reject` → `40001` 不落库不扣额度、`review` → 落库 `status: 'pending'`；拦截文案与社区逐字一致。**顺序修正**：`answerPrompt` 的「题目失效 / 已作答」前置判断放在 `guardWrite` 之前（每日额度只有 1 次，先扣额度会让 `40901` 被 `42901` 盖掉），与 `community.redeemInvite` 同序 | 单测 22 例：无题目兜底、只认当日 `ok`、重复 `40901` 不扣额度、同日第二题 `42901`、`40401`、字数与参数校验、四类门禁码、reject / review、未作答 `40301` 零内容、他人 `ok` 过滤、匿名与实名展示、注销形态、分页 | 1d ✔ |
-| BE-M6-02 | BE | 慢话题 `slowUntil`（`createTopic` / `createReply`）与 `featured`（`moderation.markFeatured` + `listTopics` 筛选 + `mod_logs`） | 单测：冷静期内回复 40901、到期可回；非 mod 标记精华 40301；精华不解除成员校验；`featured` 列表只含 `ok` | 1d |
+| ✅ BE-M6-02 | BE | 已完成（2026-10-03，本地）：`TOPIC_RULES.slowHours = 24`（前后端同名常量，一致性由 Jest 用例比对）；`createTopic` 增 `slow` 布尔 → 落库 `slowUntil = createdAt + 24h`，`presentTopic` 随摘要与详情下发；`createReply` 在机审与 `g.commit()` 之前判 `slowUntil`，未到 → 40901「这条话题还没开放回复」（作者本人同样受限，不扣额度、不落库）；`listTopics` 增 `featured` 布尔筛选（只 `true` 生效，圈子成员校验不动）；`moderation.markFeatured`（`guardRole` + `topics.featured` + `mod_logs` `kind: 'featured'`，只允许对 `ok` 话题标精华，同值调用 `changed: false`） | 实测：`tests/cloudfunctions/m6-slow-featured.test.js` 17 例全通过（差 1ms 不可回 / 到点可回、旧文档缺字段兜 `null`、`slow` 只接受布尔、已有回复照常读、非成员 40401 优先、`featured` 只含 `ok` 且不越圈、非 mod 40301、二次调用幂等仍留审计）；变异验证 7 处全部被捕获；`npm run test:functions` 261/261、`test:ops` 32/32、Jest 40 suites / 551 tests / 32 snapshots、`tsc --noEmit` 0 错 | 1d ✔ |
 | BE-M6-03 | BE | 通知：`reply` / `moderation` / `prompt` 落 `notifications`（`_shared/notify.js`）+ `listNotifications` / `markNotificationsRead`；`cloudbaserc.json` 加定时触发器；订阅消息按 D14（模板 ID 缺则跳过） | 单测：同 `(uid, type, refId)` 只一条、未读数与分页正确、触发器函数在无题目时不写任何记录、`envVariables` 缺键不抛错 | 1.5d |
 | OPS-M6-01 | OPS | `scripts/ops/daily-prompt.mjs`（`set` / `list` / `close` / `audit`）+ `daily-prompt.seed.json`；`ensure-indexes.mjs --apply` 建 1 个新索引 | 脚本单测：参数解析、预览不写、重复执行幂等、`audit` 报出同日多条与未作答统计 | 0.5d |
 | ✅ FE-M6-00 | FE | 已完成（2026-10-03，本地）：`types/models.ts` 加每日一题类型（`DailyPrompt` / `PromptAnswer` / `PromptAnswerItem` / `PromptAnswerPage` 等）；`constants/community.ts` 的 `PROMPT_RULES`（`textMax 120`、`answer { min:5, max:500 }`、`listMax 50`、`defaultAnon true`）；`services/practice.ts` 的 `todayPrompt` / `answerPrompt` / `listAnswers` 与 `guard.ts` 的 `WRITE_ACTIONS.practice`；`cloud.types.ts` 的 `FunctionMap`；`mock/client.ts` 补齐同名 handler（校验顺序、`40901` 先于额度、`anon: input.anon !== false` 均与云函数一致） | 实测：`npx tsc --noEmit` 0 错；「mock 与云函数共用规则由测试比对」= `src/constants/__tests__/community.test.ts` 新增「每日一题规则（M6）」用例，对 `PROMPT_RULES` 整对象 `toEqual`，任一侧漂移即红 | 0.5d ✔ |
@@ -111,6 +111,7 @@
 
 - **实现结果（2026-10-03，BE-M6-00 / 01）**：`tests/cloudfunctions/m6-prompt.test.js` 22 例全通过；变异验证 5 处（去掉「已作答」前置 / 默认匿名翻成默认实名 / reject 先扣额度 / 他人答案不按 `ok` 过滤 / 重复判断挪到扣额度之后）各使**恰好 1 例**转红，恢复后复绿。全量复跑：云函数 244/244、运维 32/32、Jest 38 suites / 526 tests / 31 snapshots、`npx tsc --noEmit` 0 错。
 
+- **实现结果（2026-10-03，BE-M6-02）**：慢话题与精华全部落在云端读写的既有链路上，没有新集合、没有新索引、没有定时任务——`slowUntil` 只在 `createTopic` 多存一个字段、在 `createReply` 多一个前置判断（放在机审与计额度之前，被挡下的回复不占额度也不发机审）；精华只在 `topics` 上翻一个布尔，配套 `moderation.markFeatured` 走 `guardRole` 并逐次写 `mod_logs`。`TOPIC_RULES.slowHours` 同时加到 `_shared/config.js` 与 `src/constants/community.ts`，`tests/cloudfunctions/m3.test.js` 里那条 `TOPIC_RULES` 断言与前端 `community.test.ts` 的比对用例一起把两边钉住（只改一侧必红）。刻意保守的地方：冷静期对作者本人同样生效（开放回复是给别人看的，不是给自己续写的通道）、`featured: false` 视为「不过滤」而不是「只看非精华」、给非 `ok` 话题标精华一律 40001 但取消标记任何时候都可以。
 - **实现结果（2026-10-03，FE-M6-00 / 01）**：卡片与作答页全程走 mock 云端（`TARO_APP_DATA_SOURCE` 不变），断言打在真实请求上。覆盖：无题目（含门禁未过）不渲染、未作答 / 已作答 / 审核中三态与 CTA 文案、默认匿名提交且首尾空白被裁、切实名后 `anon=false`、未作答时不发 `listAnswers`、他人列表不含 `pending` / `removed`、「查看更多」翻页（21 条 → 第二页取到第 21 条）、`40901`「今天已经作答过了」并回读状态、`42901`「明天再来」、机审拒绝与云函数同一句话且不落库。测试侧两个坑记在这里免得重犯：`useRequest` 有 5 分钟内存缓存，`mockControl.reset()` 不清它，`beforeEach` 必须 `invalidate()`；发布类动作的 `requirePhone` 除 `account.phoneVerified` 外还要求「已读社区公约」（`markRulesRead()`），否则提交会被静默引导走别的分支、连请求都不发。文案：`showToast` 上限 8 字，长句留在页面内联显示（新增 `SUBMITTED_TOAST` / `PENDING_TOAST`，`PENDING_HINT` 等长文案继续用于卡片与列表）。全量复跑：Jest 40 suites / 551 tests / 32 snapshots、云函数 244/244、运维 32/32、`npx tsc --noEmit` 0 错；本轮新增与改动的文件 `npx eslint` 0 问题（`src/services/mock/client.ts` 的 6 条 `import/first`、`CheckinCalendar.tsx` 的数字分隔符、`me.ts` / `cloud.rn.ts` 各 1 条经与 HEAD 版本比对确认是既有债，本轮不动）。**仍仅本地，未部署**。
 
 ## 7. 上线与回滚

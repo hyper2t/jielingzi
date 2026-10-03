@@ -34,6 +34,8 @@ const TOPIC_RULES = Object.freeze({
   tagsMax: 3,
   tag: { min: 1, max: 12 },
   excerptLen: 80,
+  /** 慢话题冷静期小时数（D11）：createTopic({ slow: true }) 后这段时间内不开放回复，固定 24h，暂不做自定义时长 */
+  slowHours: 24,
 })
 
 /**

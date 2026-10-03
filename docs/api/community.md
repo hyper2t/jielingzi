@@ -22,6 +22,8 @@
 `topics`：`_openid`（作者 accountId，PRD 里的 authorUid；注销时 detach → `null` + `authorDeleted: true`）、`circleId`（M4 起必填：话题所属圈子；M3 期间的旧话题为 `null`，对任何人不可见）、`anon`、`title`、`body`、`tags`、`images`（预留，M3 恒为 `[]`）、`status`（`pending` / `ok` / `folded` / `removed`）、`featured`、`replyCount`、`reportCount`、`createdAt`、`lastReplyAt`；删除时另有 `removedBy: 'author'`、`removedAt`。
 `replies`：`_openid`、`topicId`、`circleId`、`anon`、`body`、`short`、`quoteId`、`status`、`reportCount`、`createdAt`。
 
+M6 起 `topics` 另有 `slowUntil`（毫秒时间戳，`null` = 没有冷静期；M6 之前入库的文档没有这个字段，读侧一律兜成 `null`）。`featured` 是 M3 就有的字段，只有 `moderation.markFeatured` 会改它。**两者都不新增索引**：查询条件仍是 `circleId` + `status`（`idx_circle_status_time` 覆盖），`featured` 与 `slowUntil` 由同一次查询附带处理。
+
 | 规则 | 值（唯一来源 `_shared/config.js` 的 `TEXT_RULES` / `TOPIC_RULES` / `DAILY_LIMITS`，前端 `src/constants/community.ts` 同名常量由测试比对） |
 |---|---|
 | 标题 | 5–40 字，单行（空白折叠、去首尾空格），按 Unicode 码点计 |
@@ -29,6 +31,7 @@
 | 标签 | 可选，≤ 3 个，每个 1–12 字，去 `#`、去重 |
 | 回复 | 有效字数 ≥ 1，总长 ≤ 5000；有效字数 **< 30** 标记 `short`（前端默认折叠） |
 | 额度（北京时间切日） | 话题 2 条 / 天，回复 20 条 / 天；被机审拒绝的不占额度；删除不占额度 |
+| 慢话题（M6，D11） | `TOPIC_RULES.slowHours = 24`：`createTopic({ slow: true })` → `slowUntil = createdAt + 24h`，到点前 `createReply` 一律 40901 |
 
 不允许含控制字符、零宽字符、双向控制符；所有动作**拒绝未声明的参数**（40001，防夹带 `status` / `images` / `_openid` 等）。
 
@@ -67,16 +70,18 @@
 | body | 见上表（必填） |
 | anon | boolean，默认 `false` |
 | tags | string[]，可选 |
+| slow | boolean，可选，默认 `false`；`true` = 慢话题，`slowUntil` 之前不开放回复（D11） |
 
 - 首次发帖会补建档案并分配匿名代号（`ensureProfile`），实名发帖时昵称没填则显示代号。
+- 慢话题只是**多存一个 `slowUntil`**：发帖流程、额度、机审都不变；服务端不设定时任务、不发「已开放」事件，前端拿 `slowUntil` 自己算剩余时间。
 - 出参：`{ topic, status: 'ok' | 'pending', remaining }`；`topic` 为 `getTopic` 同样的完整对象。
 - 错误：40001（`msg` 可直接展示）、40101、40302、40303、40304、40305、42901。
 
 ### listTopics
 
-话题流：`status = ok`，新的在前。入参 `page`（默认 1）、`size`（1–50，默认 20）；`circleId` 可选：不传 = 我所有开放圈子的聚合（没有圈子则空列表）；传了必须是成员（40301）。详见「圈子与邀请码」。
+话题流：`status = ok`，新的在前。入参 `page`（默认 1）、`size`（1–50，默认 20）、`featured`（可选布尔：`true` = 只看精华，`false` 或不传 = 不过滤）；`circleId` 可选：不传 = 我所有开放圈子的聚合（没有圈子则空列表）；传了必须是成员（40301）。详见「圈子与邀请码」。
 
-- 出参：`{ list, total, page, size, hasMore }`；list 项只给摘要：`{ id, title, excerpt（≤ 80 字）, tags, anon, author, replyCount, createdAt, lastReplyAt, featured, images, folded, pending }`，**不含正文**。
+- 出参：`{ list, total, page, size, hasMore }`；list 项只给摘要：`{ id, title, excerpt（≤ 80 字）, tags, anon, author, replyCount, createdAt, lastReplyAt, featured, slowUntil, images, folded, pending }`，**不含正文**。
 - 错误：40101、40303。
 
 ### getTopic
@@ -95,7 +100,7 @@
 
 - 出参：`{ reply, status: 'ok' | 'pending', remaining }`。`status = ok` 时话题的 `replyCount` +1、`lastReplyAt` 更新。
 - `replyCount` 是展示用的近似值：审核员放行 / 下架、举报折叠不回写它。
-- 错误：同 createTopic，另有 40401。
+- 错误：同 createTopic，另有 40401；慢话题冷静期未到 → **40901**「这条话题还没开放回复」（作者本人也一样）。被冷静期挡下的回复不落库、不扣当日额度、也不调用机审（判断在 `g.commit()` 与 `screen()` 之前）。
 
 ### listReplies
 

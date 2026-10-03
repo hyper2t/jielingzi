@@ -62,6 +62,14 @@
 - 出参：`{ ok: true, resolved: 被关闭的举报数, status: 内容新状态 | null }`
 - 错误：40001、40101、40301、40401
 
+## markFeatured（仅 mod / admin，M6）
+
+- 入参：`{ topicId, featured, note? }`（`featured` 必填布尔；`note` ≤ 200 字，只进 `mod_logs`）。只支持话题。
+- 行为：只改 `topics.featured`，**不动 `status`**（D12：精华不解除 M4 的圈子成员校验，精华列表不会变成越权通道）；`featured: true` 要求话题当前是 `ok`，否则 40001；取消标记任何时候都允许，便于撤销误标。
+- 出参：`{ ok: true, featured, changed }`。同值重复调用是幂等的（`changed: false`、数据不变），但每次仍写一条 `mod_logs`（`kind: 'featured'`、`action: 'feature' | 'unfeature'`、`actor`、`subject` = 话题作者）。
+- 错误：40001（参数）、40301（非 mod / admin）、40401（话题不存在或已删除）。
+- 不发站内消息（通知归 BE-M6-03）；配套入口是 `community.listTopics({ featured: true })`。
+
 ## 站内消息 notifications（BE-M2-04）
 
 `{ _openid: 接收人, type: 'reply' | 'moderation' | 'prompt', refType, refId, text, read: false, createdAt }`；只写与「我」直接相关的消息，不含营销与被处理内容的原文。列表与未读数在 M6（FE-M6-03）。
