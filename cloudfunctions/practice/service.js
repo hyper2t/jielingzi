@@ -459,6 +459,37 @@ async function listNotifications (params, ctx) {
  * 标记已读（BE-M6-03，D16）：ids 或 all: true。更新条件里始终带 _openid，所以别人的 id 只会命中 0 条
  * ——不报错、也不暴露那条消息是否存在；已读过的再标一次同样 updated = 0（幂等）。
  */
+function validatePromptSubscribe (input) {
+  const src = input && typeof input === 'object' ? input : {}
+  noUnknown(src, ['granted'])
+  if (typeof src.granted !== 'boolean') throw badParam('granted 需为布尔值')
+  return { granted: src.granted }
+}
+
+/**
+ * 记录一次订阅消息授权（D09b，BE-M6-04）：小程序端 requestSubscribeMessage 成功后调用，
+ * 一次成功 = 一次发送额度，封顶 PROMPT_RULES.subscribeQuotaMax；拒绝（granted: false）只记 openid 不动额度。
+ * 顺带把**本次调用的小程序 openid** 存进 `users.mpOpenid`：订阅消息的 touser 只能是它，而
+ * `account_links` 只存 linkId 哈希（`_shared/account.js` 的 linkAlias 不落 value），事后取不回来，
+ * 所以必须在还有身份上下文的这一刻记下来。非小程序端（拿不到 raw.openId）直接拒——这一判断放在
+ * guardWrite 之前：拒掉的调用不该消耗写入门禁与数据库配额（下面的用例正是靠这一点用桩库跑）。
+ */
+async function recordPromptSubscription (params, ctx) {
+  const input = validatePromptSubscribe(params)
+  const raw = (ctx.identity && ctx.identity.raw) || {}
+  const mpOpenid = typeof raw.openId === 'string' ? raw.openId.trim() : ''
+  if (!mpOpenid) throw forbidden('当前登录方式不是小程序，无法记录订阅授权')
+  const { accountId } = await guardWrite(ctx, 'recordPromptSubscription', { requirePhone: false, allowMuted: true })
+  const users = ctx.db.collection('users')
+  const found = await withCollection(ctx.db, 'users', () => users.where({ _openid: accountId }).limit(1).get())
+  const doc = (found && found.data && found.data[0]) || null
+  if (!doc) throw notFound('账号不存在')
+  const before = Number.isFinite(doc.promptSubscribeQuota) ? Math.max(doc.promptSubscribeQuota, 0) : 0
+  const quota = input.granted ? Math.min(before + 1, PROMPT_RULES.subscribeQuotaMax) : before
+  await withCollection(ctx.db, 'users', () =>
+    users.where({ _openid: accountId }).update({ mpOpenid, promptSubscribeQuota: quota, promptSubscribeAt: ctx.now() }))
+  return { quota, granted: input.granted }
+}
 async function markNotificationsRead (params, ctx) {
   const input = validateMarkRead(params)
   const { accountId } = await guardWrite(ctx, 'markNotificationsRead', { requirePhone: false, allowMuted: true, limit: 0 })
@@ -484,7 +515,9 @@ const actions = {
   listAnswers,
   /** BE-M6-03：站内消息（列表 / 标记已读）。每日提醒由定时触发器直接进 _shared/reminder，不在此暴露给客户端 */
   listNotifications,
-  markNotificationsRead
+  markNotificationsRead,
+  /** BE-M6-04：订阅消息额度记账（前端授权成功后上报），供定时提醒决定是否外发 */
+  recordPromptSubscription
 }
 
 module.exports = { actions, IDENTITY_FREE_ACTIONS, PRACTICE_IDS }

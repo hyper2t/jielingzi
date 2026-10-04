@@ -38,8 +38,9 @@ export const PROMPT_RULES = {
   /** 答案列表单页上限 */
   listMax: 50,
   /** 默认匿名：作答未显式选择时按匿名处理（D9，可切实名） */
-  defaultAnon: true
-} as const
+    defaultAnon: true,
+    /** 订阅消息额度上限（D09b）：与云函数 _shared/config.js 同步，一致性用例盯着 */
+    subscribeQuotaMax: 10} as const
 
 /** 话题的其余规则（PRD T1）：标签最多几个、每个标签的字数；列表摘要长度 */
 export const TOPIC_RULES = {

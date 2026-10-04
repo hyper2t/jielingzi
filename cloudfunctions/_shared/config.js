@@ -74,6 +74,8 @@ const PROMPT_RULES = Object.freeze({
   listMax: 50,
   /** 默认匿名：作答未显式选择时按匿名处理（D9，用户可切实名） */
   defaultAnon: true,
+  /** 订阅消息额度上限（D09b）：一次成功授权 = 一次发送额度，封顶只为防刷；清零由微信侧 43101 触发 */
+  subscribeQuotaMax: 10,
 })
 
 /** 练习方式预置列表（PRD P1；措辞规范见 docs/prd/wording.md）。id 入库，label 仅展示 */

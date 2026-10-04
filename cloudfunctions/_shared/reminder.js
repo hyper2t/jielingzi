@@ -23,6 +23,14 @@ const PROMPTS_COLLECTION = 'daily_prompts'
 const USERS_COLLECTION = 'users'
 /** 通知正文：固定说明，不含题目原文、昵称等任何他人信息 */
 const REMINDER_TEXT = '今天的每日一题已经准备好，可以写下你的回答'
+/** 订阅消息的落地页：点通知直接进当日作答页 */
+const SUBSCRIBE_PAGE = 'pkg-practice/pages/prompt/index'
+/**
+ * 订阅消息的 data —— key 必须与小程序后台的模板字段严格一致，模板请按这两项创建：
+ * thing1 = 固定提醒语（微信对 thing 类型限 20 字，超了会 47003）、date2 = 当天日期（YYYY-MM-DD）。
+ */
+const SUBSCRIBE_THING = '今日的每日一题已备好'
+const SUBSCRIBE_DATE = 'date2'
 /** users 扫描分页与上限：超限只记日志（truncated），不静默丢掉后面的账号 */
 const SCAN_PAGE = 100
 const SCAN_MAX = 2000
@@ -53,7 +61,9 @@ function eligible(user, now) {
 
 /** 按 _id 升序翻页扫描 users（返回去重后的 accountId 列表） */
 async function scanUsers(db, now) {
-  const uids = new Set()
+    const seen = new Set()
+    const uids = []
+    const accounts = []
   let scanned = 0
   let truncated = false
   for (let skip = 0; ; skip += SCAN_PAGE) {
@@ -61,14 +71,78 @@ async function scanUsers(db, now) {
       db.collection(USERS_COLLECTION).orderBy('_id', 'asc').skip(skip).limit(SCAN_PAGE).get())
     const rows = (res && res.data) || []
     scanned += rows.length
-    for (const u of rows) if (eligible(u, now)) uids.add(u._openid)
+        for (const u of rows) {
+          if (!eligible(u, now) || seen.has(u._openid)) continue
+          seen.add(u._openid)
+          uids.push(u._openid)
+          accounts.push({
+            uid: u._openid,
+            mpOpenid: typeof u.mpOpenid === 'string' ? u.mpOpenid : '',
+            quota: Number.isFinite(u.promptSubscribeQuota) ? Math.max(u.promptSubscribeQuota, 0) : 0,
+          })
+        }
     if (rows.length < SCAN_PAGE) break
     if (skip + SCAN_PAGE >= SCAN_MAX) {
       truncated = true
       break
     }
   }
-  return { uids: [...uids], scanned, truncated }
+  return { uids, accounts, scanned, truncated }
+}
+
+/**
+ * 额度记账（发送成功 -1 / 43101 清零）：只按 _openid 定位自己那行。
+ * 失败故意不外抛——额度顶多偏大一格，下轮重复发一次也会先被 notify 的去重挡住站内消息。
+ */
+async function spendQuota(db, uid, quota, now) {
+  try {
+    await withCollection(db, USERS_COLLECTION, () =>
+      db.collection(USERS_COLLECTION).where({ _openid: uid }).update({ promptSubscribeQuota: quota, promptSubscribeAt: now }))
+  } catch (e) { /* 记账失败不影响提醒本身 */ }
+}
+
+/**
+ * 订阅消息外发（D09b）。三条前提全满足才发：调用方注入了 mp 客户端、给了模板 ID、账号有 mpOpenid 且额度 > 0。
+ * 少任何一条都只是「不发」，站内提醒照常——与 `user` 函数「没配凭证时 mp 为 null」同款做法；
+ * 本模块因此仍然不读任何环境变量（env 读取留在 practice/index.js 的注入处，见 m6-notify 的既有用例）。
+ */
+async function sendSubscriptionReminders(ctx, { accounts, date }) {
+  const templateId = typeof ctx.promptTemplateId === 'string' ? ctx.promptTemplateId.trim() : ''
+  const out = { attempted: 0, sent: 0, noQuota: 0, failed: 0, skipped: 0, reason: '' }
+  if (!ctx.mp || !templateId) return null // 通道未启用：不返回全零计数，免得调用方把「没配」读成「配了但没人可发」
+  for (const acc of accounts) {
+    if (!acc.mpOpenid || acc.quota <= 0) {
+      out.skipped += 1
+      continue
+    }
+    out.attempted += 1
+    let res = null
+    try {
+      res = await ctx.mp.subscribeMessageSend({
+        toUser: acc.mpOpenid,
+        templateId,
+        page: SUBSCRIBE_PAGE,
+        data: { thing1: SUBSCRIBE_THING, [SUBSCRIBE_DATE]: date },
+      })
+    } catch (e) {
+      out.failed += 1
+      continue
+    }
+    if (res && res.outcome === 'sent') {
+      out.sent += 1
+      await spendQuota(ctx.db, acc.uid, Math.max(acc.quota - 1, 0), ctx.now())
+    } else if (res && res.outcome === 'no-quota') {
+      out.noQuota += 1
+      await spendQuota(ctx.db, acc.uid, 0, ctx.now())
+    } else if (res && res.outcome === 'bad-template') {
+      out.failed += 1
+      out.reason = 'bad-template'
+      break // 模板失配是配置问题：继续跑只会让每个账号都撞一遍同样的错
+    } else {
+      out.failed += 1
+    }
+  }
+  return out
 }
 
 /**
@@ -81,9 +155,9 @@ async function runPromptReminder(ctx) {
   const now = ctx.now()
   const date = cnDate(now)
   const prompt = await findTodayPrompt(ctx.db, date)
-  if (!prompt) return { date, promptId: null, sent: 0, deduped: 0, scanned: 0, truncated: false }
+  if (!prompt) return { date, promptId: null, sent: 0, deduped: 0, scanned: 0, truncated: false, subscribe: null }
 
-  const { uids, scanned, truncated } = await scanUsers(ctx.db, now)
+  const { uids, accounts, scanned, truncated } = await scanUsers(ctx.db, now)
   let sent = 0
   let deduped = 0
   for (const uid of uids) {
@@ -93,7 +167,8 @@ async function runPromptReminder(ctx) {
     if (wrote) sent += 1
     else deduped += 1
   }
-  const summary = { date, promptId: prompt._id, sent, deduped, scanned, truncated }
+    const subscribe = await sendSubscriptionReminders(ctx, { accounts, date })
+    const summary = { date, promptId: prompt._id, sent, deduped, scanned, truncated, subscribe }
   if (ctx.logger && typeof ctx.logger.info === 'function') ctx.logger.info(`[promptReminder] ${JSON.stringify(summary)}`)
   return summary
 }
@@ -114,4 +189,4 @@ function createTimerEntry({ run, createContext, logger = console }) {
   }
 }
 
-module.exports = { runPromptReminder, createTimerEntry, isTimerEvent, eligible, REMINDER_TEXT, REMINDER_REF_TYPE: 'daily_prompt' }
+module.exports = { runPromptReminder, createTimerEntry, isTimerEvent, eligible, REMINDER_TEXT, REMINDER_REF_TYPE: 'daily_prompt', sendSubscriptionReminders, SUBSCRIBE_PAGE, SUBSCRIBE_THING }

@@ -335,7 +335,7 @@ test('runPromptReminder：当日没有 ok 题目时整批跳过，一条通知�
   for (const prompts of [[], [promptDoc({ date: '2026-10-02' })], [promptDoc({ status: 'pending' })], [promptDoc({ status: 'closed' })]]) {
     const db = rworld([userRow(ID.alice)], prompts)
     const r = await runPromptReminder(rctx(db))
-    assert.deepEqual({ ...r, promptId: null }, { date: TODAY, promptId: null, sent: 0, deduped: 0, scanned: 0, truncated: false })
+    assert.deepEqual({ ...r, promptId: null }, { date: TODAY, promptId: null, sent: 0, deduped: 0, scanned: 0, truncated: false, subscribe: null })
     assert.ok(!db.store.notifications, '零写入：连 notifications 集合都不该建')
   }
 })
@@ -343,7 +343,7 @@ test('runPromptReminder：当日没有 ok 题目时整批跳过，一条通知�
 test('runPromptReminder：每个合格账号一条，第二次跑只算去重（一题最多提醒一次）', async () => {
   const db = rworld([userRow(ID.alice), userRow(ID.bob)], [promptDoc()])
   const first = await runPromptReminder(rctx(db))
-  assert.deepEqual(first, { date: TODAY, promptId: 'prompt-1', sent: 2, deduped: 0, scanned: 2, truncated: false })
+  assert.deepEqual(first, { date: TODAY, promptId: 'prompt-1', sent: 2, deduped: 0, scanned: 2, truncated: false, subscribe: null })
   assert.equal(db.store.notifications.length, 2)
   const one = db.store.notifications[0]
   assert.equal(one.type, 'prompt')
@@ -353,7 +353,7 @@ test('runPromptReminder：每个合格账号一条，第二次跑只算去重（
   assert.equal(one.read, false)
   assert.ok(!db.store.notifications.some((n) => String(n.text).includes('你想放下的一件小事')), '正文只有固定说明，不含题目原文')
   const second = await runPromptReminder(rctx(db))
-  assert.deepEqual(second, { date: TODAY, promptId: 'prompt-1', sent: 0, deduped: 2, scanned: 2, truncated: false })
+  assert.deepEqual(second, { date: TODAY, promptId: 'prompt-1', sent: 0, deduped: 2, scanned: 2, truncated: false, subscribe: null })
   assert.equal(db.store.notifications.length, 2, '重跑不重复打扰')
 })
 
@@ -375,13 +375,16 @@ test('runPromptReminder：users 超过一页也要扫全，且不重不漏', asy
   const many = Array.from({ length: 120 }, (_x, i) => userRow(`acct-many-${i}`))
   const db = rworld(many, [promptDoc()])
   const r = await runPromptReminder(rctx(db))
-  assert.deepEqual(r, { date: TODAY, promptId: 'prompt-1', sent: 120, deduped: 0, scanned: 120, truncated: false })
+  assert.deepEqual(r, { date: TODAY, promptId: 'prompt-1', sent: 120, deduped: 0, scanned: 120, truncated: false, subscribe: null })
   assert.equal(new Set(db.store.notifications.map((n) => n._openid)).size, 120)
 })
 
-test('runPromptReminder：没有可用环境变量也不抛错——提醒这段代码压根不读环境（D17 后补外发）', async () => {
+test('runPromptReminder：env 只在入口读、外发只走注入的 mp 客户端；一个变量都没有也照样跑完（D17 后补）', async () => {
   const src = fs.readFileSync(path.join(ROOT, 'cloudfunctions/_shared/reminder.js'), 'utf8').replace(/\r\n/g, '\n')
-  assert.ok(!/process\.env|WX_MP_|subscribeMessage/.test(src), 'reminder.js 里不该出现环境变量与订阅消息调用')
+  assert.ok(!/process\.env|WX_MP_/.test(src), 'reminder.js 不该读环境变量：模板 ID 与小程序凭证由 practice/index.js 注入')
+  assert.ok(!/require\(['\"].*wxmp/.test(src), 'reminder.js 不许自己 require wxmp：外发通道只能有一条，即入口注入的 ctx.mp')
+  assert.ok(!/api\.weixin\.qq\.com/.test(src), 'reminder.js 不许直连微信 URL：同理')
+  assert.ok(/ctx\.mp\./.test(src), '但必须能看到走 ctx.mp 的调用，否则 D09b 又变成空口实现')
   const saved = new Map(Object.keys(process.env).filter((k) => /^(WX|TCB|CLOUDBASE|PHONE)_/.test(k)).map((k) => [k, process.env[k]]))
   for (const k of saved.keys()) delete process.env[k]
   try {
@@ -443,9 +446,9 @@ test('practice 入口：定时事件走提醒，普通调用仍走 action 分发
   assert.equal(entryDb.store.notifications.length, 2, '普通调用不再触发提醒')
 })
 
-test('接线：两个新动作已在 practice.actions 上，且没有把提醒暴露成 action', () => {
+test('接线：三个新动作已在 practice.actions 上（含 D09b 订阅记账），且没有把提醒暴露成 action', () => {
   assert.deepEqual(Object.keys(practice.actions).sort(),
-    ['answerPrompt', 'checkin', 'listAnswers', 'listCheckins', 'listNotifications', 'markNotificationsRead', 'ping', 'todayPrompt'])
+    ['answerPrompt', 'checkin', 'listAnswers', 'listCheckins', 'listNotifications', 'markNotificationsRead', 'ping', 'recordPromptSubscription', 'todayPrompt'])
   assert.ok(!('promptReminder' in practice.actions) && !('runReminder' in practice.actions), '客户端不该能手动催提醒')
   assert.ok(!practice.IDENTITY_FREE_ACTIONS.includes('listNotifications'), '消息列表要求身份')
   const src = fs.readFileSync(path.join(ROOT, 'cloudfunctions/practice/index.js'), 'utf8')

@@ -6,6 +6,14 @@
 const { createMain, getApp, resolveCaller } = require('./_shared')
 const { createTimerEntry, isTimerEvent, runPromptReminder } = require('./_shared/reminder')
 const { actions, IDENTITY_FREE_ACTIONS } = require('./service')
+const { createMpClient } = require('./_shared')
+
+/**
+ * 订阅消息通道（D09b）：没配小程序凭证时 createMpClient 返回 null、模板 ID 为空串，
+ * 于是提醒只走站内那半边——env 只在这里读，`_shared/reminder.js` 保持不读任何环境变量。
+ */
+const mp = createMpClient(process.env)
+const promptTemplateId = typeof process.env.WX_MP_PROMPT_TEMPLATE_ID === 'string' ? process.env.WX_MP_PROMPT_TEMPLATE_ID.trim() : ''
 
 const main = createMain({
   actions,
@@ -22,7 +30,7 @@ const main = createMain({
  */
 const timerMain = createTimerEntry({
   run: runPromptReminder,
-  createContext: async () => ({ db: getApp().database(), now: () => Date.now(), logger: console }),
+  createContext: async () => ({ db: getApp().database(), now: () => Date.now(), logger: console, mp, promptTemplateId }),
 })
 
 exports.main = async (event, context) => (isTimerEvent(event) ? timerMain(event, context) : main(event, context))
