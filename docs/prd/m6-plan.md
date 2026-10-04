@@ -1,7 +1,7 @@
 # M6 实施计划：每日一题 / 慢话题 / 精华 / 通知
 
 > 范围：PRD §5 T3 / T5 / W3 / N1（`docs/prd/README.md`）、§7.1 与 §7.4 线框中的「每日一题」卡片与「精华」入口。
-> 状态（2026-10-04）：**已评审并部分实现**——D9（署名形态）与 N1（通知范围）由用户当日拍板（见 D9、D17）。已完成的都只在本地、**未部署**：BE-M6-00 与 BE-M6-01（每日一题：今日题目 / 作答 / 答案列表）、FE-M6-00 与 FE-M6-01（前端类型与常量、`services/practice.ts`、mock、练习 Tab 卡片 + 作答页）、BE-M6-02（慢话题 `slowUntil` 与精华 `featured`）、OPS-M6-01（`daily-prompt.mjs` 录题 / 巡检 + 首周题目种子）、FE-M6-02（发帖的慢话题开关、冷静期展示、圈内只看精华、`markTopicFeatured` 接线）、BE-M6-03（`notifications` 三类通知 + `listNotifications` / `markNotificationsRead` + 定时触发器）、FE-M6-03（消息页 + 未读角标 + 订阅授权）。QA-M6-01 已完成（2026-10-04，本地）：`docs/test/cases/M6.md` 登记自动化用例 M6-A01…A17 与三端清单 M6-D01…D09，全量门禁绿、本轮变异验证 8/8 被捕获。QA-M6-02 已完成（2026-10-04，本地）：审核队列加「标为精华 / 取消精华」入口（`queue` 目标快照带 `featured`），并补 8 处变异验证。未开工：M4 签核与 M5 真机验收；M6 真机项与订阅送达要等部署窗口，全部记 ⏭ 或受阻。接口见 [`docs/api/practice.md`](../api/practice.md)「每日一题」。
+> 状态（2026-10-04）：**已评审并部分实现**——D9（署名形态）与 N1（通知范围）由用户当日拍板（见 D9、D17）。**2026-10-04 更新**：`practice` / `community` / `moderation` 已按用户授权部署到体验版环境，索引与首周题目也已落地（回滚包与实测见第 7 节末与 [`docs/test/cases/M6.md`](../test/cases/M6.md) §4）；下面各项的完成记录仍是本地验证：BE-M6-00 与 BE-M6-01（每日一题：今日题目 / 作答 / 答案列表）、FE-M6-00 与 FE-M6-01（前端类型与常量、`services/practice.ts`、mock、练习 Tab 卡片 + 作答页）、BE-M6-02（慢话题 `slowUntil` 与精华 `featured`）、OPS-M6-01（`daily-prompt.mjs` 录题 / 巡检 + 首周题目种子）、FE-M6-02（发帖的慢话题开关、冷静期展示、圈内只看精华、`markTopicFeatured` 接线）、BE-M6-03（`notifications` 三类通知 + `listNotifications` / `markNotificationsRead` + 定时触发器）、FE-M6-03（消息页 + 未读角标 + 订阅授权）。QA-M6-01 已完成（2026-10-04，本地）：`docs/test/cases/M6.md` 登记自动化用例 M6-A01…A17 与三端清单 M6-D01…D09，全量门禁绿、本轮变异验证 8/8 被捕获。QA-M6-02 已完成（2026-10-04，本地）：审核队列加「标为精华 / 取消精华」入口（`queue` 目标快照带 `featured`），并补 8 处变异验证。未开工：M4 签核与 M5 真机验收；M6 真机项与订阅送达要等部署窗口，全部记 ⏭ 或受阻。接口见 [`docs/api/practice.md`](../api/practice.md)「每日一题」。
 > 前置：M4 签核（[`docs/ops/release-checklist.md`](../ops/release-checklist.md) 第 7~8 步）与 M5 真机验收（[`docs/test/cases/M5.md`](../test/cases/M5.md)）先闭合；M6 不得先于它们部署到共享环境。
 > 下游：`docs/prd/join-plan.md` 的申请结果通知（V2-1）依赖本里程碑的 N1。
 
@@ -164,6 +164,8 @@
 4. 录入首周题目：`node scripts/ops/daily-prompt.mjs set --from-file scripts/ops/daily-prompt.seed.json` 预览 → 确认后加 `--apply`；临时撤当天用 `close --date … --apply`；录完 `audit` 应只输出「没问题 ✓」。提醒外发在模板 ID 到位前保持「只站内」。
 5. 冒烟：`invoke-fn.mjs` 调 `practice` 的 `todayPrompt` / `listNotifications`；**不在生产写测试数据**（如需作答测试，用 `test_` 前缀题目并在事后 `close`）。
 6. 回滚：`practice` / `community` / `moderation` 回到上一提交重新部署；`daily_prompts` / `prompt_answers` / `notifications` 的数据无需回滚（不被旧代码读取）；触发器回滚要一并删掉 `triggers` 再部署，否则旧函数会被定时唤起。
+
+**2026-10-04 部署实测（体验版）**：`tcb fn deploy <f> --force` 三函数成功，且 `cloudbaserc.json` 的 `triggers` 会被 deploy 自动创建（不必再 `tcb fn trigger create`）；`ensure-indexes.mjs --apply` 复核 28 条索引齐、`conflicts 0`；`daily-prompt.mjs set --apply` 写 7 条、二次运行全 `unchanged`。回滚方式：部署前用 `tcb fn code download <f>` 存下的 `../deploy-backup-20261004/code_<f>`，用 `tcb fn code update <f>` 还原（`tcb fn list-function-versions` 显示线上没有发布过版本号，不能靠流量切换回滚）。触发器时区仍待控制台核对；`tcb` 全局登录可能指向别的账号（本次就先撞了一次 `env not found`）。
 
 ## 8. 风险与未决
 
