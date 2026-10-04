@@ -74,3 +74,11 @@ export async function markNotificationsRead (ids?: string[]): Promise<MarkReadRe
   invalidate(NOTIFICATIONS_KEY)
   return r
 }
+
+/**
+ * 上报一次订阅授权（D09b）：只在小程序真的弹过授权后调用，同意就换一次发送额度。
+ * 这里不吞错也不 assertCanWrite——被禁言的用户照样该把 openid 记上；静默交给调用方（subscribe.ts）。
+ */
+export async function recordPromptSubscription (granted: boolean) {
+  return getClient().fn.call('practice', 'recordPromptSubscription', { granted })
+}

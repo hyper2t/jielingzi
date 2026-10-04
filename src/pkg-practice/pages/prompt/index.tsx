@@ -17,7 +17,7 @@ import {
   ANSWER_LABEL, ANON_HINT, ANON_LABEL, EMPTY_ANSWERS_TEXT, MORE_TEXT, PENDING_HINT, PROMPT_PAGE_TITLE,
   PENDING_TOAST, SUBMIT_TEXT, SUBMITTED_TOAST, answerAuthorText, answerCounter, promptError, validatePromptAnswer
 } from '@/features/practice/prompt'
-import { TODAY_PROMPT_KEY, answerPrompt, listAnswers, todayPrompt } from '@/services/practice'
+import { TODAY_PROMPT_KEY, answerPrompt, listAnswers, recordPromptSubscription, todayPrompt } from '@/services/practice'
 import { needsAdultConfirm } from '@/services/errors'
 import { useRequest } from '@/hooks/useRequest'
 import { useTrackPage } from '@/hooks/useTrackPage'
@@ -113,7 +113,7 @@ export default function PromptAnswerPage () {
       track('prompt_answer', { status: r.answer.status, anon })
       showToast(r.answer.status === 'pending' ? PENDING_TOAST : SUBMITTED_TOAST)
       // 只在作答成功后请求订阅授权（D14）：缺模板 ID / 非小程序端自动跳过，失败静默，不影响本次提交
-      void requestSubscribe()
+      void requestSubscribe({ report: recordPromptSubscription })
       setText('')
     } catch (e) {
       if (needsAdultConfirm(e)) void navigate('adult', { reason: PAGE_TITLE })

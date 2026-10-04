@@ -177,6 +177,8 @@ export interface FunctionMap {
     listNotifications: [{ page?: number, size?: number }, NotificationPage]
     /** 标记已读：ids（1–100）或 all: true；别人的 id 命中 0 条、重复标记幂等 */
     markNotificationsRead: [{ ids?: string[], all?: true }, MarkReadResult]
+    /** 订阅授权上报（D09b）：granted=true 才加额度，云端封顶 PROMPT_RULES.subscribeQuotaMax；非小程序端 40301 */
+    recordPromptSubscription: [{ granted: boolean }, { quota: number; granted: boolean }]
   }
   // 业务云函数在这里按同样格式声明：<函数名>: { <action>: [入参, 出参] }，并在 cloud.rn.ts 标注公开 / 免身份动作
 }

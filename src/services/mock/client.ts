@@ -111,6 +111,8 @@ let prompts: MockPrompt[] = []
 let promptAnswers: MockPromptAnswer[] = []
 let promptSeq = 0
 let answerSeq = 0
+/** 每日一题订阅额度（D09b）：与云端同规则——一次成功授权 +1，封顶 subscribeQuotaMax */
+let promptSubscribeQuota = 0
 /** 与云函数 _shared/config.js 的 cnDate 一致：每日一题按北京时间归日 */
 const mockCnDate = () => new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10)
 /** 答案列表默认分页：与云函数 service.js 的 ANSWER_PAGE_SIZE 同值（同 mock 里 180 分钟上限的处理方式） */
@@ -293,6 +295,7 @@ export const mockControl = {
     notifySeq = 0
     promptSeq = 0
     answerSeq = 0
+    promptSubscribeQuota = 0
     postSeq = 0
     circles = [defaultMockCircle()]
     memberships = [{ circleId: DEFAULT_CIRCLE_ID, accountId: MOCK_OPENID }]
@@ -944,6 +947,14 @@ const handlers: Handlers = {
         updated += 1
       })
       return { updated, unread: notifications.filter(n => n.owner === 'me' && !n.read).length }
+    },
+    /** 订阅授权上报（D09b）：与云函数同规则；清零只在真实 43101 时发生，mock 不复现 */
+    recordPromptSubscription: (input: { granted: boolean }) => {
+      noUnknown(input, ['granted'])
+      if (typeof input.granted !== 'boolean') throw badParam('granted 需为布尔值')
+      guard({ requirePhone: false, allowMuted: true })
+      if (input.granted) promptSubscribeQuota = Math.min(promptSubscribeQuota + 1, PROMPT_RULES.subscribeQuotaMax)
+      return { quota: promptSubscribeQuota, granted: input.granted }
     }
   }
 }

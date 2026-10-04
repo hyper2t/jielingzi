@@ -40,15 +40,21 @@ export function canRequestSubscribe(opts: { env?: Env; taro?: unknown } = {}): b
 
 /**
  * 发起一次订阅请求。不抛错：任何异常都转成 'failed'，调用方可以安全地 `void requestSubscribe()`。
- * @param opts.taro 注入 Taro（测试用）；@param opts.templateId 覆盖模板 ID（测试用）
+ * @param opts.taro 注入 Taro（测试用）；@param opts.templateId 覆盖模板 ID（测试用）；@param opts.report 授权结果回调（D09b 额度记账），它抛错也仍算请求成功
  */
-export async function requestSubscribe(opts: { env?: Env; taro?: any; templateId?: string } = {}): Promise<SubscribeResult> {
+export async function requestSubscribe(opts: { env?: Env; taro?: any; templateId?: string; report?: (granted: boolean) => Promise<unknown> } = {}): Promise<SubscribeResult> {
   const env = opts.env
   const taro = 'taro' in opts ? opts.taro : Taro
   const templateId = (opts.templateId ?? readTemplateId(env) ?? '').trim()
   if (!canRequestSubscribe({ env, taro })) return 'skipped'
   try {
-    await taro.requestSubscribeMessage({ tmplIds: [templateId] })
+    const res: any = await taro.requestSubscribeMessage({ tmplIds: [templateId] })
+    // 微信按模板 ID 逐项回 'accept' / 'reject' / 'ban'；没有回包（含测试替身）时按 accept 处理。
+    const state = res && typeof res === 'object' ? res[templateId] : undefined
+    const accepted = state === undefined || state === 'accept'
+    if (opts.report) {
+      try { await opts.report(accepted) } catch (e) { /* 记账失败不该把授权说成失败 */ }
+    }
     return 'requested'
   } catch (e) {
     return 'failed'
