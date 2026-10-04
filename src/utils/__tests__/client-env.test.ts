@@ -34,6 +34,19 @@ describe('client env defaults', () => {
     expect(missing).toEqual([])
   })
 
+  it('src 里不得动态读 process.env（DefinePlugin 只替换 process.env.TARO_APP_* 成员写法）', () => {
+    const bad: string[] = []
+    for (const file of walk(SRC)) {
+      const text = fs.readFileSync(file, 'utf8')
+      text.split(/\r?\n/).forEach((line, n) => {
+        const t = line.trim()
+        if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) return
+        if (/process\.env\s*(?:\[[^\]]*\]|\bas\b)/.test(t)) bad.push(`${path.relative(SRC, file)}:${n + 1}`)
+      })
+    }
+    expect(bad).toEqual([])
+  })
+
   it('转成 Taro config.env 格式（JSON 字面量），数据源默认 mock', () => {
     const env = clientEnv()
     expect(env.TARO_APP_DATA_SOURCE).toBe('"mock"')

@@ -26,7 +26,9 @@ const CLIENT_ENV_DEFAULTS = {
   /** App 微信登录（iOS）：Universal Link，如 https://<官网域名>/app/ */
   TARO_APP_WX_UNIVERSAL_LINK: '',
   /** App 字体：'' = 系统字体（Playground / 未打包字体的安装包）；'bundled' = 安装包已打入品牌字体（docs/ops/rn-dev-client.md「字体」） */
-  TARO_APP_RN_FONTS: ''
+  TARO_APP_RN_FONTS: '',
+  /** 小程序订阅消息模板 ID（每日一题提醒）：为空 = 前端根本不请求授权，见 src/features/notify/subscribe.ts */
+  TARO_APP_WX_MP_PROMPT_TEMPLATE_ID: ''
 }
 
 /** 转成 Taro config.env 需要的格式（值为 JSON 字符串字面量） */
