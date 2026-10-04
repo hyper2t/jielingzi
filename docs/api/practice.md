@@ -100,6 +100,16 @@
   模板 ID 取自 `TARO_APP_WX_MP_PROMPT_TEMPLATE_ID`：非 weapp、缺该键、或 Taro 上没有
   `requestSubscribeMessage` → 直接跳过；调用报错或用户在弹窗里拒绝 → 静默，不弹提示、不影响本次提交结果。
 
+- 授权结果会回记云端（D09b）：`requestSubscribe({ report })` 按微信逐项回包判 `accept` / `reject`——只有 `accept` 才加额度，`reject` 仅把 openid 记上；`report` 自身抛错静默处理（记账失败不该被说成授权失败），非 weapp / 缺模板 ID 时压根不请求、也不上报。
+
+### recordPromptSubscription
+
+- 用途（BE-M6-04 / D09b）：小程序端订阅授权有了结果就上报，云端据此记账——一次 `granted: true` 换一次发送额度。
+- 入参：`{ granted: boolean }`，只认这一个键（多余键 40001）；`granted` 非布尔 40001。
+- 出参：`{ quota, granted }`。`quota` 是记账后的剩余额度，封顶 `PROMPT_RULES.subscribeQuotaMax`（=10，FE 的 `src/constants/community.ts` 是它的镜像，一致性用例覆盖）。
+- 前置：必须是小程序端登录（`identity.raw.openId` 存在），否则 40301——非小程序端没有可用的 `touser`，记账也就没意义。顺带把该 openid 落到 `users.mpOpenid`：`account_links` 只存 linkId 哈希（`linkAlias` 不落 value），事后取不回来，所以必须在这一步记下。
+
+
 ### 谁会往 `notifications` 里写
 
 | 来源 | `type` | `refType` / `refId` | 说明 |
@@ -126,6 +136,8 @@
   真要隔离得靠平台侧「仅平台调用」的函数配置，本轮不做（与 `mediacheck` 同法时再一并处理）。
 - 失败不外抛：`createTimerEntry` 捕获异常、只记 `[promptReminder]` 日志并返回 `'success'`，避免平台按调用失败重试反复唤起
   （提醒可延迟，明晚还会再跑）。
-- **不外发订阅消息**：`_shared/reminder.js` 不读任何环境变量，`practice` 在 `cloudbaserc.json` 里也没有 `envVariables`，
-  所以「模板 ID 缺键」这条链路没有对应代码，不会抛错；订阅消息按 D17 后补。
-- **2026-10-04 补记（底层件已就位，尚未接线）**：`_shared/wxmp.js` 新增 `mp.subscribeMessageSend`（`POST /cgi-bin/message/subscribe/send`，`data` 每项自动包成 `{ value }`、非字符串转字符串、`page` / `miniprogram_state` 为空则不带），errcode 分类为 `sent` / `no-quota`（43101 = 没订阅、已取消或额度用完，属正常结果不重试）/ `bad-template`（40037、47003 = 模板或参数问题）/ `failed`，只有传输层失败才外抛；`tests/cloudfunctions/m6-subscribe-send.test.js` 覆盖 6 例。但 `runPromptReminder` **仍不调用它**：额度记录与模板字段映射未定（见 `docs/prd/m6-plan.md` 的 D09b 前提），`practice` 也仍无 `envVariables`。
+- **订阅消息外发（D09b 已接线）**：`runPromptReminder` 返回的 summary 多一个 `subscribe` 字段——`null` 表示通道没启用（入口没注入 `ctx.mp` 或没有模板 ID），否则是 `{ attempted, sent, noQuota, failed, skipped, reason }`。
+  发送只走注入的 `ctx.mp.subscribeMessageSend`：`_shared/reminder.js` 仍然一行 `process.env` 都不读，也不许自己 `require` wxmp 或直连微信 URL（`m6-notify` 有用例钉住这三条）；环境变量只在 `practice/index.js` 读，取 `WX_MP_APP_ID` / `WX_MP_APP_SECRET` / `WX_MP_PROMPT_TEMPLATE_ID`。
+  这三个键还没进 `cloudbaserc.json`（随下一次部署一并加），所以线上目前仍是 `subscribe: null`——站内提醒照常，不会因为缺配置抛错。
+  谁能收到：`users.mpOpenid` 有值（由 `recordPromptSubscription` 写入）且 `promptSubscribeQuota > 0`。发成功扣 1；微信回 43101（用户没额度了）就地清零；模板失配则整批早停，免得每个账号都撞一遍同样的错。
+- **2026-10-04 补记（2026-10-04 已接线）**：`_shared/wxmp.js` 新增 `mp.subscribeMessageSend`（`POST /cgi-bin/message/subscribe/send`，`data` 每项自动包成 `{ value }`、非字符串转字符串、`page` / `miniprogram_state` 为空则不带），errcode 分类为 `sent` / `no-quota`（43101 = 没订阅、已取消或额度用完，属正常结果不重试）/ `bad-template`（40037、47003 = 模板或参数问题）/ `failed`，只有传输层失败才外抛；`tests/cloudfunctions/m6-subscribe-send.test.js` 覆盖 6 例。但 `runPromptReminder` **仍不调用它**：额度记录与模板字段映射未定（见 `docs/prd/m6-plan.md` 的 D09b 前提），`practice` 也仍无 `envVariables`。

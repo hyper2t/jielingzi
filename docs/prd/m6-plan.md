@@ -187,3 +187,13 @@
 **2026-10-04 订阅通道现状（模板 ID 已到位）**：`TARO_APP_WX_MP_PROMPT_TEMPLATE_ID` 已写入 `.env` 并进入小程序产物；`src/features/notify/subscribe.ts` 的读取写法由 `env[SUBSCRIBE_TEMPLATE_ENV]` 改为 `process.env.TARO_APP_WX_MP_PROMPT_TEMPLATE_ID` 成员形式（DefinePlugin 只静态替换成员写法，旧写法使配置永久失效），`config/client-env.js` 补兜底默认值，`src/utils/__tests__/client-env.test.ts` 新增「src 里不得动态读 process.env」守卫用例。D14 的服务端半边仍未实现（`_shared/wxmp.js` 无 `subscribeMessage.send`，`practice` 无 `envVariables`），故 ★D17 的「后补」仍然成立：真机现在可验「弹窗出现 / 拒绝不重复打扰 / 额度累积」，「订阅消息实际送达」需等发送通道落地。
 
 **D09b（订阅消息送达）的落地前提（2026-10-04 读码确认，本轮只交底层件）**：① 收件人标识可行——小程序登录时 `accountId = raw.openId`（`cloudfunctions/_shared/account.js:216-218`），且 `account_links` 中 `kind: 'mp'` 的 `value` 存明文 openid，`touser` 取得到；② 额度必须自己记——微信不提供余额查询，只能「发送成功 -1、`43101` 清零」，需要 `users` 上新增计数字段与扣减事务；③ 需要前端上报授权结果（`requestSubscribe()` 返回 `'requested'` 时 +1，并设每日上限防刷）；④ `data` 的 key 必须与模板关键词一一对齐，模板一改就失配（`47003`）；⑤ `practice` 需要 `WX_MP_APP_ID` / `WX_MP_APP_SECRET` / `WX_MP_PROMPT_TEMPLATE_ID` 三个 `envVariables` 并重新部署（部署整体覆盖环境变量，改前先 `tcb fn env pull` 备份）。
+
+## 补记（2026-10-04）：D09b 云端送达与额度记账落地
+
+- 发送通道：`_shared/reminder.js` 的 `sendSubscriptionReminders` 在站内提醒之后跑，只走入口注入的 `ctx.mp`。判定标准是「三个都有才发」：注入了 mp 客户端、注入了模板 ID、账号有 `mpOpenid` 且 `promptSubscribeQuota > 0`；少任何一个都只是不发，站内照常。通道没启用时 summary 的 `subscribe` 是 `null` 而不是全零计数——免得调用方把「没配」读成「配了但没人可发」。
+- 额度记账：`users.promptSubscribeQuota`，由 `practice.recordPromptSubscription` 在小程序端授权成功后 +1，封顶 10（`PROMPT_RULES.subscribeQuotaMax`）；发成功 -1，微信 43101 清零，模板失配（47003 类）整批早停。上限只为防刷，不是产品承诺。
+- `touser` 的来源定在 `users.mpOpenid`：`_shared/account.js` 的 `linkAlias` 只把 `kind: 'mp'` 存成 linkId 哈希、不落明文 value，事后取不回来，所以必须在还有 `identity.raw.openId` 的这一刻记下；拿不到 `raw.openId` 的调用（H5 / App）直接 40301 拒掉。
+- 模板字段约定：`data` 用 `thing1`（固定语「今日的每日一题已备好」，微信对 thing 限 20 字）+ `date2`（当天 `YYYY-MM-DD`），落地页 `pkg-practice/pages/prompt/index`。**小程序后台的模板必须按这两个键创建**，否则每条都会 47003，而这条早停只会在 summary 里留一个 `reason: 'bad-template'`。
+- 环境变量归属：`WX_MP_APP_ID` / `WX_MP_APP_SECRET` / `WX_MP_PROMPT_TEMPLATE_ID` 只在 `practice/index.js` 读，`reminder.js` 保持零 `process.env`（`m6-notify` 那条「没有可用环境变量也不抛错」的用例因此仍然成立，只是判据换成了「env 只在入口读 + 外发只有一条通道」）。
+- 还没做的两件事：① `cloudbaserc.json` 里 `practice` 的 `envVariables`（与部署同一笔写，需单独授权）；② 订阅模板 ID 的真值——`.env` 里那串中段是 15 个 `x` 的占位，2026-10-04 已清空，留空即「前端不请求授权、云端不外发」，等真值填回后 `npm run build:weapp` 才会重新进包。
+- 本仓库的日志查询在本环境不可用（`tcb fn log` 报 `SearchClsLog topic not exist`），所以 D09b 上线后的验收只能靠：`daily-prompt.mjs` 那类只读脚本 + 单元用例 + 真机收到推送，**不要**把「看云端日志」写进验收步骤。
