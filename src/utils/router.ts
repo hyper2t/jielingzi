@@ -18,6 +18,8 @@ export const ROUTES = {
   circle: '/pkg-community/pages/circle/index',
   joinCircle: '/pkg-community/pages/join-circle/index',
   invites: '/pkg-community/pages/invites/index',
+  /** 站内消息（FE-M6-03）：三类通知的收件箱 */
+  messages: '/pkg-community/pages/messages/index',
   // pkg-practice（M5/M6 补齐：timerDone、calendar、prompt…）
   timer: '/pkg-practice/pages/timer/index',
   /** 每日一题作答与答案列表（FE-M6-01） */
@@ -47,6 +49,8 @@ export interface RouteParams {
   circle: { id: string }
   joinCircle: { code?: string }
   invites: { circleId?: string }
+  /** 无入参：消息都属于当前账号 */
+  messages: undefined
   timer: { minutes?: number }
   /** promptId / date 由练习 Tab 的卡片带入；缺 promptId 时页面回落到今日题目 */
   prompt: { promptId?: string, date?: string }

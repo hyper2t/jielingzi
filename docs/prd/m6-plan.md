@@ -1,7 +1,7 @@
 # M6 实施计划：每日一题 / 慢话题 / 精华 / 通知
 
 > 范围：PRD §5 T3 / T5 / W3 / N1（`docs/prd/README.md`）、§7.1 与 §7.4 线框中的「每日一题」卡片与「精华」入口。
-> 状态（2026-10-03）：**已评审并部分实现**——D9（署名形态）与 N1（通知范围）由用户当日拍板（见 D9、D17）。已完成的都只在本地、**未部署**：BE-M6-00 与 BE-M6-01（每日一题：今日题目 / 作答 / 答案列表）、FE-M6-00 与 FE-M6-01（前端类型与常量、`services/practice.ts`、mock、练习 Tab 卡片 + 作答页）、BE-M6-02（慢话题 `slowUntil` 与精华 `featured`）、OPS-M6-01（`daily-prompt.mjs` 录题 / 巡检 + 首周题目种子）、FE-M6-02（发帖的慢话题开关、冷静期展示、圈内只看精华、`markTopicFeatured` 接线）。未开工：通知（BE-M6-03、FE-M6-03）、QA-M6-01、精华标记在审核页的按钮，以及 M4 签核与 M5 真机验收。接口见 [`docs/api/practice.md`](../api/practice.md)「每日一题」。
+> 状态（2026-10-03）：**已评审并部分实现**——D9（署名形态）与 N1（通知范围）由用户当日拍板（见 D9、D17）。已完成的都只在本地、**未部署**：BE-M6-00 与 BE-M6-01（每日一题：今日题目 / 作答 / 答案列表）、FE-M6-00 与 FE-M6-01（前端类型与常量、`services/practice.ts`、mock、练习 Tab 卡片 + 作答页）、BE-M6-02（慢话题 `slowUntil` 与精华 `featured`）、OPS-M6-01（`daily-prompt.mjs` 录题 / 巡检 + 首周题目种子）、FE-M6-02（发帖的慢话题开关、冷静期展示、圈内只看精华、`markTopicFeatured` 接线）、BE-M6-03（`notifications` 三类通知 + `listNotifications` / `markNotificationsRead` + 定时触发器）、FE-M6-03（消息页 + 未读角标 + 订阅授权）。未开工：QA-M6-01、精华标记在审核页的按钮，以及 M4 签核与 M5 真机验收。接口见 [`docs/api/practice.md`](../api/practice.md)「每日一题」。
 > 前置：M4 签核（[`docs/ops/release-checklist.md`](../ops/release-checklist.md) 第 7~8 步）与 M5 真机验收（[`docs/test/cases/M5.md`](../test/cases/M5.md)）先闭合；M6 不得先于它们部署到共享环境。
 > 下游：`docs/prd/join-plan.md` 的申请结果通知（V2-1）依赖本里程碑的 N1。
 
@@ -94,7 +94,7 @@
 | ✅ FE-M6-00 | FE | 已完成（2026-10-03，本地）：`types/models.ts` 加每日一题类型（`DailyPrompt` / `PromptAnswer` / `PromptAnswerItem` / `PromptAnswerPage` 等）；`constants/community.ts` 的 `PROMPT_RULES`（`textMax 120`、`answer { min:5, max:500 }`、`listMax 50`、`defaultAnon true`）；`services/practice.ts` 的 `todayPrompt` / `answerPrompt` / `listAnswers` 与 `guard.ts` 的 `WRITE_ACTIONS.practice`；`cloud.types.ts` 的 `FunctionMap`；`mock/client.ts` 补齐同名 handler（校验顺序、`40901` 先于额度、`anon: input.anon !== false` 均与云函数一致） | 实测：`npx tsc --noEmit` 0 错；「mock 与云函数共用规则由测试比对」= `src/constants/__tests__/community.test.ts` 新增「每日一题规则（M6）」用例，对 `PROMPT_RULES` 整对象 `toEqual`，任一侧漂移即红 | 0.5d ✔ |
 | ✅ FE-M6-01 | FE | 已完成（2026-10-03，本地）：`features/practice/prompt.ts`（状态机 `none` / `unanswered` / `answered` / `pending`、字数校验、`answerCounter`、署名文案、`promptError` 码表）、`PromptCard.tsx` 挂进练习 Tab、`pkg-practice/pages/prompt` 作答页（默认匿名可切实名、未作答不请求 `listAnswers`、分页「查看更多」、`pending` 只出现在我那条、列表失败可重试且不打断作答）、`utils/router.ts` 的 `prompt` 路由与参数、`app.config.ts` 分包页、`utils/track.ts` 的 `prompt_answer` | 实测：`src/pkg-practice/__tests__/m6.test.tsx` 12 例（卡片 5 + 作答页 7）与 `src/features/practice/__tests__/prompt.test.ts` 全绿，快照 1 个（未作答态卡片）；全量 Jest 40 suites / 551 tests / 32 snapshots | 1d ✔ |
 | ✅ FE-M6-02 | FE | 已完成（2026-10-03，本地）：发起话题页的「慢话题」开关（默认关、开了才带 `slow: true`、随草稿一起保存恢复）；列表卡片与详情页的冷静期展示（未到点只收起回复栏并显示剩余时间，读 / 引用查看 / 举报照常）；圈内话题流「只看精华」筛选（筛选态进 `usePaged` 的 key）；`markTopicFeatured` 服务层接线。契约同步：`models.ts` 的 `TopicSummary.slowUntil` 与 `TopicInput.slow`、`cloud.types.ts` 的 `FunctionMap`（`listTopics` 入参加 `featured`、`moderation.markFeatured`）、`guard.ts` 的 `WRITE_ACTIONS.moderation`、`mock/client.ts`（create 落 `slowUntil` / list 按 `featured` 筛 / createReply 冷静期闸门 / markFeatured handler）与云函数同口径 | 实测：新增 `src/pkg-community/__tests__/m6.test.tsx` 6 例（开关与发布入参、草稿恢复、锁回复栏、到点放开、筛选透传与重新取数、精华空态）；`rules.test.ts` +6 例（`slow` 只在为真时下发、文案与 `TOPIC_RULES.slowHours` 同源、`isReplyLocked` 到点即解锁的边界、剩余时间给准数、40901 透出云端中文、老草稿缺字段不炸）；`topic-card` +1 例；`community-topics` +6 例（含 markFeatured 权限与状态校验、缓存失效、话题流版本、未同意不发请求）；全量 Jest **41 suites / 570 tests / 32 snapshots**、`tsc --noEmit` 0 错、`test:functions` 261/261、`test:ops` 47/47；**变异验证 17 处全部被捕获**（含「到点仍算锁住」「筛选没传下去」「切换不重新取数」「markFeatured 不校验状态」「锁住时整块提示消失」） | 0.5d ✔ |
-| FE-M6-03 | FE | 消息页 + 未读角标；订阅授权只在主动操作成功后请求；`Taro.requestSubscribeMessage` 失败静默 | 三端走通并留证 | 1d |
+| ✅ FE-M6-03 | FE | 已完成（2026-10-04，本地）：`features/notify/`——`rules.ts`（三类标签、`formatPostTime` 时间口径、「能不能点开」只看 `type` + `refType` + `refId`、分页合并与就地标已读）、`subscribe.ts`（订阅授权，缺配置即跳过、失败静默）、`badge.ts`（weapp tabBar 角标，best-effort）；`services/practice.ts` 的 `listNotifications` / `notificationsUnread` / `markNotificationsRead` 与 `NOTIFICATIONS_KEY`；`pkg-community/pages/messages`；「我的」入口显示未读数并同步角标；提交回答成功后才请求订阅授权。契约同步：`models.ts` 的 `AppNotification` / `NotificationPage` / `MarkReadResult`、`cloud.types.ts` 两个动作、`guard.ts` 的写动作、`app.config.ts` 分包页、`router.ts` 的 `messages` 路由、`mock/client.ts` 两个 handler（校验顺序、倒序、`unread` 只数自己的、1–100 上限）与「回复别人话题 → 作者收到消息」的联动 | 实测：新增 3 个测试文件 54 例；全量 Jest **44 suites / 628 tests / 33 snapshots**、变异验证 29 处全部被捕获、`tsc --noEmit` 0 错、`test:functions` 287/287、`test:ops` 47/47，改动文件 eslint 只剩 `mock/client.ts` 的 6 条既有债。**三端**按 `TARO_ENV` 分支在 jsdom 下覆盖（weapp 走角标与订阅、h5 / rn 只站内），真机与订阅送达留到 `QA-M6-01` 登记；模板 ID 未到位前「实际送达」一项记受阻、不得标通过 | 1d ✔ |
 | QA-M6-01 | QA | `docs/test/cases/M6.md`：作答可见性、每日一次与并发、慢话题时间边界、精华权限、通知去重与送达、越权专项 | 自动化 + 变异验证通过；三端清单登记 | 0.5d |
 | DOC-M6 | PM / BE | 契约定稿、`docs/ops/collections.md` 索引表、`wording.md` 补「每日一题 / 慢话题 / 精华」措辞规范（含题目与提醒文案送审） | 文档与实现一致 | 随各项 |
 
@@ -138,6 +138,22 @@
   以及 `index.js` 的接线被摘掉。触发器配置与 `timeout` 提升也进了用例（`cloudbaserc.json` 断言只有 `practice` 挂了
   一个 `timer` 且没有 `envVariables`）。**未做**：订阅消息外发（D17）、`notifications` 的推送优先级/合并（PRD 未要求）、
   复核通过后补发回复通知（明确不做，见上）。
+
+- **实现结果（2026-10-04，FE-M6-03）**：消息页只在既有链路上加东西——`useRequest` 的缓存键、`guard.ts` 的写动作、
+  `mock/client.ts` 的同名 handler，没有新增错误码、没有轮询定时器：未读数由 `listNotifications` 的 `unread` 带回，
+  「我的」入口用 `notificationsUnread()`（内部就是 `NOTIFICATIONS_ENTRY_SIZE = 1` 的一页一条）换同一个数字，所以红点不多打一次云端。三个刻意的取舍：
+  ① 前端**只按 `type` + `refType` + `refId` 决定能不能点开**，绝不解析 `text`——云端改文案不会把跳转改坏，
+  `moderation` 与缺 `refId` 的老数据一律不挂点击而不是跳到一个错的页面；② 标已读失败**不本地假装已读**
+  （下次照常亮，宁可多提醒一次也不把消息吞掉），但失败也不挡住进话题；③ 订阅授权只在主动操作（提交回答）成功后请求，
+  缺模板 ID / 非小程序端 / API 不存在就整个跳过，用户在弹窗里拒绝也不给任何提示（D14：不拿授权就不发外发，站内照常）。
+  没用 `usePaged`：它以 `_id` 去重且不提供「就地改一条」的入口，而这里条目主键是云端的 `id`、点开后要立刻翻成已读——
+  于是分页合并与就地标记落在 `mergeNotifications` / `markLocalRead`，去重语义与 `usePaged` 保持一致并由用例钉住。
+  mock 也补齐了联动（回别人话题 → 作者收到 `reply` 通知、自己回自己不发），否则「真机有消息、mock 空页」迟早对不上。
+  两个测试侧的坑记在这里免得重犯：`test/setup.js` 把 `TARO_ENV` 默认成 `weapp`，要测「非小程序端不碰 tabBar」必须显式切成 `h5`；
+  `process.env.X = undefined` 会被 Node 写成字符串 `'undefined'`，所以还原环境用 `= prev` 而不是 `delete`。
+  实测：`notify.test.ts`（规则 / 订阅 / 角标）、`practice-notifications.test.ts`（服务层门禁、分页、上限、越权、mock 联动）、
+  `m6-messages.test.tsx`（两个页面 + 快照，1 个）共 54 例；变异验证 29 处全部被捕获（含「空选中被升格成全部已读」「未读数把别人的算进来」「订阅失败往上抛」「角标越界不截断」「时间口径不共用」）；全量复跑 Jest 44 suites / 628 tests / 33 snapshots、
+  `npx tsc --noEmit` 0 错、`test:functions` 287/287、`test:ops` 47/47。**仍仅本地，未部署。**
 
 ## 7. 上线与回滚
 

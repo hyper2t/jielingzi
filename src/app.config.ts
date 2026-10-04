@@ -17,8 +17,8 @@ export default defineAppConfig({
   subPackages: [
     {
       root: 'pkg-community',
-      // M3：话题详情（topic）、发起话题（topic-new）；M4：圈子列表 / 详情、加入圈子、邀请码
-      pages: ['pages/topic/index', 'pages/topic-new/index', 'pages/circles/index', 'pages/circle/index', 'pages/join-circle/index', 'pages/invites/index']
+      // M3：话题详情（topic）、发起话题（topic-new）；M4：圈子列表 / 详情、加入圈子、邀请码；M6：站内消息（messages）
+      pages: ['pages/topic/index', 'pages/topic-new/index', 'pages/circles/index', 'pages/circle/index', 'pages/join-circle/index', 'pages/invites/index', 'pages/messages/index']
     },
     {
       root: 'pkg-practice',
@@ -45,7 +45,8 @@ export default defineAppConfig({
   preloadRule: {
     'pages/index/index': { network: 'all', packages: ['pkg-community'] },
     'pages/practice/index': { network: 'all', packages: ['pkg-practice'] },
-    'pages/mine/index': { network: 'all', packages: ['pkg-user'] }
+    // 消息入口在「我的」里，所以「我的」也预下载 pkg-community（FE-M6-03）
+    'pages/mine/index': { network: 'all', packages: ['pkg-user', 'pkg-community'] }
   },
   window: {
     backgroundColor: '#F7F8F2',

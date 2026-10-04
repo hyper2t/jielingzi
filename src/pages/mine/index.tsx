@@ -3,7 +3,7 @@
  * → 圈子 / 话题等业务区块（M3 / M4）→ 协议页脚（用户协议 · 隐私政策 · 社区公约）。
  * 未同意 / App 端未登录时不发任何云端请求；档案取数：useRequest(ready ? PROFILE_KEY : null, getProfile)。
  */
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useDidShow } from '@tarojs/taro'
 import { View, Text } from '@tarojs/components'
 import type { Profile } from '@/types/models'
@@ -13,6 +13,9 @@ import { ensureSignedIn, loginGate } from '@/features/auth/require-login'
 import { ensureAdult } from '@/features/auth/gates'
 import { profileMeta } from '@/features/profile/rules'
 import { getProfile, listInvites, INVITES_KEY, PROFILE_KEY } from '@/services/community'
+import { NOTIFICATIONS_KEY, notificationsUnread } from '@/services/practice'
+import { NOTIFICATIONS_TITLE, unreadLabel } from '@/features/notify/rules'
+import { syncTabBadge } from '@/features/notify/badge'
 import { useRequest } from '@/hooks/useRequest'
 import { navigate } from '@/utils/router'
 import { a11yButton } from '@/utils/a11y'
@@ -26,7 +29,7 @@ export const CONSENT_HINT = '同意协议后可使用云端同步'
 /** App 端登录卡片 */
 export const LOGIN_CARD_TEXT = '登录后数据云端同步，小程序与 App 互通'
 export const LOGIN_ACTION = '登录'
-export const MINE_PLACEHOLDER = '我的话题与消息即将开放'
+export const MINE_PLACEHOLDER = '我的话题列表即将开放'
 /** 已同意但还没确认 18+ */
 export const ADULT_HINT = '确认年满 18 周岁后可参与交流'
 export const PROFILE_SETUP = '完善练习档案'
@@ -34,15 +37,17 @@ export const PROFILE_SETUP_HINT = '设置昵称与练习方式，让同好认识
 /** 审核入口（仅 mod / admin） */
 export const ADMIN_ENTRY = '审核队列'
 
-function MineEntry ({ label, onClick, className = '' }: { label: string, onClick: () => void, className?: string }) {
+/** note：右侧的灰色补充说明（如「2 条未读」）；有未读时改主色，扫一眼就能看出哪条要处理 */
+function MineEntry ({ label, note, onClick, className = '' }: { label: string, note?: string, onClick: () => void, className?: string }) {
   return (
     <View
       {...tw('flex flex-row items-center justify-between min-h-touch px-4 rounded-md bg-paper-light', className)}
       hoverClass={tw('bg-paper-dark').className}
       onClick={onClick}
-      {...a11yButton(label)}
+      {...a11yButton(note ? `${label}，${note}` : label)}
     >
       <Text {...tw('font-body text-body text-ink')}>{label}</Text>
+      {!!note && <Text {...tw(`font-body text-caption ${note.includes('0 条') ? 'text-ink-faint' : 'text-brand-dark'} mr-2`)}>{note}</Text>}
       <Icon name='chevron-right' tone='soft' size='sm' />
     </View>
   )
@@ -111,9 +116,19 @@ export default function Mine () {
   const ready = !loginGate(consent, signedIn)
   const profile = useRequest(ready ? PROFILE_KEY : null, getProfile)
   const inviteSummary = useRequest(ready && adultOk ? INVITES_KEY : null, listInvites)
+  /** 未读数：与消息页共用 key，标记已读后一起失效（这里只取一页一条，成本与打开消息页同级） */
+  const notes = useRequest(ready && adultOk ? NOTIFICATIONS_KEY : null, notificationsUnread)
+  const unread = notes.data || 0
   const shown = useRef(false)
+  useEffect(() => {
+    // 小程序原生角标；H5 / RN 里是空操作（页面内的未读数才是保证送达的展示）
+    void syncTabBadge(unread)
+  }, [unread])
   useDidShow(() => {
-    if (shown.current && ready && adultOk) void inviteSummary.refresh()
+    if (shown.current && ready && adultOk) {
+      void inviteSummary.refresh()
+      void notes.refresh()
+    }
     shown.current = true
   })
   const editProfile = () => { if (ensureAdult({ reason: '编辑档案', returnTo: 'profileEdit' })) void navigate('profileEdit') }
@@ -163,6 +178,12 @@ export default function Mine () {
       {/* 圈子 / 话题 / 邀请码 / 消息（M3、M4、M6）；ready 为 false 时只读本机数据 */}
       {ready && <View {...tw('flex flex-col mx-page mt-3')}>
         <MineEntry label='我的圈子' onClick={() => { void navigate('circles') }} className='mb-2' />
+        <MineEntry
+          label={NOTIFICATIONS_TITLE}
+          note={notes.data === undefined ? undefined : unreadLabel(unread)}
+          onClick={() => { void navigate('messages') }}
+          className='mb-2'
+        />
         <MineEntry
           label={inviteSummary.data ? `邀请码（剩余 ${inviteSummary.data.quota}）` : '邀请码'}
           onClick={() => { void navigate('invites') }}

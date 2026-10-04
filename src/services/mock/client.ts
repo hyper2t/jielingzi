@@ -94,6 +94,19 @@ interface MockCheckin { date: string, practice: PracticeCheckinInput['practice']
 let checkins: MockCheckin[] = []
 interface MockPrompt { id: string, date: string, text: string, status: 'ok' | 'closed' }
 interface MockPromptAnswer { id: string, promptId: string, date: string, text: string, anon: boolean, mine: boolean, authorName: string, status: 'ok' | 'pending' | 'removed', createdAt: number, deleted?: boolean }
+/** 站内消息（FE-M6-03）：owner 模拟归属，只有 'me' 的那份本人能看见（等价于云端的 _openid 过滤） */
+interface MockNotification {
+  id: string
+  type: 'reply' | 'moderation' | 'prompt'
+  refType: string | null
+  refId: string | null
+  text: string
+  read: boolean
+  createdAt: number
+  owner: 'me' | 'other'
+}
+let notifications: MockNotification[] = []
+let notifySeq = 0
 let prompts: MockPrompt[] = []
 let promptAnswers: MockPromptAnswer[] = []
 let promptSeq = 0
@@ -102,6 +115,12 @@ let answerSeq = 0
 const mockCnDate = () => new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10)
 /** 答案列表默认分页：与云函数 service.js 的 ANSWER_PAGE_SIZE 同值（同 mock 里 180 分钟上限的处理方式） */
 const MOCK_ANSWER_PAGE_SIZE = 20
+/** 站内消息：分页与批量上限与云函数 practice/service.js 同值 */
+const MOCK_NOTIFY_PAGE_SIZE = 20
+const MOCK_NOTIFY_PAGE_MAX = 50
+const MOCK_NOTIFY_MARK_MAX = 100
+/** 固定文案与云端一致（改动要同步 cloudfunctions/practice/service.js 与 _shared/reminder.js，用例比对） */
+const MOCK_REPLY_NOTICE = '你的话题收到了新回复'
 let postedToday = { topic: 0, reply: 0, answer: 0, createInvite: 0, redeemInvite: 0 }
 export const MOCK_REJECT_MARK = '[reject]'
 export const MOCK_REVIEW_MARK = '[review]'
@@ -195,6 +214,12 @@ export const mockControl = {
     const base = Date.now() - list.length * 1000
     list.forEach((r, i) => {
       replies.push({ id: `r${++postSeq}`, anon: false, mine: false, authorName: '松声', status: 'ok', quoteId: null, createdAt: base + i * 1000, ...r })
+      const d = replies[replies.length - 1]
+      const t = topics.find(x => x.id === d.topicId)
+      // 与云函数一致：别人回复我的话题 → 作者收到一条通知（自己的回复不通知自己）
+      if (t?.mine && !d.mine && d.status === 'ok') {
+        notifications.push({ id: `nt${++notifySeq}`, type: 'reply', refType: 'topic', refId: t.id, text: MOCK_REPLY_NOTICE, read: false, createdAt: d.createdAt, owner: 'me' })
+      }
     })
   },
   get topics (): MockTopic[] { return topics.map(t => ({ ...t })) },
@@ -230,6 +255,23 @@ export const mockControl = {
   get checkins (): MockCheckin[] { return checkins.map(c => ({ ...c, sessionIds: [...c.sessionIds] })) },
   get account (): AccountStatus { return { ...account } },
   get profile (): Profile | null { return profile ? { ...profile } : null },
+  /** 预置站内消息（owner 默认 'me' = 写给我的；'other' 用来验证「别人的消息我看不到」） */
+  seedNotifications (list: Array<Partial<MockNotification> & { text: string }>) {
+    const base = Date.now() - list.length * 1000
+    list.forEach((n, i) => {
+      notifications.push({
+        id: n.id || `nt${++notifySeq}`,
+        type: n.type || 'reply',
+        refType: n.refType ?? 'topic',
+        refId: n.refId ?? null,
+        text: n.text,
+        read: n.read ?? false,
+        createdAt: n.createdAt ?? base + i * 1000,
+        owner: n.owner ?? 'me'
+      })
+    })
+  },
+  get notifications (): MockNotification[] { return notifications.map(n => ({ ...n })) },
   reset () {
     this.latency = 300
     this.failTimes = 0
@@ -247,6 +289,8 @@ export const mockControl = {
     checkins = []
     prompts = []
     promptAnswers = []
+    notifications = []
+    notifySeq = 0
     promptSeq = 0
     answerSeq = 0
     postSeq = 0
@@ -630,6 +674,10 @@ const handlers: Handlers = {
       const d: MockReply = { id: `r${++postSeq}`, topicId: t.id, body: normalizeBody(input.body), anon: input.anon === true, mine: true, authorName: '', status, quoteId: input.quoteId || null, createdAt: now }
       replies.push(d)
       if (status === 'ok') { t.replyCount += 1; t.lastReplyAt = now }
+      // 站内通知（BE-M6-03）：只发话题作者。我回复别人的话题，那条归属「别人」，我的收件箱不该出现
+      if (status === 'ok' && !t.mine) {
+        notifications.push({ id: `nt${++notifySeq}`, type: 'reply', refType: 'topic', refId: t.id, text: MOCK_REPLY_NOTICE, read: false, createdAt: now, owner: 'other' })
+      }
       postedToday.reply += 1
       return { status: status === 'ok' ? 'ok' : 'pending', reply: replyOut(d), remaining: DAILY_LIMITS.createReply - postedToday.reply }
     },
@@ -857,8 +905,46 @@ const handlers: Handlers = {
         list: rows.map(presentMockAnswer),
         mine: presentMockAnswer(mine)
       }
+    },
+    /** 站内消息：只看得到写给自己的那份，createdAt 倒序；unread 供入口与角标共用 */
+    listNotifications: (input: { page?: number, size?: number }) => {
+      noUnknown(input, ['page', 'size'])
+      const page = input.page === undefined ? 1 : input.page
+      if (!Number.isInteger(page) || page < 1) throw badParam('page 需为正整数')
+      const size = input.size === undefined ? MOCK_NOTIFY_PAGE_SIZE : input.size
+      if (!Number.isInteger(size) || size < 1 || size > MOCK_NOTIFY_PAGE_MAX) throw badParam(`size 需为 1–${MOCK_NOTIFY_PAGE_MAX} 的整数`)
+      guard({ requirePhone: false, allowMuted: true })
+      const all = notifications.filter(n => n.owner === 'me').sort((a, b) => b.createdAt - a.createdAt)
+      const skip = (page - 1) * size
+      const rows = all.slice(skip, skip + size)
+      return {
+        page,
+        size,
+        hasMore: all.length > skip + rows.length,
+        unread: all.filter(n => !n.read).length,
+        list: rows.map(n => ({ id: n.id, type: n.type, refType: n.refType, refId: n.refId, text: n.text, read: n.read, createdAt: n.createdAt }))
+      }
+    },
+    /** 已读：ids 或 all: true；只改自己的那份，重复标记 updated = 0（与云端的 _openid + read:false 条件同形） */
+    markNotificationsRead: (input: { ids?: string[], all?: true }) => {
+      noUnknown(input, ['ids', 'all'])
+      if (input.all !== true) {
+        const ids = Array.isArray(input.ids) ? input.ids : null
+        if (!ids || !ids.length) throw badParam('请传 ids 数组，或 all: true')
+        if (ids.length > MOCK_NOTIFY_MARK_MAX) throw badParam(`一次最多标记 ${MOCK_NOTIFY_MARK_MAX} 条`)
+        if (ids.some(id => typeof id !== 'string' || !id)) throw badParam('ids 需为非空字符串数组')
+      }
+      guard({ requirePhone: false, allowMuted: true })
+      const wanted = input.all === true ? null : new Set(input.ids as string[])
+      let updated = 0
+      notifications.forEach(n => {
+        if (n.owner !== 'me' || n.read) return
+        if (wanted && !wanted.has(n.id)) return
+        n.read = true
+        updated += 1
+      })
+      return { updated, unread: notifications.filter(n => n.owner === 'me' && !n.read).length }
     }
-
   }
 }
 

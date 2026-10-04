@@ -11,6 +11,7 @@ import { Text, Textarea, View } from '@tarojs/components'
 import { Button, ConsentSheet, PhoneSheet, Screen, showToast, Toggle } from '@/components'
 import { PROMPT_RULES } from '@/constants/community'
 import { requirePhone } from '@/features/auth/gates'
+import { requestSubscribe } from '@/features/notify/subscribe'
 import { loginGate, goLogin } from '@/features/auth/require-login'
 import {
   ANSWER_LABEL, ANON_HINT, ANON_LABEL, EMPTY_ANSWERS_TEXT, MORE_TEXT, PENDING_HINT, PROMPT_PAGE_TITLE,
@@ -111,6 +112,8 @@ export default function PromptAnswerPage () {
       const r = await answerPrompt({ promptId, text: text.trim(), anon })
       track('prompt_answer', { status: r.answer.status, anon })
       showToast(r.answer.status === 'pending' ? PENDING_TOAST : SUBMITTED_TOAST)
+      // 只在作答成功后请求订阅授权（D14）：缺模板 ID / 非小程序端自动跳过，失败静默，不影响本次提交
+      void requestSubscribe()
       setText('')
     } catch (e) {
       if (needsAdultConfirm(e)) void navigate('adult', { reason: PAGE_TITLE })

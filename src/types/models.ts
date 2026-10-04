@@ -317,3 +317,41 @@ export interface ReplyInput {
   anon?: boolean
   quoteId?: string
 }
+// ---- 站内消息（FE-M6-03，契约见 docs/api/practice.md「站内消息与每日提醒」）----
+
+/** 通知类型：与云端 _shared/notify.js 的 NOTIFY_TYPES 一致，前端不新增第四类 */
+export type NotificationType = 'reply' | 'moderation' | 'prompt'
+
+/**
+ * 一条站内消息。`text` 是云端写好的固定说明（不含他人内容原文）；能否点开只看 `refType` / `refId`。
+ * `createdAt` 为毫秒时间戳，缺字段的旧数据按 null 处理（前端只是不显示时间，不报错）。
+ */
+export interface AppNotification {
+  id: string
+  type: NotificationType
+  refType: string | null
+  refId: string | null
+  text: string
+  read: boolean
+  createdAt: number | null
+}
+
+/** practice.listNotifications 的返回体：`unread` 是本人未读条数（入口与角标共用） */
+export interface NotificationPage {
+  page: number
+  size: number
+  hasMore: boolean
+  unread: number
+  list: AppNotification[]
+}
+
+/** practice.markNotificationsRead 的返回体（updated 用于判断是否真的改动过） */
+export interface MarkReadResult {
+  updated: number
+  unread: number
+}
+
+/** 消息点击后的去处；不在表里的类型不可点（见 features/notify/rules.ts） */
+export type NotificationTarget =
+  | { route: 'topic', params: { id: string } }
+  | { route: 'prompt', params: { promptId: string } }

@@ -60,9 +60,9 @@
 - `community.createReply`：`slowUntil` 未到 → `40901`「这条话题还没开放回复」；已发布的回复不受影响。
 - `community.listTopics`：增 `featured: true` 筛选；圈内精华仍只对成员可见。
 - `moderation.markFeatured`：`{ topicId, featured }` → `{ ok: true, featured, changed }`，仅 `mod` / `admin`，写 `mod_logs`（`kind: 'featured'`）。**已实现**，详见 [`docs/api/moderation.md`](moderation.md)。
-- 站内消息（`practice.listNotifications` / `markNotificationsRead`）与每日提醒触发器：见下一节，BE-M6-03 已实现。
+- 站内消息（`practice.listNotifications` / `markNotificationsRead`）与每日提醒触发器：见下一节，BE-M6-03（云端）与 FE-M6-03（前端）均已实现。
 
-## 站内消息与每日提醒（BE-M6-03 · 云函数已实现（本地，未部署）；消息页在 FE-M6-03 接）
+## 站内消息与每日提醒（BE-M6-03 + FE-M6-03 · 云函数与前端均已实现（本地，未部署））
 
 > 决策与理由见 [`docs/prd/m6-plan.md`](../prd/m6-plan.md) D13 / D15 / D16 / D17。集合 `notifications` 在安全规则里是私有的
 > （`{ read: false, write: false }`），客户端只能经这两个动作读写；没有新增错误码。
@@ -84,6 +84,21 @@
 - 返回：`{ updated, unread }`。更新条件带 `_openid`，所以传别人的 id 只会命中 0 条——不报错、也不暴露那条消息是否存在；
   已读过的再标一次 `updated: 0`（幂等）。
 - 门禁同上（也是写动作，但同样 `limit: 0` 不占额度）。
+- 前端接线（FE-M6-03）：`services/practice.ts` 的 `listNotifications(page?, size?)` / `notificationsUnread()` /
+  `markNotificationsRead(ids?)`；列表缓存键 `NOTIFICATIONS_KEY`（写成功后 `invalidate`）；`guard.ts` 把
+  `markNotificationsRead` 计进 `practice` 的写动作（未同意 / 未确认 18+ / 封禁禁言时前端就地引导，**一个请求都不发**，
+  读动作也只在门禁过了之后才发）。「我的」入口用 `notificationsUnread()`（内部就是 `listNotifications(1, NOTIFICATIONS_ENTRY_SIZE)`）只为拿 `unread`，
+  不多发一次计数请求；门禁未过时直接返回空页。
+- 前端的 `markNotificationsRead(ids?)`：不传 → `{ all: true }`；传空数组 → 原样发出、由云端 `40001` 挡下——
+  「空选中」不等于「全部已读」，前端不改调用方的语义。标记失败不本地假装已读（下次照常是未读），但也不挡住跳转。
+- 页面：`pkg-community/pages/messages`（标签 / 时间 / 可点判定在 `features/notify/rules.ts`，时间口径共用
+  `utils/format.ts` 的 `formatPostTime`；只有 `type` 与 `refType` 对得上且 `refId` 在的条目才挂点击，
+  `moderation` 与缺引用的老数据一律不可点；「全部标为已读」放导航栏右侧且只在有未读时出现）。
+  weapp 下「我的」还会把未读数同步成 tabBar 角标（`features/notify/badge.ts`，超过 99 显示 `99+`；
+  非 weapp 端、没有该 API、被 reject 都静默返回 false）。
+- 订阅消息授权（D14 / D17）只在「提交回答成功」之后请求（`pkg-practice/pages/prompt`），
+  模板 ID 取自 `TARO_APP_WX_MP_PROMPT_TEMPLATE_ID`：非 weapp、缺该键、或 Taro 上没有
+  `requestSubscribeMessage` → 直接跳过；调用报错或用户在弹窗里拒绝 → 静默，不弹提示、不影响本次提交结果。
 
 ### 谁会往 `notifications` 里写
 

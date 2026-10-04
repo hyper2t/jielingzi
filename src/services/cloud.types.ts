@@ -6,7 +6,7 @@
  * - RN：cloud.rn.ts（CloudBase HTTP API：公开读用 Publishable Key；身份类调用用登录后的会话，见 `CloudAuth`）
  * 云函数入参 / 出参以 docs/api/*.md 为准（starter：docs/api/user.md）。
  */
-import type { AccountStatus, CheckinMonth, Circle, CircleDetail, Invite, InviteList, MediaQueueItem, ModDecision, ModQueueItem, PracticeCheckinInput, PracticeCheckinResult, Profile, ProfilePatch, PromptAnswer, PromptAnswerInput, PromptAnswerPage, PromptToday, Reply, ReplyInput, ReportTarget, TopicDetail, TopicInput, TopicSummary, User, UserSettings } from '@/types/models'
+import type { AccountStatus, CheckinMonth, Circle, CircleDetail, Invite, InviteList, MarkReadResult, MediaQueueItem, ModDecision, ModQueueItem, NotificationPage, PracticeCheckinInput, PracticeCheckinResult, Profile, ProfilePatch, PromptAnswer, PromptAnswerInput, PromptAnswerPage, PromptToday, Reply, ReplyInput, ReportTarget, TopicDetail, TopicInput, TopicSummary, User, UserSettings } from '@/types/models'
 
 /** 客户端可直读的集合（安全规则见 docs/api/README.md「安全规则」）；业务集合落地时在这里补充 */
 export interface CollectionMap {
@@ -173,7 +173,10 @@ export interface FunctionMap {
     answerPrompt: [PromptAnswerInput, { answer: PromptAnswer }]
     /** 答案列表：本人未作答 → 40301；他人只返回 status ok，本人那条在 mine 里 */
     listAnswers: [{ promptId: string, page?: number, size?: number }, PromptAnswerPage]
-
+    /** 站内消息（BE-M6-03）：只返回写给自己账号的那份，createdAt 倒序；unread 是未读条数 */
+    listNotifications: [{ page?: number, size?: number }, NotificationPage]
+    /** 标记已读：ids（1–100）或 all: true；别人的 id 命中 0 条、重复标记幂等 */
+    markNotificationsRead: [{ ids?: string[], all?: true }, MarkReadResult]
   }
   // 业务云函数在这里按同样格式声明：<函数名>: { <action>: [入参, 出参] }，并在 cloud.rn.ts 标注公开 / 免身份动作
 }

@@ -1,0 +1,188 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`快照 消息页（有未读 + 三种类型） 1`] = `
+<View
+  className="flex flex-col flex-1 min-h-screen bg-paper jl-safe-bottom"
+>
+  <View
+    className="bg-paper"
+    style={
+      {
+        "paddingTop": 20,
+      }
+    }
+  >
+    <View
+      className="flex flex-row items-center px-2"
+      style={
+        {
+          "height": 40,
+          "paddingRight": 94,
+        }
+      }
+    >
+      <View
+        accessibilityLabel="返回"
+        accessibilityRole="button"
+        ariaLabel="返回"
+        ariaRole="button"
+        className="flex items-center justify-center w-touch h-touch rounded-full"
+        hoverClass="bg-paper-dark"
+        onClick={[Function]}
+      >
+        <Image
+          accessibilityElementsHidden={true}
+          ariaHidden={true}
+          className="w-7 h-7"
+          importantForAccessibility="no-hide-descendants"
+          mode="aspectFit"
+          src="file-stub"
+        />
+      </View>
+      <Text
+        className="flex-1 font-title font-bold text-subtitle text-ink ml-1"
+        numberOfLines={1}
+      >
+        消息
+      </Text>
+      <View
+        accessibilityLabel="全部标为已读"
+        accessibilityRole="button"
+        ariaLabel="全部标为已读"
+        ariaRole="button"
+        className="flex items-center justify-center min-h-touch px-2 rounded-full"
+        hoverClass="bg-paper-dark"
+        onClick={[Function]}
+      >
+        <Text
+          className="font-body text-caption text-ink-soft"
+        >
+          全部标为已读
+        </Text>
+      </View>
+    </View>
+  </View>
+  <View
+    className="flex flex-col flex-1"
+  >
+    <View
+      className="flex flex-col px-page pt-4 pb-section"
+    >
+      <Text
+        className="mb-3 font-body text-caption text-ink-faint"
+      >
+        2 条未读
+      </Text>
+      <View
+        className="mb-2"
+      >
+        <View
+          accessibilityLabel="回复，你的话题收到了新回复"
+          accessibilityRole="button"
+          ariaLabel="回复，你的话题收到了新回复"
+          ariaRole="button"
+          hoverClass="bg-paper-dark"
+          onClick={[Function]}
+        >
+          <View
+            className="flex flex-col p-4 rounded-md bg-paper-light"
+          >
+            <View
+              className="flex flex-row items-center"
+            >
+              <Text
+                className="font-body text-caption font-bold text-brand-dark"
+              >
+                回复
+              </Text>
+              <Text
+                className="ml-2 font-body text-caption text-ink-faint"
+              >
+                2020-01-01
+              </Text>
+              <Text
+                className="ml-auto font-body text-caption text-brand-dark"
+              >
+                未读
+              </Text>
+            </View>
+            <Text
+              className="mt-2 font-body text-body text-ink"
+            >
+              你的话题收到了新回复
+            </Text>
+          </View>
+        </View>
+      </View>
+      <View
+        className="mb-2"
+      >
+        <View
+          className="flex flex-col p-4 rounded-md bg-paper-light"
+        >
+          <View
+            className="flex flex-row items-center"
+          >
+            <Text
+              className="font-body text-caption font-bold text-brand-dark"
+            >
+              处理结果
+            </Text>
+            <Text
+              className="ml-2 font-body text-caption text-ink-faint"
+            >
+              2020-01-01
+            </Text>
+          </View>
+          <Text
+            className="mt-2 font-body text-body text-ink"
+          >
+            内容已下架
+          </Text>
+        </View>
+      </View>
+      <View
+        className="mb-2"
+      >
+        <View
+          accessibilityLabel="每日一题，今天的每日一题已经准备好，可以写下你的回答"
+          accessibilityRole="button"
+          ariaLabel="每日一题，今天的每日一题已经准备好，可以写下你的回答"
+          ariaRole="button"
+          hoverClass="bg-paper-dark"
+          onClick={[Function]}
+        >
+          <View
+            className="flex flex-col p-4 rounded-md bg-paper-light"
+          >
+            <View
+              className="flex flex-row items-center"
+            >
+              <Text
+                className="font-body text-caption font-bold text-brand-dark"
+              >
+                每日一题
+              </Text>
+              <Text
+                className="ml-2 font-body text-caption text-ink-faint"
+              >
+                2020-01-01
+              </Text>
+              <Text
+                className="ml-auto font-body text-caption text-brand-dark"
+              >
+                未读
+              </Text>
+            </View>
+            <Text
+              className="mt-2 font-body text-body text-ink"
+            >
+              今天的每日一题已经准备好，可以写下你的回答
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  </View>
+</View>
+`;
