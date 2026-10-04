@@ -177,4 +177,5 @@
 | 精华列表变成越权通道 | D12 明确不解除成员校验，并在用例里专测（`listTopics({ featured: true })` 对非成员不返回圈内内容） |
 | M4 / M5 真机未闭合就推进 M6 部署 | 本计划第 7 节第 3 步之前必须完成 M4 签核与 M5 真机验收；否则只在本地与隔离 Dev 环境验证 |
 | 用户可见文案「精选」（前端 `FEATURED_BADGE`）与「精华」（云端提示 / 本文档）用词不一 | FE-M6-02 先沿用前端既有文案不动快照；待 `wording.md` 定稿后一次性统一（TopicCard 徽标、圈内筛选、`markFeatured` 的 40001 提示、`docs/api/*.md`），连带更新快照 |
+| `tcb` CLI 登录账号与项目环境不匹配（2026-10-04 实测） | 现象：`tcb fn list` 报 `[DescribeEnvInfo] env not found in list`，该账号 `env list` 只有另一个环境，同区域加 `-e <envId>` 也绕不过。处置：函数部署前先 `tcb logout && tcb login` 到创建 `TARO_APP_CLOUD_ENV_ID` 那个账号，或改在控制台 / 开发者工具上传；`scripts/ops/*`（集合、索引、录题、函数环境变量）走 `.env` 的 SecretId/Key，不受影响。函数未上线前，`ensure-indexes --apply` 与 `daily-prompt.mjs --apply` 一律按待授权处理 |
 | ~~精华只能由云端动作标记，审核页还没有入口~~ **已落地**（2026-10-04，QA-M6-02） | 审核页行内按钮（`ok` 才可标、撤销不限状态、失败不假装成功）；`queue` 目标快照带 `featured` 供前端判断，用例见 `docs/test/cases/M6.md` 的 M6-A18 |
