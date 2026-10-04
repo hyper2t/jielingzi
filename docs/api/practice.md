@@ -128,3 +128,4 @@
   （提醒可延迟，明晚还会再跑）。
 - **不外发订阅消息**：`_shared/reminder.js` 不读任何环境变量，`practice` 在 `cloudbaserc.json` 里也没有 `envVariables`，
   所以「模板 ID 缺键」这条链路没有对应代码，不会抛错；订阅消息按 D17 后补。
+- **2026-10-04 补记（底层件已就位，尚未接线）**：`_shared/wxmp.js` 新增 `mp.subscribeMessageSend`（`POST /cgi-bin/message/subscribe/send`，`data` 每项自动包成 `{ value }`、非字符串转字符串、`page` / `miniprogram_state` 为空则不带），errcode 分类为 `sent` / `no-quota`（43101 = 没订阅、已取消或额度用完，属正常结果不重试）/ `bad-template`（40037、47003 = 模板或参数问题）/ `failed`，只有传输层失败才外抛；`tests/cloudfunctions/m6-subscribe-send.test.js` 覆盖 6 例。但 `runPromptReminder` **仍不调用它**：额度记录与模板字段映射未定（见 `docs/prd/m6-plan.md` 的 D09b 前提），`practice` 也仍无 `envVariables`。
