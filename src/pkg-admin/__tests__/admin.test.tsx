@@ -1,4 +1,5 @@
-/** FE-M2-02 审核页（仅 mod / admin）+ FE-M2-03 首次发布前公约阅读页 + 「我的」审核入口 */
+/** FE-M2-02 审核页（仅 mod / admin）+ FE-M2-03 首次发布前公约阅读页 + 「我的」审核入口
+ * 精华入口的用例编号登记在 docs/test/cases/M6.md（M6-A18，QA-M6-02）。 */
 import { act, create, ReactTestRenderer } from 'react-test-renderer'
 import Taro from '@tarojs/taro'
 import AdminQueue, { NO_PERMISSION, PASS_LABEL, QUEUE_EMPTY } from '@/pkg-admin/pages/queue/index'
@@ -125,5 +126,125 @@ describe('「我的」审核入口', () => {
     act(() => useUserStore.setState({ account: { ...STATUS, role: 'admin' } }))
     click(r, ADMIN_ENTRY)
     expect(Taro.navigateTo).toHaveBeenLastCalledWith({ url: '/pkg-admin/pages/queue/index' })
+  })
+})
+describe('审核页的精华入口（QA-M6-02）', () => {
+  const seed = (extra: Record<string, unknown> = {}) => {
+    useUserStore.setState({ account: { ...STATUS, role: 'mod' } })
+    mockControl.setAccount({ role: 'mod', adult: true })
+    mockControl.seedTopics([{ title: '值得反复看的话题', body: '正文'.repeat(30), status: 'ok', ...extra }])
+    const id = mockControl.topics[0].id
+    mockControl.seedReports([{ targetType: 'topic', targetId: id, contentType: 'topic', reason: 'other', by: 'u1' }])
+    return id
+  }
+  const featured = () => mockControl.topics[0].featured
+  const sent = () => mockControl.calls.filter(c => c.action === 'markFeatured').map(c => c.data)
+  const toasts = () => (Taro.showToast as jest.Mock).mock.calls.map((c: any) => c[0].title)
+  const danger = (r: any) => hosts(r, n => String((n.props as any).className || '').includes('text-danger')).length
+
+  it('ok 话题给「标为精华」：确认后调 markFeatured(true)、提示已标记，行内按钮翻成「取消精华」', async () => {
+    const id = seed()
+    const r = render(<AdminQueue />)
+    await flush()
+    expect(texts(r)).toContain('标为精华')
+    ;(Taro.showModal as jest.Mock).mockClear()
+    click(r, '标为精华')
+    await flush()
+    expect((Taro.showModal as jest.Mock).mock.calls[0][0].content).toContain('只加标记，不改变可见性与状态')
+    expect(sent()).toEqual([{ topicId: id, featured: true }])
+    expect(featured()).toBe(true)
+    expect(toasts()).toContain('已标为精华')
+    expect(texts(r)).toContain('取消精华')
+    expect(texts(r)).not.toContain('标为精华')
+  })
+
+  it('已是精华的行只显示「取消精华」，点了带 featured:false', async () => {
+    const id = seed({ featured: true })
+    const r = render(<AdminQueue />)
+    await flush()
+    expect(texts(r)).not.toContain('标为精华')
+    click(r, '取消精华')
+    await flush()
+    expect(sent()).toEqual([{ topicId: id, featured: false }])
+    expect(featured()).toBe(false)
+    expect(toasts()).toContain('已取消精华')
+  })
+
+  it('回复条目与待审话题不给「标为精华」；曾标精华但已删除的行仍可撤销（D12 只限制标、不限制撤）', async () => {
+    const id = seed()
+    mockControl.seedReplies([{ topicId: id, body: '这条回复也被举报了' }])
+    mockControl.seedTopics([{ title: '待审的', body: '正文'.repeat(30), status: 'pending' }])
+    const pendingId = mockControl.topics[1].id
+    mockControl.seedTopics([{ title: '被删的精华', body: '正文'.repeat(30), status: 'removed', featured: true }])
+    mockControl.seedReports([
+      { targetType: 'topic', targetId: mockControl.topics[2].id, contentType: 'topic', reason: 'other', by: 'u4' },
+      { targetType: 'reply', targetId: mockControl.replies[0].id, contentType: 'reply', reason: 'abuse', by: 'u2' },
+      { targetType: 'topic', targetId: pendingId, contentType: 'topic', reason: 'other', by: 'u3' },
+    ])
+    const r = render(<AdminQueue />)
+    await flush()
+    expect((texts(r).filter(t => t === '标为精华')).length).toBe(0)
+    expect(texts(r)).toContain('待审')
+    expect((texts(r).filter(t => t === '取消精华')).length).toBe(1)
+  })
+
+  it('点下去时话题已经没了（队列里是兜底快照）：云端 40401，页面不假装成功、可以重试', async () => {
+    useUserStore.setState({ account: { ...STATUS, role: 'mod' } })
+    mockControl.setAccount({ role: 'mod', adult: true })
+    mockControl.seedReports([{ targetType: 'topic', targetId: 'ghost-topic', contentType: 'topic', reason: 'other', by: 'u1' }])
+    const r = render(<AdminQueue />)
+    await flush()
+    expect(texts(r)).toContain('标为精华')
+    click(r, '标为精华')
+    await flush()
+    expect(sent()).toEqual([{ topicId: 'ghost-topic', featured: true }])
+    expect(mockControl.topics).toHaveLength(0)
+    expect(toasts()).not.toContain('已标为精华')
+    expect(danger(r)).toBeGreaterThan(0)
+    expect(r.root.findAll(n => typeof n.type !== 'string' && (n.props as any).label === '标为精华').length).toBe(1)
+  })
+
+  it('未同意协议时点标精华：一个请求都不发（写动作门禁）', async () => {
+    seed()
+    const r = render(<AdminQueue />)
+    await flush()
+    const before = mockControl.calls.length
+    useUserStore.setState({ consent: 'unknown' })
+    click(r, '标为精华')
+    await flush()
+    expect(mockControl.calls.slice(before).filter((c: any) => c.action === 'markFeatured')).toHaveLength(0)
+    expect(featured()).toBe(false)
+    expect(toasts()).not.toContain('已标为精华')
+    expect(danger(r)).toBeGreaterThan(0)
+  })
+
+  it('请求飞行中按钮禁用，连点两次只发一次请求', async () => {
+    seed()
+    mockControl.latency = 300
+    const r = render(<AdminQueue />)
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 420)) })
+    expect(texts(r)).toContain('标为精华')
+    click(r, '标为精华')
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 60)) })
+    const btnProps = () => (r.root.findAll(n => typeof n.type !== 'string' && (n.props as any).label === '标为精华')[0] as any).props
+    expect(btnProps().disabled).toBe(true)
+    click(r, '标为精华')
+    expect(mockControl.calls.filter(c => c.action === 'markFeatured')).toHaveLength(1)
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 520)) })
+    expect(mockControl.calls.filter(c => c.action === 'markFeatured')).toHaveLength(1)
+    expect(featured()).toBe(true)
+    mockControl.latency = 0
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
+  })
+
+  it('取消确认就不发请求（与删除 / 驳回一致）', async () => {
+    seed()
+    const r = render(<AdminQueue />)
+    await flush()
+    ;(Taro.showModal as jest.Mock).mockResolvedValueOnce({ confirm: false })
+    click(r, '标为精华')
+    await flush()
+    expect(mockControl.calls.some(c => c.action === 'markFeatured')).toBe(false)
+    expect(featured()).toBe(false)
   })
 })

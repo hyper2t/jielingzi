@@ -193,7 +193,7 @@ export interface ModQueueItem extends Required<Pick<ReportTarget, 'targetType' |
   reasons: Record<string, number>
   notes: string[]
   latestAt: number
-  target: { status: 'ok' | 'pending' | 'folded' | 'removed', excerpt: string, anon: boolean, authorDeleted: boolean } | null
+  target: { status: 'ok' | 'pending' | 'folded' | 'removed', excerpt: string, anon: boolean, authorDeleted: boolean, featured: boolean } | null
 }
 
 export type ModDecision = 'dismiss' | 'remove' | 'restore' | 'mute' | 'ban'

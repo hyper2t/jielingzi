@@ -4,7 +4,7 @@
  * 覆盖：`createTopic` 的 `slow` 入参与落库字段、冷静期的时间边界（差 1ms 不可回 / 到点可回）、
  * 被拒的回复不扣当日额度也不发机审、作者自己同样受限、已有回复不受影响、旧话题缺字段的兜底、
  * `listTopics` 的 `featured` 筛选（只含 ok、不越圈）、`moderation.markFeatured` 的权限 / 幂等 / mod_logs。
- * 用例编号已登记在 docs/test/cases/M6.md（M6-A06 / M6-A07），三端与真机项见同文件第 2 节。
+ * 用例编号已登记在 docs/test/cases/M6.md（M6-A06 / M6-A07；队列快照的 featured 属 M6-A18），三端与真机项见同文件第 2 节。
  */
 const { test, beforeEach } = require('node:test')
 const assert = require('node:assert/strict')
@@ -300,4 +300,19 @@ test('markFeatured：参数校验——topicId 要合法 id、featured 必填且
     assert.equal(r.code, 40001, JSON.stringify(p))
   }
   assert.equal(logs(db).length, 0)
+})
+test('moderation.queue：目标快照带 featured，审核页据此显示「标为精华 / 取消精华」（QA-M6-02 的入口）', async () => {
+  const db = world({
+    reports: [{ _id: 'q-feat', _openid: ID.alice, targetType: 'topic', targetId: 't-plain', contentType: 'topic', reason: 'other', note: '', state: 'open', createdAt: NOW - HOUR }],
+  })
+  const before = await call(db, 'moderation', 'queue', { page: 1, size: 20 }, ID.mod)
+  assert.equal(before.code, 0)
+  const rowOf = (r) => r.data.list.find((x) => x.targetId === 't-plain')
+  assert.equal(rowOf(before).target.featured, false, '未标精华 → 前端显示「标为精华」')
+  const marked = await call(db, 'moderation', 'markFeatured', { topicId: 't-plain', featured: true }, ID.mod)
+  assert.deepEqual(marked.data, { ok: true, featured: true, changed: true })
+  const after = await call(db, 'moderation', 'queue', { page: 1, size: 20 }, ID.mod)
+  assert.equal(rowOf(after).target.featured, true, '标完再看队列：按钮要翻成「取消精华」')
+  assert.ok(after.data.list.every((x) => x.target === null || typeof x.target.featured === 'boolean'), 'target 里 featured 恒为布尔，前端不用防 undefined')
+  assert.equal('authorUid' in rowOf(after).target, false, '多带一个展示字段不能顺手漏出作者标识')
 })

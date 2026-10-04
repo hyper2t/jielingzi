@@ -173,7 +173,8 @@ async function queue(params, ctx) {
       notes: g.notes,
       latestAt: g.latestAt,
       // 内容快照：状态与摘要；不含任何作者标识
-      target: content ? { status: content.status || 'ok', excerpt: excerpt(content), anon: content.anon === true, authorDeleted: content.authorDeleted === true } : null,
+      // featured 只给审核页决定按钮文案（D12：精华不改变可见性），不含任何作者标识
+      target: content ? { status: content.status || 'ok', excerpt: excerpt(content), anon: content.anon === true, authorDeleted: content.authorDeleted === true, featured: content.featured === true } : null,
     })
   }
   return { list, total: all.length, page: input.page, size: input.size, hasMore: start + input.size < all.length }

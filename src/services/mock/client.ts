@@ -737,8 +737,8 @@ const handlers: Handlers = {
         const g: ModQueueItem = groups.get(key) || {
           targetType: r.targetType, targetId: r.targetId, contentType: r.contentType, count: 0, reasons: {}, notes: [], latestAt: Date.now(),
           target: found
-            ? { status: found.status, excerpt: clip(found.body, 60), anon: !!found.anon, authorDeleted: false }
-            : { status: 'ok', excerpt: `mock 内容 ${r.targetId}`, anon: false, authorDeleted: false }
+            ? { status: found.status, excerpt: clip(found.body, 60), anon: !!found.anon, authorDeleted: false, featured: (found as { featured?: boolean }).featured === true }
+            : { status: 'ok', excerpt: `mock 内容 ${r.targetId}`, anon: false, authorDeleted: false, featured: false }
         }
         g.count++
         g.reasons[r.reason] = (g.reasons[r.reason] || 0) + 1

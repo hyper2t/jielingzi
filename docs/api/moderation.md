@@ -39,7 +39,7 @@
 
 - 入参：`{ state?: 'open' | 'resolved'（默认 open）, page?, size?（≤ 50） }`
 - 出参：`{ list, total, page, size, hasMore }`；list 按目标聚合、按举报人数降序：
-  `{ targetType, targetId, contentType, count（不同举报人数）, reasons: { <reason>: 人数 }, notes（最多 3 条）, latestAt, target: { status, excerpt（≤ 60 字）, anon, authorDeleted } | null }`
+  `{ targetType, targetId, contentType, count（不同举报人数）, reasons: { <reason>: 人数 }, notes（最多 3 条）, latestAt, target: { status, excerpt（≤ 60 字）, anon, authorDeleted, featured } | null }`（`featured` 自 M6 起给出，只为审核页决定显示「标为精华」还是「取消精华」，不改变可见性判定）
 - **不含任何作者 / 举报人标识**
 - 错误：40101、40301（非 mod / admin）
 

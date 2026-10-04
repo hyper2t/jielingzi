@@ -220,7 +220,7 @@ test('审核员没有读圈内内容的特权，但仍能处理：队列只给�
   const q = await modAs(db, ID.mod)({ action: 'queue' })
   assert.equal(q.code, 0)
   assert.equal(q.data.list.length, 1)
-  assert.deepEqual(q.data.list[0].target, { status: 'ok', excerpt: '话题标题 m1', anon: false, authorDeleted: false })
+  assert.deepEqual(q.data.list[0].target, { status: 'ok', excerpt: '话题标题 m1', anon: false, authorDeleted: false, featured: false })
   const s = JSON.stringify(q.data)
   for (const bad of ['circle', 'memberships', '_openid', ID.alice, ID.bob, BODY.slice(0, 10)]) assert.ok(!s.includes(bad), `队列不应包含 ${bad}`)
   const d = await modAs(db, ID.mod)({ action: 'decide', targetType: 'topic', targetId: 'm1', decision: 'remove', note: '疗效承诺' })

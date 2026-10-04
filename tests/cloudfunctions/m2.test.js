@@ -234,7 +234,7 @@ test('queue：仅 mod / admin；按目标聚合（人数、原因分布、补充
   assert.deepEqual(q.data.list.map((i) => [i.targetType, i.targetId, i.count]), [['topic', 't1', 2], ['reply', 'r1', 1]])
   assert.deepEqual(q.data.list[0].reasons, { medical: 1, spam: 1 })
   assert.deepEqual(q.data.list[0].notes.sort(), ['R1 的说明', 'R2 的说明'])
-  assert.deepEqual(q.data.list[0].target, { status: 'ok', excerpt: '如何面对练习中的枯燥期', anon: false, authorDeleted: false })
+  assert.deepEqual(q.data.list[0].target, { status: 'ok', excerpt: '如何面对练习中的枯燥期', anon: false, authorDeleted: false, featured: false }) // featured 只为审核页按钮文案（M6 QA-M6-02），仍不含任何作者标识
   const json = JSON.stringify(q.data)
   for (const id of ['"A"', '"R1"', '"R2"', '_openid', 'targetUid']) assert.ok(!json.includes(id), `不应包含 ${id}`)
   assert.equal((await as(db, 'Adm')({ action: 'queue', page: 2, size: 1 })).data.list[0].targetId, 'r1')

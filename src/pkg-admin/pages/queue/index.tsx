@@ -10,7 +10,7 @@ import { View, Text, Image } from '@tarojs/components'
 import type { MediaQueueItem, ModDecision, ModQueueItem, ReportTarget } from '@/types/models'
 import { Button, Screen, Sheet } from '@/components'
 import { MUTE_DAY_OPTIONS, REPORT_REASONS } from '@/constants/moderation'
-import { decide, decideMedia, getMediaQueue, getQueue } from '@/services/moderation'
+import { decide, decideMedia, getMediaQueue, getQueue, markTopicFeatured } from '@/services/moderation'
 import { errorCode, userFacingMessage } from '@/services/errors'
 import { ERROR_CODES } from '@/services/cloud.types'
 import { useRequest } from '@/hooks/useRequest'
@@ -42,6 +42,12 @@ const CONFIRM: Record<ModDecision, string> = {
 /** 机审待复核（pending）的内容：「通过」= 放行，对他人展示 */
 const PASS_CONFIRM = '通过这条待审内容？会对他人展示'
 export const PASS_LABEL = '通过'
+
+/** 精华入口（QA-M6-02）。用词沿用 docs/prd/wording.md §7 的「精华」；D12 规定只对 `ok` 话题标精华，取消不限状态 */
+export const FEATURE_ON_LABEL = '标为精华'
+export const FEATURE_OFF_LABEL = '取消精华'
+const FEATURE_CONFIRM_ON = '把这条话题标为精华？只加标记，不改变可见性与状态'
+const FEATURE_CONFIRM_OFF = '取消这条话题的精华标记？'
 
 export default function AdminQueue () {
   useTrackPage('admin_queue')
@@ -84,6 +90,23 @@ export default function AdminQueue () {
       showToast('已处理')
       await q.refresh()
     } catch (e) {
+      setError(userFacingMessage(e))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const actFeatured = async (item: ModQueueItem, featured: boolean) => {
+    const res = await Taro.showModal({ title: '确认处理', content: featured ? FEATURE_CONFIRM_ON : FEATURE_CONFIRM_OFF })
+    if (!res || !res.confirm) return
+    setBusy(`${item.targetType}:${item.targetId}`)
+    setError('')
+    try {
+      await markTopicFeatured(item.targetId, featured)
+      showToast(featured ? '已标为精华' : '已取消精华')
+      await q.refresh()
+    } catch (e) {
+      // 失败只报文案，不改本地状态：行还在、按钮还在，可以直接重试
       setError(userFacingMessage(e))
     } finally {
       setBusy('')
@@ -148,6 +171,7 @@ export default function AdminQueue () {
                 {!isUser && st !== 'removed' && <Button variant='text' disabled={!!busy} onClick={() => { void act(item, 'remove') }}>删除</Button>}
                 {!isUser && st === 'removed' && <Button variant='text' disabled={!!busy} onClick={() => { void act(item, 'restore') }}>恢复</Button>}
                 <Button variant='text' disabled={!!busy} onClick={() => { void act(item, 'dismiss') }}>{st === 'folded' ? '驳回并恢复' : st === 'pending' ? PASS_LABEL : '驳回'}</Button>
+                {item.contentType === 'topic' && item.target && (item.target.featured ? <Button variant='text' disabled={!!busy} label={FEATURE_OFF_LABEL} onClick={() => { void actFeatured(item, false) }}>{FEATURE_OFF_LABEL}</Button> : st === 'ok' ? <Button variant='text' disabled={!!busy} label={FEATURE_ON_LABEL} onClick={() => { void actFeatured(item, true) }}>{FEATURE_ON_LABEL}</Button> : null)}
                 <Button variant='text' disabled={!!busy} onClick={() => setMuteFor(item)}>禁言</Button>
                 <Button variant='text' disabled={!!busy} onClick={() => { void act(item, 'ban') }}>封禁</Button>
               </View>
