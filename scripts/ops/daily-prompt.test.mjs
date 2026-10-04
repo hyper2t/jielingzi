@@ -2,6 +2,7 @@
  * OPS-M6-01：`daily-prompt.mjs` 的入参解析、写库计划、只读预览、巡检统计。
  * 验收点（docs/prd/m6-plan.md 第 5 节）：参数解析、预览不写、--apply 幂等 upsert、
  * close 后 todayPrompt 不再返回、audit 对同日多条与未作答的统计。
+ * 用例编号见 docs/test/cases/M6.md（M6-A17）；其中 dup_answer（同人同题多条作答）是 QA-M6-01 为 D7 的并发代价补的观测口径。
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
@@ -242,6 +243,33 @@ test('buildAudit：同日多条、非法 status、超长与脏空白、全被隐
   // 没有 ok 题目的日子都算「今天不出题」：closed-only 的 10-04 与 10-07 也算，只报连续段起点
   assert.deepEqual(r.stats.gaps, ['2026-10-04', '2026-10-06'])
   assert.deepEqual([r.stats.published, r.stats.closedOnly, r.stats.missing, r.stats.answers, r.stats.visible, r.stats.unanswered, r.stats.answered], [2, 2, 3, 1, 0, 1, 1])
+})
+
+test('buildAudit：同人多条作答报 dup_answer（D7 并发双写的观测口径）', async () => {
+  const db = createFakeDb({
+    data: {
+      daily_prompts: [promptDoc('p1', TODAY)],
+      prompt_answers: [
+        answerDoc('a1', 'p1', { createdAt: NOW - 20 }),
+        answerDoc('a2', 'p1', { createdAt: NOW - 10, text: '同一分钟里又交了一次' }),
+        answerDoc('a3', 'p1', { _openid: 'oB', createdAt: NOW }),
+      ],
+    },
+  })
+  const before = snapshot(db)
+  const r = await buildAudit(db, { from: TODAY, days: 1, now: NOW })
+  assert.equal(JSON.stringify(db.store), before, 'audit 只读')
+  const dup = r.issues.find((i) => i.kind === 'dup_answer')
+  assert.ok(dup, `该报同人多条：${JSON.stringify(r.issues.map((i) => i.kind))}`)
+  assert.equal(dup.level, 'warn', '是待人工看一眼，不是故障')
+  assert.match(dup.note, /oA × 2/)
+  assert.ok(!dup.note.includes('oB'), '不同账号各一条不算重复')
+  // 只有一条作答时不该冒出来
+  const single = createFakeDb({
+    data: { daily_prompts: [promptDoc('p1', TODAY)], prompt_answers: [answerDoc('a1', 'p1')] },
+  })
+  const r2 = await buildAudit(single, { from: TODAY, days: 1, now: NOW })
+  assert.ok(!r2.issues.some((i) => i.kind === 'dup_answer'), r2.issues.map((i) => i.kind).join(' '))
 })
 
 test('buildAudit：数据干净时一条问题都不报（录完题后跑它就是绿灯）', async () => {

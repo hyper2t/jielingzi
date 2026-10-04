@@ -3,6 +3,7 @@
  * BE-M6-01：每日一题的今日题目、作答与答案列表（规则见 docs/prd/m6-plan.md D6–D13）。
  * 覆盖：无题目兜底、一人一题一次与额度顺序、字数与参数校验、四类门禁、机审 reject / review、
  * 「已作答才可见他人答案」的可见性与分页、匿名与注销形态、以及与社区一致的拦截文案。
+ * 用例编号见 docs/test/cases/M6.md（M6-A01 … M6-A05；并发双写的已知代价记在 M6-A04，其前端一半由 src/pkg-practice 的连点用例钉住）。
  */
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
@@ -145,6 +146,28 @@ test('answerPrompt：同日第二题由每日额度拦住（42901）', async () 
   assert.equal(second.code, 42901)
   assert.match(second.msg, /今日额度已用完/)
   assert.equal(db.store.prompt_answers.length, 1)
+})
+
+test('answerPrompt：真并发同时提交会双写（D7 明确接受的代价），展示只认最早那条', async () => {
+  const db = world()
+  const main = as(db)
+  const [r1, r2] = await Promise.all([
+    main({ action: 'answerPrompt', promptId: 'prompt-1', text: ANSWER }),
+    main({ action: 'answerPrompt', promptId: 'prompt-1', text: '同一分钟里又交了一次' })
+  ])
+  assert.equal(r1.code, 0)
+  assert.equal(r2.code, 0)
+  // 「每人每题一条」是应用层先查后写（D6：不能建含 _openid 的唯一索引），同 tick 双发挡不住。
+  // 这里钉的是**已接受的后果**：两条都落库、额度各扣一次，多余那条由 ops 的 dup_answer 巡检发现。
+  assert.equal(db.store.prompt_answers.length, 2)
+  assert.equal(used(db, A, 'answerPrompt'), 2, '每日额度只有 1，并发是本动作唯一的漏口')
+  const mine = (await call(db, 'listAnswers', { promptId: 'prompt-1' }, A)).data.mine
+  assert.equal(mine.text, ANSWER, '本人看到的是最早那条（findMyAnswer 按 createdAt 升序取 1）')
+  assert.equal((await call(db, 'listAnswers', { promptId: 'prompt-1' }, B)).code, 40301, '没作答的人一条都看不到')
+  assert.equal((await call(db, 'answerPrompt', answerText(), B)).code, 0)
+  const seen = (await call(db, 'listAnswers', { promptId: 'prompt-1' }, B)).data
+  assert.deepEqual(seen.list.map((r) => r.text), ['想把睡前刷手机的时间换成十分钟静坐', '同一分钟里又交了一次'],
+    '他人列表里会看到同账号的两条——重复条目外露的位置就在这里，今后要按作者去重就改这一处')
 })
 
 test('answerPrompt：题目不存在或已下架 → 40401', async () => {

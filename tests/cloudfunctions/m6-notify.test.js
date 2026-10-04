@@ -5,7 +5,7 @@
  * 复核中的回复、被冷静期挡下的回复都不发）、消息列表的「仅本人 + 倒序分页 + 未读数」、标记已读的越权与幂等、
  * 每日提醒的「当日无题零写入 / 一题只提醒一次 / 门禁过滤 / 翻页扫描」，以及 practice 入口与
  * cloudbaserc.json 触发器的接线（提醒不读任何环境变量，故模板 ID 缺键不可能抛错）。
- * 三端与 QA 清单待 QA-M6-01 登记进 docs/test/cases/M6.md。
+ * 用例编号已登记在 docs/test/cases/M6.md（M6-A08 / M6-A09 / M6-A10），三端与真机项见同文件第 2 节。
  */
 const { test } = require('node:test')
 const assert = require('node:assert/strict')

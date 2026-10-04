@@ -2,6 +2,7 @@
  * FE-M6-03：消息页与「我的」入口（契约见 docs/api/practice.md「站内消息与每日提醒」）。
  * 覆盖：门禁未过不请求、三类标签与时间、点开即已读（含跳转）、不可点的类型不挂点击、
  * 分页追加、标记失败时不假装已读、全部已读，以及「我的」里的未读数与 tabBar 角标。
+ * 用例编号见 docs/test/cases/M6.md（M6-A14）。
  */
 import { act, create, ReactTestRenderer } from 'react-test-renderer'
 import Taro from '@tarojs/taro'

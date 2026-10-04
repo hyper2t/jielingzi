@@ -1,7 +1,7 @@
 # M6 实施计划：每日一题 / 慢话题 / 精华 / 通知
 
 > 范围：PRD §5 T3 / T5 / W3 / N1（`docs/prd/README.md`）、§7.1 与 §7.4 线框中的「每日一题」卡片与「精华」入口。
-> 状态（2026-10-03）：**已评审并部分实现**——D9（署名形态）与 N1（通知范围）由用户当日拍板（见 D9、D17）。已完成的都只在本地、**未部署**：BE-M6-00 与 BE-M6-01（每日一题：今日题目 / 作答 / 答案列表）、FE-M6-00 与 FE-M6-01（前端类型与常量、`services/practice.ts`、mock、练习 Tab 卡片 + 作答页）、BE-M6-02（慢话题 `slowUntil` 与精华 `featured`）、OPS-M6-01（`daily-prompt.mjs` 录题 / 巡检 + 首周题目种子）、FE-M6-02（发帖的慢话题开关、冷静期展示、圈内只看精华、`markTopicFeatured` 接线）、BE-M6-03（`notifications` 三类通知 + `listNotifications` / `markNotificationsRead` + 定时触发器）、FE-M6-03（消息页 + 未读角标 + 订阅授权）。未开工：QA-M6-01、精华标记在审核页的按钮，以及 M4 签核与 M5 真机验收。接口见 [`docs/api/practice.md`](../api/practice.md)「每日一题」。
+> 状态（2026-10-04）：**已评审并部分实现**——D9（署名形态）与 N1（通知范围）由用户当日拍板（见 D9、D17）。已完成的都只在本地、**未部署**：BE-M6-00 与 BE-M6-01（每日一题：今日题目 / 作答 / 答案列表）、FE-M6-00 与 FE-M6-01（前端类型与常量、`services/practice.ts`、mock、练习 Tab 卡片 + 作答页）、BE-M6-02（慢话题 `slowUntil` 与精华 `featured`）、OPS-M6-01（`daily-prompt.mjs` 录题 / 巡检 + 首周题目种子）、FE-M6-02（发帖的慢话题开关、冷静期展示、圈内只看精华、`markTopicFeatured` 接线）、BE-M6-03（`notifications` 三类通知 + `listNotifications` / `markNotificationsRead` + 定时触发器）、FE-M6-03（消息页 + 未读角标 + 订阅授权）。QA-M6-01 已完成（2026-10-04，本地）：`docs/test/cases/M6.md` 登记自动化用例 M6-A01…A17 与三端清单 M6-D01…D09，全量门禁绿、本轮变异验证 8/8 被捕获。未开工：精华标记在审核页的按钮，以及 M4 签核与 M5 真机验收；M6 真机项与订阅送达要等部署窗口，全部记 ⏭ 或受阻。接口见 [`docs/api/practice.md`](../api/practice.md)「每日一题」。
 > 前置：M4 签核（[`docs/ops/release-checklist.md`](../ops/release-checklist.md) 第 7~8 步）与 M5 真机验收（[`docs/test/cases/M5.md`](../test/cases/M5.md)）先闭合；M6 不得先于它们部署到共享环境。
 > 下游：`docs/prd/join-plan.md` 的申请结果通知（V2-1）依赖本里程碑的 N1。
 
@@ -95,7 +95,7 @@
 | ✅ FE-M6-01 | FE | 已完成（2026-10-03，本地）：`features/practice/prompt.ts`（状态机 `none` / `unanswered` / `answered` / `pending`、字数校验、`answerCounter`、署名文案、`promptError` 码表）、`PromptCard.tsx` 挂进练习 Tab、`pkg-practice/pages/prompt` 作答页（默认匿名可切实名、未作答不请求 `listAnswers`、分页「查看更多」、`pending` 只出现在我那条、列表失败可重试且不打断作答）、`utils/router.ts` 的 `prompt` 路由与参数、`app.config.ts` 分包页、`utils/track.ts` 的 `prompt_answer` | 实测：`src/pkg-practice/__tests__/m6.test.tsx` 12 例（卡片 5 + 作答页 7）与 `src/features/practice/__tests__/prompt.test.ts` 全绿，快照 1 个（未作答态卡片）；全量 Jest 40 suites / 551 tests / 32 snapshots | 1d ✔ |
 | ✅ FE-M6-02 | FE | 已完成（2026-10-03，本地）：发起话题页的「慢话题」开关（默认关、开了才带 `slow: true`、随草稿一起保存恢复）；列表卡片与详情页的冷静期展示（未到点只收起回复栏并显示剩余时间，读 / 引用查看 / 举报照常）；圈内话题流「只看精华」筛选（筛选态进 `usePaged` 的 key）；`markTopicFeatured` 服务层接线。契约同步：`models.ts` 的 `TopicSummary.slowUntil` 与 `TopicInput.slow`、`cloud.types.ts` 的 `FunctionMap`（`listTopics` 入参加 `featured`、`moderation.markFeatured`）、`guard.ts` 的 `WRITE_ACTIONS.moderation`、`mock/client.ts`（create 落 `slowUntil` / list 按 `featured` 筛 / createReply 冷静期闸门 / markFeatured handler）与云函数同口径 | 实测：新增 `src/pkg-community/__tests__/m6.test.tsx` 6 例（开关与发布入参、草稿恢复、锁回复栏、到点放开、筛选透传与重新取数、精华空态）；`rules.test.ts` +6 例（`slow` 只在为真时下发、文案与 `TOPIC_RULES.slowHours` 同源、`isReplyLocked` 到点即解锁的边界、剩余时间给准数、40901 透出云端中文、老草稿缺字段不炸）；`topic-card` +1 例；`community-topics` +6 例（含 markFeatured 权限与状态校验、缓存失效、话题流版本、未同意不发请求）；全量 Jest **41 suites / 570 tests / 32 snapshots**、`tsc --noEmit` 0 错、`test:functions` 261/261、`test:ops` 47/47；**变异验证 17 处全部被捕获**（含「到点仍算锁住」「筛选没传下去」「切换不重新取数」「markFeatured 不校验状态」「锁住时整块提示消失」） | 0.5d ✔ |
 | ✅ FE-M6-03 | FE | 已完成（2026-10-04，本地）：`features/notify/`——`rules.ts`（三类标签、`formatPostTime` 时间口径、「能不能点开」只看 `type` + `refType` + `refId`、分页合并与就地标已读）、`subscribe.ts`（订阅授权，缺配置即跳过、失败静默）、`badge.ts`（weapp tabBar 角标，best-effort）；`services/practice.ts` 的 `listNotifications` / `notificationsUnread` / `markNotificationsRead` 与 `NOTIFICATIONS_KEY`；`pkg-community/pages/messages`；「我的」入口显示未读数并同步角标；提交回答成功后才请求订阅授权。契约同步：`models.ts` 的 `AppNotification` / `NotificationPage` / `MarkReadResult`、`cloud.types.ts` 两个动作、`guard.ts` 的写动作、`app.config.ts` 分包页、`router.ts` 的 `messages` 路由、`mock/client.ts` 两个 handler（校验顺序、倒序、`unread` 只数自己的、1–100 上限）与「回复别人话题 → 作者收到消息」的联动 | 实测：新增 3 个测试文件 54 例；全量 Jest **44 suites / 628 tests / 33 snapshots**、变异验证 29 处全部被捕获、`tsc --noEmit` 0 错、`test:functions` 287/287、`test:ops` 47/47，改动文件 eslint 只剩 `mock/client.ts` 的 6 条既有债。**三端**按 `TARO_ENV` 分支在 jsdom 下覆盖（weapp 走角标与订阅、h5 / rn 只站内），真机与订阅送达留到 `QA-M6-01` 登记；模板 ID 未到位前「实际送达」一项记受阻、不得标通过 | 1d ✔ |
-| QA-M6-01 | QA | `docs/test/cases/M6.md`：作答可见性、每日一次与并发、慢话题时间边界、精华权限、通知去重与送达、越权专项 | 自动化 + 变异验证通过；三端清单登记 | 0.5d |
+| ✅ QA-M6-01 | QA | 已完成（2026-10-04，本地）：`docs/test/cases/M6.md` 登记 M6-A01…A17（作答可见性、每日一次与并发、慢话题时间边界、精华权限、通知去重与送达、越权专项、前后端同源、运维巡检）+ M6-D01…D09 三端清单；顺手补三处此前缺的自动化——云函数「同 tick 并发双写」真实代价（M6-A04）、前端连点保护（`loading` / `disabled` 两道）、`audit` 的 `dup_answer` 巡检（D7 承诺的观测口径此前并不存在） | 实测：Jest **44 suites / 629 tests / 33 snapshots**、`test:functions` 288/288、`test:ops` 48/48、`tsc --noEmit` 0 错；变异验证 **8/8 被捕获**（单摘第三道 `busy` 早退不转红，已记为与 UI 层互为冗余）；云端未部署 → 真机 D01–D08 待执行、D09 订阅送达受阻，M6 不签核 | 0.5d ✔ |
 | DOC-M6 | PM / BE | 契约定稿、`docs/ops/collections.md` 索引表、`wording.md` 补「每日一题 / 慢话题 / 精华」措辞规范（含题目与提醒文案送审） | 文档与实现一致 | 随各项 |
 
 合计约 6~6.5 个工作日（含并行）。依赖：BE-M6-00 → 01 / 02 / 03；FE-M6-00 可与 BE 并行（先 mock）；OPS-M6-01 在 BE-M6-00 之后；FE-M6-01~03 在 FE-M6-00 之后。
@@ -105,7 +105,7 @@
 - 云函数（`tests/cloudfunctions/m6-prompt.test.js`）：`todayPrompt` 无题目 / `closed` / 只取 `ok`；`answerPrompt` 的 40001（字数与未知字段）、40302 / 40303 / 40304、40901（重复作答）、42901（当日额度）、机审三态；`listAnswers` 未作答 40301、只返回 `ok`、返回体无身份字段。
 - 云函数（`m6-slow-featured.test.js`）：`slowUntil` 边界（差 1ms 不可回、到期可回）、已有回复不受影响、非 mod 标记 40301、`markFeatured` 写 `mod_logs` 且二次调用幂等、`listTopics({ featured: true })` 不越圈。
 - 云函数（`m6-notify.test.js`）：`(uid, type, refId)` 去重、未读数、分页、触发器入口在无题目时零写入、无模板 ID 时不外发且不抛错。
-- 运维：`daily-prompt.mjs` 预览不写 / `--apply` 幂等 upsert / `close` 后 `todayPrompt` 不再返回；`audit` 对同日多条给出可读输出。
+- 运维：`daily-prompt.mjs` 预览不写 / `--apply` 幂等 upsert / `close` 后 `todayPrompt` 不再返回；`audit` 对同日多条题目与同人同题多条作答（`dup_answer`，warn）给出可读输出。
 - 前端：卡片状态机（未作答 / 已作答 / 审核中 / 无题目）、`pending` 与 `ok` 的展示差异、未作答时不请求 `listAnswers`、订阅授权只在主动操作后触发一次、失败静默。
 - 变异验证（M3 起的习惯）：去掉「已作答」前置查询、去掉 `slowUntil` 校验、去掉 `listAnswers` 的成员前置（改为不判作答）、去掉通知去重查询——每种都要让对应用例转红，探针后恢复。
 
@@ -171,7 +171,7 @@
 | ~~★「作答是否署名」未定~~ **已定**（2026-10-03：可选匿名、默认匿名，见 D9） | 若日后要展示更多身份信息（头像 / 徽章 / 练习年限），须同步隐私政策与 `wording.md`，并补「他人可否反查练习者身份」的越权用例 |
 | ★ 订阅消息模板 ID 未申请 | 阻塞 FE-M6-03 的真实送达验收（`QA-M6-01` 的「订阅消息实际送达」项在模板到位前记为受阻，不得标为通过） |
 | ★ 题目文案与提醒文案需法务 / 措辞审阅 | 走 `wording.md` §1 / §2 流程；未通过前不 `--apply` 写题 |
-| 并发双写导致同日多条答案（D7） | `daily-prompt.mjs audit` 观测；若内测真实出现，再评估把 `prompt_answers` 的注销语义从 `detach` 改成删除并补唯一索引 |
+| 并发双写导致同日多条答案（D7） | **观测已落地**（2026-10-04，QA-M6-01）：`daily-prompt.mjs audit` 的 `dup_answer`（warn）+ 云函数 M6-A04 与前端连点用例各钉一条；若内测真实出现，再评估把 `prompt_answers` 的注销语义从 `detach` 改成删除并补唯一索引 |
 | 提醒定时触发器成本与时区 | 每日一次、08:00 北京时间（控制台时区待部署时核对）；无题目即早退；触发器重跑由 `(uid, type, refId)` 去重兜住。**已按此实现**；另记一笔：定时事件不是安全边界，靠「不收业务参数 + 不回数据 + 幂等」兜，真隔离要等平台侧「仅平台调用」配置 |
 | 精华列表变成越权通道 | D12 明确不解除成员校验，并在用例里专测（`listTopics({ featured: true })` 对非成员不返回圈内内容） |
 | M4 / M5 真机未闭合就推进 M6 部署 | 本计划第 7 节第 3 步之前必须完成 M4 签核与 M5 真机验收；否则只在本地与隔离 Dev 环境验证 |

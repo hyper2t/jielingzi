@@ -262,6 +262,18 @@ export async function buildAudit (db, { from, days, now = Date.now() }) {
     if (answers) stats.answered += 1
     else stats.unanswered += 1
     if (answers > 0 && visible === 0) issues.push({ level: 'warn', date, kind: 'all-hidden', note: `${prompt._id} 有 ${answers} 条作答但可见 0 条（都卡在待复核 / 已处理，看看机审是不是出问题了）` })
+
+    if (answers > 1) {
+      // 「每人每题一条」是应用层判断（见 m6-plan D6 / D7），真并发会漏，所以巡检负责把它观测出来
+      const rows = await scan(db, ANSWERS, { promptId: prompt._id })
+      const byUid = new Map()
+      for (const a of rows) byUid.set(a._openid, (byUid.get(a._openid) || 0) + 1)
+      const dups = [...byUid.entries()].filter(([, n]) => n > 1)
+      if (dups.length) {
+        const who = dups.map(([uid, n]) => `${uid} × ${n}`).join('、')
+        issues.push({ level: 'warn', date, kind: 'dup_answer', note: `${prompt._id} 有同人多条作答（${who}）：本人只会看到最早那条，但他人列表里会重复出现（m6-plan D7 的已知代价，需要人工决定要不要清）` })
+      }
+    }
   }
   const orphans = (await scan(db, ANSWERS, { date: db.command.in(dates) })).filter((a) => !byId.has(a.promptId))
   if (orphans.length) {

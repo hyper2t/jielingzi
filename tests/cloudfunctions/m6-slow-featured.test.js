@@ -4,7 +4,7 @@
  * 覆盖：`createTopic` 的 `slow` 入参与落库字段、冷静期的时间边界（差 1ms 不可回 / 到点可回）、
  * 被拒的回复不扣当日额度也不发机审、作者自己同样受限、已有回复不受影响、旧话题缺字段的兜底、
  * `listTopics` 的 `featured` 筛选（只含 ok、不越圈）、`moderation.markFeatured` 的权限 / 幂等 / mod_logs。
- * 三端与 QA 清单待 QA-M6-01 登记进 docs/test/cases/M6.md。
+ * 用例编号已登记在 docs/test/cases/M6.md（M6-A06 / M6-A07），三端与真机项见同文件第 2 节。
  */
 const { test, beforeEach } = require('node:test')
 const assert = require('node:assert/strict')

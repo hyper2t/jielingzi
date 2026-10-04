@@ -2,6 +2,7 @@
  * FE-M6-01：练习 Tab 的「每日一题」卡片与作答页（走 mock 云端）。
  * 覆盖：无题目不渲染、状态机（未作答 / 已作答 / 审核中）、默认匿名、前端校验不发请求、
  * 「未作答时不请求 listAnswers」、他人答案只渲染可见条目、分页「查看更多」、40901 与 42901 的提示。
+ * 用例编号见 docs/test/cases/M6.md（M6-A11；连点保护那一例同时钉住 M6-A04 的前端半）。
  */
 import Taro from '@tarojs/taro'
 import { act, create, ReactTestRenderer } from 'react-test-renderer'
@@ -145,6 +146,27 @@ describe('每日一题作答页', () => {
     expect(texts(mounted!)).toContain('其他人的回答')
   })
 
+  it('连点两次提交只发一次请求（前端这一层先把 D7 的并发双写挡住）', async () => {
+    mockControl.latency = 300 // 让第一次提交保持在飞行中，第二次点击才会撞到 loading
+    mockControl.seedPrompts([{ text: QUESTION }])
+    ;(Taro as any).__routerParams = { promptId: 'p1', date: today }
+    act(() => { mounted = create(<PromptAnswerPage />) })
+    await flush()
+    typeByLabel(mounted!, '我的回答', GOOD)
+    clickByLabel(mounted!, '提交回答')
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 60)) })
+    // 飞行中的两道减法：提交按钮进 loading（Button 用它吞点击）、输入框 disabled
+    expect(mounted!.root.findAll(n => typeof n.type !== 'string' && (n.props as any).loading === true)).toHaveLength(1)
+    expect(mounted!.root.findAll(n => (n.props as any).ariaLabel === '我的回答' && (n.props as any).disabled === true).length).toBeGreaterThan(0)
+    clickByLabel(mounted!, '提交回答')
+    expect(callsOf('answerPrompt')).toHaveLength(1)
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 500)) })
+    expect(callsOf('answerPrompt')).toHaveLength(1)
+    expect(mockControl.promptAnswers).toHaveLength(1)
+    // 把这一例发出的请求全部等落地，别让 300ms 的延迟渗到下一例
+    mockControl.latency = 0
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
+  })
   it('切到实名后提交：mock 与云端一致地记 anon=false', async () => {
     mockControl.seedPrompts([{ text: QUESTION }])
     ;(Taro as any).__routerParams = { promptId: 'p1', date: today }
