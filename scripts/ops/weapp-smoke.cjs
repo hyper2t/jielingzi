@@ -4,6 +4,7 @@
  * 用法：node scripts/ops/weapp-smoke.cjs [dist]
  */
 const fs = require('fs'), path = require('path'), vm = require('vm')
+
 const root = path.resolve(process.argv[2] || 'dist')
 const noop = () => {}
 const sys = { platform: 'devtools', windowWidth: 375, windowHeight: 667, statusBarHeight: 20, pixelRatio: 2, SDKVersion: '3.5.0', version: '8.0.0', language: 'zh_CN', system: 'iOS 16', model: 'iPhone', screenWidth: 375, screenHeight: 667, safeArea: { top: 20, bottom: 667, left: 0, right: 375, width: 375, height: 647 }, theme: 'light' }
@@ -32,6 +33,7 @@ vm.createContext(ctx)
 function load (rel) {
   if (loaded.has(rel)) return; loaded.add(rel)
   const p = path.join(root, rel)
+  if (!fs.existsSync(p)) { console.log('skip (missing chunk)', rel); return }
   const code = fs.readFileSync(p, 'utf8')
   try { vm.runInContext(code, ctx, { filename: rel }) ; console.log('loaded', rel) } catch (e) { console.log('THROW in', rel, '::', e && e.message, '\n', String(e && e.stack).split('\n').filter(l => /^\s+at /.test(l)).slice(0,8).join('\n')) }
 }
@@ -42,7 +44,11 @@ try {
   if (a && a.onLaunch) { a.onLaunch({ path: 'pages/index/index', query: {}, scene: 1001 }); console.log('app.onLaunch ok') }
 } catch (e) { console.log('THROW in app.onLaunch ::', e && e.message, '\n', String(e && e.stack).split('\n').filter(l => /^\s+at /.test(l)).slice(0,8).join('\n')) }
 const walk = (d) => fs.readdirSync(path.join(root, d), { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(d + '/' + e.name) : (e.name === 'index.js' ? [d + '/' + e.name] : []))
-const allPages = [...walk('pages'), ...walk('pkg-user')]
+const cfg = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'))
+const subs = (cfg.subpackages || cfg.subPackages || []).map(s => s && s.root).filter(r => r && fs.existsSync(path.join(root, r)))
+const roots = [...new Set(['pkg-user', ...subs])].filter(r => r !== 'pages')
+const allPages = [...walk('pages'), ...roots.flatMap(r => walk(r))]
+console.log('subpackage roots:', roots.join(', '))
 console.log('page files:', allPages.join(', '))
 for (const pg of allPages) load(pg)
 console.log('pages registered:', pages.length)

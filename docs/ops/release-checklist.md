@@ -37,6 +37,8 @@
 7. ☐ 手工复核待办：M4-D01 的非成员浏览开放圈子列表 / 简介 / 公约可由获批的 18+ QA 非成员独立执行，不依赖 grant / issue；其余依赖成员、邀请码或圈内测试内容的用例按 `docs/test/cases/M4.md` 逐项准备 QA 账号与数据。小程序、iOS、Android 结果均须留证；不得把未执行的独立用例一并标为受阻，也不得据此签 M4 上线。
 8. ☐ 发客户端（小程序提审、App 打包）；须待三端 QA 通过并签核后执行。
 
+9. ✅ 2026-10-04 只读盘点与工具补齐（用户授权范围：只建缺失索引）：`tcb` CLI 换账号后能列出本环境 5 个函数（`practice` 仍是 10-02 版本，M6 代码未上线）；`ensure-indexes.mjs --apply` 补建 `prompt_answers.idx_prompt_list`，复核 28 条索引齐、`conflicts 0`；`daily_prompts` 仍 0 条题，`audit` 输出「没问题 ✓」。另把 `scripts/ops/weapp-smoke.cjs` 从「只扫主包 + pkg-user」改为按 `app.json` 的 `subpackages` 扫全部分包（17 个页面全加载、14 个注册页 onLoad 全通过、0 抛错），并让它在缺 chunk 文件时打印 `skip (missing chunk)`。顺带记一条常态：`pkg-community` 各页页首都 `require("../../sub-vendors.js")` 而 dist 只输出 `vendors.js`，M4 已验收的 `topic` / `circles` 也一样——不是缺陷，但真机白屏时先查这里。步骤 7（非成员浏览与圈成员 / 邀请码相关）与步骤 8（提审、发客户端）仍需人工与设备，M4 尚未签核。
+
 名额增发（手动）：`node scripts/ops/invite-quota.mjs --report` 看本月有效回复榜，再 `--account <id> --add N --apply`。
 
 每日一题录题（手动，OPS-M6-01）：`node scripts/ops/daily-prompt.mjs set --from-file scripts/ops/daily-prompt.seed.json` 预览 → 确认后加 `--apply`；当天要撤 `close --date … --apply`（只改 `status`，正文留着）；录完 `audit` 期望只输出「没问题 ✓」。索引侧待办 1 个：`prompt_answers.idx_prompt_list`，须用户授权后 `ensure-indexes.mjs --apply`。
