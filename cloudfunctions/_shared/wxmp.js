@@ -21,6 +21,11 @@ const EARLY_REFRESH_MS = 5 * 60 * 1000
 const TOKEN_ERRCODES = [40001, 40014, 42001]
 /** 手机号 code 无效（已使用 / 过期 / 不属于该用户） */
 const PHONE_CODE_ERRCODES = [40029, 40163, 41008]
+/** 订阅消息：用户未订阅 / 已取消 / 本次额度用完 —— 正常业务结果，不该重试 */
+const SUBSCRIBE_NO_QUOTA_ERRCODES = [43101]
+/** 订阅消息：模板 ID 不属于本小程序，或参数不符合模板要求 —— 配置问题 */
+const SUBSCRIBE_BAD_TEMPLATE_ERRCODES = [40037, 47003]
+
 
 function cleanEnv(v) {
   if (typeof v !== 'string') return null
@@ -131,7 +136,37 @@ function createMpClient(env, opts = {}) {
     return { traceId: data.trace_id }
   }
 
-  return { appId, getAccessToken, getPhoneNumber, msgSecCheck, mediaCheckAsync, postJson }
+  /**
+   * 一次性订阅消息发送（D14 / ★D17 的订阅通道底层件）：POST /cgi-bin/message/subscribe/send。
+   * 只回结论、不抛业务错：微信侧 errcode 一律映射成 outcome，由调用方决定要不要扣额度 / 记日志；
+   * 只有传输层失败（postJson 里的 upstream）才外抛，交回「提醒可以晚发」的既有口径吞掉。
+   * - 'no-quota'：43101 = 用户没订阅 / 已取消 / 本次额度用完，属正常结果，重试没有意义；
+   * - 'bad-template'：模板 ID 与小程序不匹配或参数不合模板要求（40037 / 47003），是配置问题，要能报警但不该影响站内提醒；
+   * - 'failed'：其它 errcode（频控、系统繁忙等），本次不发，额度按调用方语义保留；
+   * - data 的每一项按微信要求包成 { value }，非字符串统一转字符串、null / undefined 退化成空串。
+   */
+  async function subscribeMessageSend({ toUser, templateId, page = '', data = {}, miniprogramState = 'formal', lang = 'zh_CN' } = {}) {
+    const toUserTrimmed = typeof toUser === 'string' ? toUser.trim() : ''
+    const tpl = typeof templateId === 'string' ? templateId.trim() : ''
+    if (!toUserTrimmed || !tpl) throw badParam('订阅消息缺少收件人或模板 ID')
+    const body = { touser: toUserTrimmed, template_id: tpl, lang }
+    if (page) body.page = page
+    if (miniprogramState) body.miniprogram_state = miniprogramState
+    const fields = {}
+    for (const [key, value] of Object.entries(data || {})) {
+      fields[key] = { value: typeof value === 'string' ? value : String(value == null ? '' : value) }
+    }
+    body.data = fields
+    const res = await postJson('/cgi-bin/message/subscribe/send', body)
+    const errcode = Number(res.errcode) || 0
+    if (!errcode) return { outcome: 'sent', errcode: 0 }
+    const errmsg = typeof res.errmsg === 'string' ? res.errmsg.slice(0, 64) : undefined
+    if (SUBSCRIBE_NO_QUOTA_ERRCODES.includes(errcode)) return { outcome: 'no-quota', errcode }
+    if (SUBSCRIBE_BAD_TEMPLATE_ERRCODES.includes(errcode)) return { outcome: 'bad-template', errcode, errmsg }
+    return { outcome: 'failed', errcode, errmsg }
+  }
+
+  return { appId, getAccessToken, getPhoneNumber, msgSecCheck, mediaCheckAsync, postJson, subscribeMessageSend }
 }
 
-module.exports = { createMpClient, MP_TOKEN_ERRCODES: TOKEN_ERRCODES, MP_PHONE_CODE_ERRCODES: PHONE_CODE_ERRCODES }
+module.exports = { createMpClient, MP_TOKEN_ERRCODES: TOKEN_ERRCODES, MP_PHONE_CODE_ERRCODES: PHONE_CODE_ERRCODES, MP_SUBSCRIBE_NO_QUOTA_ERRCODES: SUBSCRIBE_NO_QUOTA_ERRCODES, MP_SUBSCRIBE_BAD_TEMPLATE_ERRCODES: SUBSCRIBE_BAD_TEMPLATE_ERRCODES }
