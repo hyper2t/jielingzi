@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /cloud-admin/
+Disallow: /__auth/
+
