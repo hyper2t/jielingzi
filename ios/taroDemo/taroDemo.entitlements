@@ -10,7 +10,7 @@
 	-->
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:TODO-your-universal-link-host.example.com</string>
+		<string>applinks:jielingzi.cn</string>
 	</array>
 	<!-- 通过 Apple 登录（NA-L04，App Store 审核指南 4.8） -->
 	<key>com.apple.developer.applesignin</key>

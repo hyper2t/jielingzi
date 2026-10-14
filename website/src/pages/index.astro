@@ -1,0 +1,31 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Hero from '../components/home/Hero.astro';
+import Why from '../components/home/Why.astro';
+import Features from '../components/home/Features.astro';
+import Circles from '../components/home/Circles.astro';
+import Safety from '../components/home/Safety.astro';
+import Faq from '../components/home/Faq.astro';
+import Join from '../components/home/Join.astro';
+
+// SEO / 分享卡片信息(与旧站一致)
+const meta = {
+  "title": "结灵子 · 练习者的深度交流社区",
+  "description": "结灵子是冥想、正念、太极、站桩、瑜伽等身心练习同好的深度交流社区：邀请制圈子、长文话题、练习计时与打卡。无广告、无推荐算法。",
+  "keywords": "结灵子,冥想,正念,太极,站桩,瑜伽,练习记录,深度交流社区",
+  "ogTitle": "结灵子 · 练习者的深度交流社区",
+  "ogDescription": "慢慢聊，认真记录。邀请制圈子 · 长文话题 · 练习计时与打卡。",
+  "ogType": "website"
+};
+---
+<Layout home {...meta}>
+  <main id="main">
+    <Hero />
+    <Why />
+    <Features />
+    <Circles />
+    <Safety />
+    <Faq />
+    <Join />
+  </main>
+</Layout>

@@ -1,0 +1,5 @@
+---
+// 品牌标记(“结”字双环 + 一粒“子”)。big 用于页面底部“加入”区的大号版本。
+const { big = false } = Astro.props;
+---
+<svg class={big ? 'mark big' : 'mark'} viewBox="0 0 120 120" aria-hidden="true"><path d="M60 68 C70 56,84 50,96 54 C108 58,108 76,96 80 C84 84,70 78,60 68 C50 58,36 52,24 56 C12 60,12 78,24 82 C36 86,50 80,60 68 Z" fill="none" stroke="currentColor" stroke-width={big ? 4 : 6} stroke-linecap="round" stroke-linejoin="round"/><circle cx="61" cy="40" r={big ? 5.5 : 6.5} fill="currentColor"/></svg>

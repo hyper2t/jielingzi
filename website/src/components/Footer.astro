@@ -1,0 +1,16 @@
+---
+import Logo from './Logo.astro';
+// home=true:首页页脚(年份由 site.js 在浏览器端更新);否则为子页面页脚。
+const { home = false } = Astro.props;
+---
+{home ? (
+  <footer class="foot">
+    <div class="wrap foot-inner">
+      <div class="brand"><Logo /><span>结灵子</span></div>
+      <nav class="foot-links"><a href="/rules.html">社区公约</a><a href="#safety">安全与边界</a><a href="#faq">常见问题</a></nav>
+      <p class="copy">© <span id="y">2026</span> 结灵子 · 练习不能代替医疗，如有身心不适请及时就医。</p>
+    </div>
+  </footer>
+) : (
+  <footer class="foot"><div class="wrap foot-inner"><div class="brand"><Logo /><span>结灵子</span></div><nav class="foot-links"><a href="/">首页</a><a href="/rules.html">社区公约</a><a href="/#faq">常见问题</a></nav><p class="copy">© 2026 结灵子 · 练习不能代替医疗，如有身心不适请及时就医。</p></div></footer>
+)}

@@ -1,0 +1,25 @@
+---
+import Logo from './Logo.astro';
+// home=true:首页导航(锚点 + 主导航);否则为子页面精简导航(回首页 + 加入内测)。
+const { home = false } = Astro.props;
+---
+{home ? (
+  <header class="nav" id="top">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top" aria-label="结灵子 首页">
+        <Logo />
+        <span>结灵子</span>
+      </a>
+      <nav class="links" aria-label="主导航">
+        <a href="#why">理念</a>
+        <a href="#features">功能</a>
+        <a href="#circles">圈子</a>
+        <a href="#safety">安全</a>
+        <a href="#faq">问答</a>
+      </nav>
+      <a class="btn btn-sm" href="#join">加入内测</a>
+    </div>
+  </header>
+) : (
+  <header class="nav"><div class="wrap nav-inner"><a class="brand" href="/"><Logo /><span>结灵子</span></a><a class="btn btn-sm" href="/#join" style="margin-left:auto">加入内测</a></div></header>
+)}

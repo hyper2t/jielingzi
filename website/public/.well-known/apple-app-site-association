@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["APPLE_TEAM_ID.com.jielingzi.app"],
+        "components": [
+          {
+            "/": "/app/*",
+            "comment": "微信授权等流程经 https://jielingzi.cn/app/... 回跳 App;路径须与 .env 的 TARO_APP_WX_UNIVERSAL_LINK 一致"
+          }
+        ]
+      }
+    ]
+  }
+}

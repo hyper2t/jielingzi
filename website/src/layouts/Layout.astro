@@ -1,0 +1,41 @@
+---
+import '../styles/site.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+  keywords?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogType?: string;
+  /** 首页:显示完整导航/页脚与“跳到正文”链接 */
+  home?: boolean;
+}
+const { title, description, keywords, ogTitle, ogDescription, ogType, home = false } = Astro.props;
+---
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
+{description && <meta name="description" content={description}>}
+{keywords && <meta name="keywords" content={keywords}>}
+<meta name="theme-color" content="#F7F8F2">
+{ogTitle && <meta property="og:title" content={ogTitle}>}
+{ogDescription && <meta property="og:description" content={ogDescription}>}
+{ogType && <meta property="og:type" content={ogType}>}
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body class="no-js">
+{home && <a class="skip" href="#main">跳到正文</a>}
+<Header home={home} />
+<slot />
+<Footer home={home} />
+<script>
+  import '../scripts/site.js';
+</script>
+</body>
+</html>
