@@ -136,7 +136,7 @@ export default function AccountSection () {
           <Text {...tw('font-body text-caption text-ink-soft mt-1')}>{DELETE_ACCOUNT_CONFIRM}</Text>
           <View {...tw('flex flex-row items-center min-h-touch px-3 mt-3 rounded-md bg-paper')}>
             <Input
-              {...tw('flex-1 font-body text-body text-ink')}
+              {...tw('flex-1 font-body text-body rn-input text-ink')}
               value={word}
               maxlength={4}
               placeholder={`请输入「${DELETE_ACCOUNT_WORD}」以确认`}

@@ -65,7 +65,7 @@ export default function CirclePage () {
 
   return (
     <Screen
-      nav={{ title: circle?.name || '圈子' }}
+      nav={{ title: circle?.name || '圈子', showBack: true }}
       status={status}
       emptyText={emptyText}
       emptyActionText={emptyActionText}

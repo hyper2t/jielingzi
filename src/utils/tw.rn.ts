@@ -126,6 +126,13 @@ function convertUnit (token: string): string {
   return token.replace(UNIT_RE, `[${Math.round(px * 100) / 100}px]`)
 }
 
+/**
+ * 单行 Input 专用（只在 RN 端生效，小程序 / H5 没有这个类、不受影响）：
+ * iOS TextInput 的 lineHeight 大于字号时文字与 placeholder 下沉，等于字号又会裁掉霞鹜文楷的上半部，
+ * 所以直接去掉行高、去掉上下内边距，交给原生按字体度量垂直居中。用法：tw('flex-1 font-body text-body rn-input text-ink')
+ */
+const RN_INPUT = { lineHeight: undefined, paddingTop: 0, paddingBottom: 0, paddingVertical: 0 }
+
 const cache = new Map<string, object>()
 const CACHE_LIMIT = 4000
 
@@ -141,6 +148,7 @@ function resolve (classes: string): object {
   classes.split(/\s+/).forEach(raw => {
     let c = raw.charAt(0) === '!' ? raw.slice(1) : raw
     if (!c) return
+    if (c === 'rn-input') { extras.push(RN_INPUT); return }
     if (has(RN_SHADOWS, c)) { extras.push(RN_SHADOWS[c]); return }
     if (has(SCREEN_SIZE, c)) { extras.push(SCREEN_SIZE[c](windowSize())); return }
     if (has(RENAME, c)) c = RENAME[c]

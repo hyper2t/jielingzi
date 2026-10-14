@@ -82,7 +82,7 @@ export default function ProfileEdit () {
       showToast(AVATAR_SUBMITTED)
     } catch (e) {
       if (needsAdultConfirm(e)) void navigate('adult', { reason: '上传头像' })
-      else setErrors(er => ({ ...er, avatar: userFacingMessage(e) }))
+      else { const msg = userFacingMessage(e); setErrors(er => ({ ...er, avatar: msg })) }
     } finally {
       setUploading(false)
     }
@@ -197,7 +197,7 @@ export default function ProfileEdit () {
         <Field label='昵称' hint={counter(form.nickname, TEXT_RULES.nickname.max)} error={errors.nickname}>
           <View {...tw('flex flex-row items-center min-h-touch-kid px-4 rounded-md bg-paper-light')}>
             <Input
-              {...tw('flex-1 font-body text-body text-ink')}
+              {...tw('flex-1 font-body text-body rn-input text-ink')}
               value={form.nickname}
               maxlength={32}
               placeholder={`${TEXT_RULES.nickname.min}–${TEXT_RULES.nickname.max} 个字`}
@@ -232,7 +232,7 @@ export default function ProfileEdit () {
         <Field label='练习年限' hint='选填' error={errors.years}>
           <View {...tw('flex flex-row items-center min-h-touch-kid px-4 rounded-md bg-paper-light')}>
             <Input
-              {...tw('flex-1 font-body text-body text-ink')}
+              {...tw('flex-1 font-body text-body rn-input text-ink')}
               type='number'
               value={form.years}
               maxlength={2}
@@ -248,7 +248,7 @@ export default function ProfileEdit () {
         <Field label='当前目标' hint={counter(form.goal, TEXT_RULES.goal.max)} error={errors.goal}>
           <View {...tw('flex flex-row items-center min-h-touch-kid px-4 rounded-md bg-paper-light')}>
             <Input
-              {...tw('flex-1 font-body text-body text-ink')}
+              {...tw('flex-1 font-body text-body rn-input text-ink')}
               value={form.goal}
               maxlength={60}
               placeholder='如：每天静坐 20 分钟（选填）'
@@ -262,7 +262,7 @@ export default function ProfileEdit () {
         <Field label='一句话介绍' hint={counter(form.bio, TEXT_RULES.bio.max)} error={errors.bio}>
           <View {...tw('flex flex-row items-center min-h-touch-kid px-4 rounded-md bg-paper-light')}>
             <Input
-              {...tw('flex-1 font-body text-body text-ink')}
+              {...tw('flex-1 font-body text-body rn-input text-ink')}
               value={form.bio}
               maxlength={120}
               placeholder='介绍一下你的练习（选填）'

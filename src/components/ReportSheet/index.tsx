@@ -92,7 +92,7 @@ export default function ReportSheet ({ open, target, onClose, onDone }: ReportSh
         })}
         <View {...tw('flex flex-row items-center min-h-touch-kid px-4 mt-2 rounded-md bg-paper')}>
           <Input
-            {...tw('flex-1 font-body text-body text-ink')}
+            {...tw('flex-1 font-body text-body rn-input text-ink')}
             value={note}
             maxlength={REPORT_NOTE_MAX}
             placeholder='补充说明（选填）'

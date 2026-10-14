@@ -207,7 +207,7 @@ export default function TopicNew () {
         <Field label='标题' hint={`${textLength(normalizeLine(form.title))}/${TEXT_RULES.topicTitle.max}`} error={errors.title}>
           <View {...tw('flex flex-row items-center min-h-touch-kid px-4 rounded-md bg-paper-light')}>
             <Input
-              {...tw('flex-1 font-body text-body text-ink')}
+              {...tw('flex-1 font-body text-body rn-input text-ink')}
               value={form.title}
               maxlength={TEXT_RULES.topicTitle.max * 2}
               placeholder={`${TEXT_RULES.topicTitle.min}–${TEXT_RULES.topicTitle.max} 个字，说清你想聊什么`}
@@ -236,7 +236,7 @@ export default function TopicNew () {
         <Field label='标签' hint={`选填 · 最多 ${TOPIC_RULES.tagsMax} 个 · 已填 ${tags.length}`} error={errors.tags}>
           <View {...tw('flex flex-row items-center min-h-touch-kid px-4 rounded-md bg-paper-light')}>
             <Input
-              {...tw('flex-1 font-body text-body text-ink')}
+              {...tw('flex-1 font-body text-body rn-input text-ink')}
               value={form.tags}
               maxlength={60}
               placeholder='用空格分隔，如：冥想 呼吸'

@@ -43,7 +43,10 @@ export function useRequest<T> (key: string | null, fetcher: () => Promise<T>, op
     try {
       const data = await cachedFetch(key, () => fetcherRef.current(), { ttl, force, persist })
       if (alive.current) setState({ data, error: null, loading: false, stale: false, key })
-    } catch (error) {
+    } catch (caught) {
+      // Hermes：catch 参数被闭包（下面的 setState 更新函数）捕获后会变成未定义的全局变量
+      // （ReferenceError: Property 'error' doesn't exist），先拷到局部常量
+      const error = caught
       if (!alive.current) return
       const fallback = persist ? peekPersisted<T>(key) : undefined
       setState(s => ({

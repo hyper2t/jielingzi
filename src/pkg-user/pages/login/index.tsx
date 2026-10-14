@@ -223,7 +223,7 @@ export default function Login () {
         <View {...tw('flex flex-row items-center min-h-touch-kid px-4 mt-6 rounded-md bg-paper-light')}>
           <Text {...tw('font-body text-body text-ink mr-2')}>+86</Text>
           <Input
-            {...tw('flex-1 font-body text-body text-ink')}
+            {...tw('flex-1 font-body text-body rn-input text-ink')}
             type='number'
             maxlength={11}
             value={phone}
@@ -237,7 +237,7 @@ export default function Login () {
         {/* 验证码 + 获取按钮 */}
         <View {...tw('flex flex-row items-center min-h-touch-kid pl-4 pr-1 mt-3 rounded-md bg-paper-light')}>
           <Input
-            {...tw('flex-1 font-body text-body text-ink')}
+            {...tw('flex-1 font-body text-body rn-input text-ink')}
             type='number'
             maxlength={CODE_LEN}
             value={code}
@@ -253,6 +253,7 @@ export default function Login () {
             disabled={left > 0 || sending || submitting}
             label={left > 0 ? `${left} 秒后可重新发送` : sendLabel}
             onClick={() => { void onSend() }}
+            {...tw('self-center')}
           >
             {sendLabel}
           </Button>
@@ -277,7 +278,7 @@ export default function Login () {
         {/* 协议勾选：默认不勾选 */}
         <View {...tw('flex flex-row items-start mt-6')}>
           <View
-            {...tw('w-6 h-6 rounded-full border-2 border-solid items-center justify-center mr-2 mt-0.5', agreed ? 'bg-brand border-brand' : 'bg-paper-light border-ink')}
+            {...tw('w-6 h-6 rounded-full border-2 border-solid items-center justify-center mr-2 mt-2.5', agreed ? 'bg-brand border-brand' : 'bg-paper-light border-ink')}
             onClick={() => { setAgreed(!agreed); setHint('') }}
             {...a11yButton(agreed ? '已同意协议，点击取消' : '同意协议')}
           >

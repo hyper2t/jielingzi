@@ -14,6 +14,10 @@ import { buildUrl, parseParams } from '@/utils/router'
 import { useTrackPage } from '@/hooks/useTrackPage'
 import { tw } from '@/utils/tw'
 
+// Taro RN 没有实现 useShareAppMessage（导入为 undefined，调用即 TypeError: undefined is not a function）；
+// App 端分享走「复制邀请文案」，这里退化为空 hook。模块级常量，调用顺序不变，符合 hooks 规则。
+const useShareHook: typeof useShareAppMessage = typeof useShareAppMessage === 'function' ? useShareAppMessage : () => {}
+
 export const INVITES_TITLE = '我的邀请码'
 export const INVITE_TTL_HINT = '每个邀请码 7 天内有效，成功加入后立即失效。'
 export const NO_INVITES_HINT = '生成的邀请码会显示在这里'
@@ -60,7 +64,7 @@ export default function Invites () {
     shown.current = true
   })
 
-  useShareAppMessage((res: any) => {
+  useShareHook((res: any) => {
     const all = invitesReq.data?.list || []
     const requestedCode = String(res?.target?.dataset?.code || '')
     const invite = all.find(item => item.code === requestedCode && item.status === 'active') || all.find(item => item.status === 'active')
@@ -100,7 +104,7 @@ export default function Invites () {
 
   return (
     <Screen
-      nav={{ title: INVITES_TITLE }}
+      nav={{ title: INVITES_TITLE, showBack: true }}
       status={status}
       emptyText={emptyText}
       emptyActionText={access.actionText}

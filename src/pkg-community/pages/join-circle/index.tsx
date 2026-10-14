@@ -59,14 +59,14 @@ export default function JoinCircle () {
   }
 
   return (
-    <Screen nav={{ title: JOIN_TITLE }} overlay={<><ConsentSheet /><PhoneSheet /></>}>
+    <Screen nav={{ title: JOIN_TITLE, showBack: true }} overlay={<><ConsentSheet /><PhoneSheet /></>}>
       <View {...tw('flex flex-col px-page pt-5')}>
         <Text {...tw('font-title font-bold text-title text-ink')}>输入邀请码</Text>
         <Text {...tw('font-body text-body text-ink-soft mt-2')}>{INVITE_HELP}</Text>
 
         <View {...tw('flex flex-row items-center min-h-touch-kid px-4 mt-5 rounded-md bg-paper-light')}>
           <Input
-            {...tw('flex-1 font-body text-subtitle text-ink')}
+            {...tw('flex-1 font-body text-subtitle rn-input text-ink')}
             value={code}
             maxlength={15}
             placeholder='例如 ABCD 2345'

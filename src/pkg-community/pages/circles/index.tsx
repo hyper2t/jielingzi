@@ -57,7 +57,7 @@ export default function Circles () {
 
   return (
     <Screen
-      nav={{ title: CIRCLES_TITLE }}
+      nav={{ title: CIRCLES_TITLE, showBack: true }}
       status={status}
       emptyText={emptyText}
       emptyActionText={access.actionText}
